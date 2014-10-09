@@ -529,6 +529,7 @@ ifneq (,$(findstring MINGW,$(uname_S)))
 ifneq (,$(wildcard ../THIS_IS_MSYSGIT))
 	htmldir = doc/git/html/
 	prefix =
+	prefix = /mingw/
 	INSTALL = /bin/install
 	EXTLIBS += /mingw/lib/libz.a
 	NO_R_TO_GCC_LINKER = YesPlease
