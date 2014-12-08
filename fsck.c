@@ -452,6 +452,9 @@ static int fsck_tag(struct tag *tag, const char *data,
 int fsck_object(struct object *obj, void *data, unsigned long size,
 	int strict, fsck_error error_func)
 {
+	if (data && ((char *)data)[size])
+		die("I got a non-NUL-terminated buffer!!!");
+
 	if (!obj)
 		return error_func(obj, FSCK_ERROR, "no valid object to fsck");
 
