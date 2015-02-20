@@ -17,6 +17,7 @@
 
 # for git on windows so stdin will not be misdetected as attached to a
 # terminal
+test -z "$TEST_NO_REDIRECT" ||
 exec < /dev/null
 
 # Keep the original TERM for say_color
@@ -511,7 +512,12 @@ test_eval_ () {
 	# The test itself is run with stderr put back to &4 (so either to
 	# /dev/null, or to the original stderr if --verbose was used).
 	{
-		test_eval_inner_ "$@" </dev/null >&3 2>&4
+		if test -z "$TEST_NO_REDIRECT"
+		then
+			test_eval_inner_ "$@" </dev/null >&3 2>&4
+		else
+			test_eval_inner_ "$@"
+		fi
 		test_eval_ret_=$?
 		if test "$trace" = t
 		then
