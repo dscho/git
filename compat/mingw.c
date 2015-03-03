@@ -2233,7 +2233,7 @@ void mingw_startup()
 			environ[i] = xstrdup(to_free + 6);
 			free(to_free);
 		}
-		if (starts_with(environ[i], "TMP=")) {
+		if (strncasecmp(environ[i], "TMP=", 4)) {
 			/*
 			 * Convert all dir separators to forward slashes,
 			 * to help shell commands called from the Git
