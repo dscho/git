@@ -5,6 +5,17 @@ die () {
 	exit 1
 }
 
+if grep '^NAME="Ubuntu"' /etc/os-release >/dev/null 2>&1 &&
+   (test ! -f /usr/include/openssl/ssl.h ||
+   test ! -f /usr/include/expat.h ||
+   test ! -f /usr/include/zlib.h) ;
+then
+    die "Some files missing. Try to run these commands in advance:
+    sudo apt-get update
+    sudo apt-get install git gcc make libssl-dev libcurl4-openssl-dev \\
+	    libexpat-dev tcl tk gettext git-email zlib1g-dev"
+fi
+
 cd "$(dirname "$0")"/../.. ||
 die "Could not cd to top-level directory"
 
