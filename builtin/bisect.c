@@ -8,6 +8,7 @@
 #include "prompt.h"
 #include "quote.h"
 #include "revision.h"
+#include "config.h"
 
 static GIT_PATH_FUNC(git_path_bisect_terms, "BISECT_TERMS")
 static GIT_PATH_FUNC(git_path_bisect_expected_rev, "BISECT_EXPECTED_REV")
@@ -1298,6 +1299,8 @@ int cmd_bisect(int argc, const char **argv, const char *prefix)
 	int res = 0;
 	struct bisect_terms terms = { .term_good = NULL, .term_bad = NULL };
 	const char *command = argc > 1 ? argv[1] : "help";
+
+	git_config(git_default_config, NULL);
 
 	if (!strcmp("-h", command) || !strcmp("help", command))
 		usage(bisect_long_usage);
