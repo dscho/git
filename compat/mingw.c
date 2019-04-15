@@ -3755,6 +3755,8 @@ int wmain(int argc, const wchar_t **wargv)
 
 	SetConsoleCtrlHandler(handle_ctrl_c, TRUE);
 
+	trace2_initialize_clock();
+
 	maybe_redirect_std_handles();
 	adjust_symlink_flags();
 	fsync_object_files = FSYNC_OBJECT_FILES_ON;
