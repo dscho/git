@@ -322,6 +322,10 @@ static int handle_options(const char ***argv, int *argc, int *envchanged)
 			} else {
 				exit(list_cmds(cmd));
 			}
+#ifdef USE_MIMALLOC
+		} else if (!strcmp(cmd, "--mimalloc-eager-commit")) {
+			mi_option_enable(mi_option_eager_commit);
+#endif
 		} else {
 			fprintf(stderr, _("unknown option: %s\n"), cmd);
 			usage(git_usage_string);

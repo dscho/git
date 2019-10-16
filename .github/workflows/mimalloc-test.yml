@@ -1,0 +1,173 @@
+name: mimalloc-test
+
+on: [push, pull_request]
+
+jobs:
+  prereqs:
+    name: Some prerequisites
+    runs-on: windows-latest
+    steps:
+      - name: initialize MinGit
+        shell: bash
+        run: |
+          curl -Lo MinGit.zip https://github.com/git-for-windows/git/releases/download/v2.37.2.windows.2/MinGit-2.37.2.2-64-bit.zip &&
+          mkdir -p MinGit &&
+          unzip MinGit.zip -d MinGit &&
+          cp /etc/profile MinGit/etc/
+      - name: upload MinGit
+        uses: actions/upload-artifact@v2
+        with:
+          name: MinGit
+          path: MinGit
+
+  build:
+    needs: prereqs
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, msvc]
+        allocator: [system-allocator, nedmalloc, mimalloc]
+    env:
+      MINGIT_NAME: MinGit-${{ matrix.compiler }}-${{ matrix.allocator }}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: git-for-windows/setup-git-for-windows-sdk@v1
+      - name: initialize vcpkg
+        if: matrix.compiler == 'msvc'
+        uses: actions/checkout@v2
+        with:
+          repository: 'microsoft/vcpkg'
+          path: 'compat/vcbuild/vcpkg'
+      - name: download vcpkg artifacts
+        if: matrix.compiler == 'msvc'
+        uses: git-for-windows/get-azure-pipelines-artifact@v0
+        with:
+          repository: git/git
+          definitionId: 9
+      - name: download MinGit
+        uses: actions/download-artifact@v2
+        with:
+          name: MinGit
+          path: ${{ github.workspace }}/${{ env.MINGIT_NAME }}
+      - name: provide minimal /bin/install
+        shell: bash
+        run: |
+          # Provide a minimal /bin/install for use by Git's `make install`
+          cat >/usr/bin/install <<\EOF
+          #!/bin/sh
+
+          die () {
+            echo "$*" >&2
+            exit 1
+          }
+
+          dir_mode=
+          while case "$1" in
+          -d) dir_mode=t;;
+          -m) shift;;
+          -m*) ;;
+          -*) die "Unknown option: $1";;
+          *) break;;
+          esac; do shift; done
+
+          if test -z "$dir_mode" && test $# -ge 2
+          then
+            cp "$@"
+          elif test -n "$dir_mode" && test $# = 1
+          then
+            mkdir -p "$1"
+          else
+            die "Unhandled arguments: $* (dir: ${dir_mode:-f})"
+          fi
+          EOF
+      - name: skip dashed built-ins
+        shell: bash
+        run: echo SKIP_DASHED_BUILT_INS=1 >>config.mak
+      - name: compile using MSVC
+        if: matrix.compiler != 'gcc'
+        shell: bash
+        run: echo MAKEFLAGS=MSVC=Yep >>$GITHUB_ENV
+      - name: use mimalloc
+        if: matrix.allocator == 'mimalloc'
+        shell: bash
+        run: echo USE_MIMALLOC=YesPlease >>config.mak
+      - name: use nedmalloc
+        if: matrix.allocator == 'nedmalloc'
+        shell: bash
+        run: echo USE_NED_ALLOCATOR=YesPlease >>config.mak
+      - name: build ${{ env.MINGIT_NAME }}
+        shell: bash
+        env:
+          NDEBUG: 1
+          NO_PERL: 1
+          NO_TCLTK: 1
+        run: |
+          make -j3 &&
+          make -j3 strip &&
+          make -j3 DESTDIR=${{ env.MINGIT_NAME }} gitexecdir=bin install
+      - name: upload ${{ env.MINGIT_NAME }}
+        uses: actions/upload-artifact@v2
+        with:
+          name: ${{ env.MINGIT_NAME }}
+          path: ${{ env.MINGIT_NAME }}
+
+  repack_test:
+    name: Test Matrix
+    needs: build
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, msvc]
+    steps:
+      - name: initialize bare repo
+        shell: bash
+        run: |
+          set -x &&
+          git init --bare bare-repo.git &&
+          # git -C bare-repo.git fetch https://github.com/git/git refs/tags/v2.0.0:refs/tags/v2.0.0 &&
+          git -C bare-repo.git fetch https://github.com/torvalds/linux/ v2.6.21
+      - name: download MinGit-${{ matrix.compiler }}-system-allocator
+        uses: actions/download-artifact@v2
+        with:
+          name: MinGit-${{ matrix.compiler }}-system-allocator
+          path: ${{ github.workspace }}/MinGit-${{ matrix.compiler }}-system-allocator
+      - name: download MinGit-${{ matrix.compiler }}-nedmalloc
+        uses: actions/download-artifact@v2
+        with:
+          name: MinGit-${{ matrix.compiler }}-nedmalloc
+          path: ${{ github.workspace }}/MinGit-${{ matrix.compiler }}-nedmalloc
+      - name: download MinGit-${{ matrix.compiler }}-mimalloc
+        uses: actions/download-artifact@v2
+        with:
+          name: MinGit-${{ matrix.compiler }}-mimalloc
+          path: ${{ github.workspace }}/MinGit-${{ matrix.compiler }}-mimalloc
+      - name: run tests
+        env:
+          GIT_TRACE_PERFORMANCE: 1
+          MIMALLOC_SHOW_STATS: 1
+          NEDMALLOC_SHOW_STATS: 1
+        shell: bash
+        run: |
+          set -x &&
+          compiler=${{ matrix.compiler }} &&
+          for run in 1 2 3 4 5
+          do
+            for allocator in mimalloc mimalloc-eager system-allocator nedmalloc
+            do
+              echo "$compiler-$allocator"
+              extra= &&
+              if test mimalloc-eager = $allocator
+              then
+                extra=--mimalloc-eager-commit &&
+                allocator=mimalloc
+              fi &&
+
+              rm -rf bare.git &&
+              cp -R bare-repo.git bare.git &&
+
+              time MinGit-$compiler-$allocator/cmd/git.exe -C bare.git repack -q -d -l -A --unpack-unreachable=2.weeks.ago ||
+              exit 1
+            done
+          done
