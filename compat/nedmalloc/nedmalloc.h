@@ -174,7 +174,6 @@ EXTSPEC MALLOCATTR void **nedpindependent_comalloc(nedpool *p, size_t elems, siz
 }
 #endif
 
-#undef MALLOCATTR
 #undef EXTSPEC
 
 #endif
