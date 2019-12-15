@@ -304,7 +304,7 @@ check_parents () {
 	do
 		if ! test -r "$cachedir/notree/$miss"
 		then
-			debug "incorrect order: $miss"
+			debug "unprocessed parent commit: $miss"
 			process_split_commit "$miss" ""
 		fi
 	done
@@ -454,6 +454,24 @@ find_existing_splits () {
 			;;
 		esac
 	done || exit $?
+}
+
+find_mainline_ref () {
+	debug "Looking for first split..."
+	dir="$1"
+	revs="$2"
+
+	git log --reverse --grep="^git-subtree-dir: $dir/*\$" \
+		--no-show-signature --pretty=format:'START %H%n%s%n%n%b%nEND%n' $revs |
+	while read a b junk
+	do
+		case "$a" in
+		git-subtree-mainline:)
+			echo "$b"
+			return
+			;;
+		esac
+	done
 }
 
 # Usage: copy_commit REV TREE FLAGS_STR
@@ -744,10 +762,9 @@ process_split_commit () {
 
 	debug "Processing commit: $rev"
 	local indent=$(($indent + 1))
-	exists=$(cache_get "$rev") || exit $?
-	if test -n "$exists"
+	if test -z "$(cache_miss "$rev")"
 	then
-		debug "prior: $exists"
+		debug "prior found for $rev"
 		return
 	fi
 	createcount=$(($createcount + 1))
@@ -892,6 +909,17 @@ cmd_split () {
 	fi
 
 	unrevs="$(find_existing_splits "$dir" "$rev")" || exit $?
+
+	mainline="$(find_mainline_ref "$dir" "$revs")"
+	if test -n "$mainline"
+	then
+		debug "Mainline $mainline predates subtree add"
+		git rev-list --topo-order --skip=1 $mainline |
+		while read rev
+		do
+			cache_set "$rev" ""
+		done || exit $?
+	fi
 
 	# We can't restrict rev-list to only $dir here, because some of our
 	# parents have the $dir contents the root, and those won't match.
