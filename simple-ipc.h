@@ -1,7 +1,7 @@
 #ifndef GIT_IPC_H
 #define GIT_IPC_H
 
-#if defined(GIT_WINDOWS_NATIVE)
+#if defined(GIT_WINDOWS_NATIVE) || !defined(NO_UNIX_SOCKETS)
 #define SUPPORTS_SIMPLE_IPC
 #endif
 
