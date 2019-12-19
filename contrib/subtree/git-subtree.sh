@@ -43,6 +43,7 @@ b,branch=     create a new branch from the split subtree
 ignore-joins  ignore prior --rejoin commits
 onto=         try connecting new tree to an existing one
 rejoin        merge the new branch back into HEAD
+clear-cache   reset the subtree mapping cache
  options for 'add' and 'merge' (also: 'pull', 'split --rejoin', and 'push --rejoin')
 squash        merge subtree changes as a single commit
 m,message=    use the given message as the commit message for the merge commit
@@ -148,6 +149,7 @@ main () {
 	# Begin "real" flag parsing.
 	arg_debug=
 	arg_prefix=
+	arg_clear_cache=
 	arg_split_branch=
 	arg_split_onto=
 	arg_split_ignore_joins=
@@ -223,6 +225,12 @@ main () {
 			test -n "$allow_addmerge" || die "The '$opt' flag does not make sense with 'git subtree $arg_command'."
 			arg_addmerge_squash=
 			;;
+		--clear-cache)
+			arg_clear_cache=t
+			;;
+		--no-clear-cache)
+			arg_clear_cache=
+			;;
 		--)
 			break
 			;;
@@ -264,8 +272,12 @@ main () {
 cache_setup () {
 	assert test $# = 0
 	cachedir="$GIT_DIR/subtree-cache/$$"
-	rm -rf "$cachedir" ||
-		die "Can't delete old cachedir: $cachedir"
+	if test -n "$arg_clear_cache"
+	then
+		debug "Clearing cache"
+		rm -rf "$cachedir" ||
+			die "Can't delete old cachedir: $cachedir"
+	fi
 	mkdir -p "$cachedir" ||
 		die "Can't create new cachedir: $cachedir"
 	mkdir -p "$cachedir/notree" ||
@@ -327,6 +339,14 @@ cache_set () {
 	then
 		die "cache for $oldrev already exists!"
 	fi
+	echo "$newrev" >"$cachedir/$oldrev"
+}
+
+# Usage: cache_set_if_unset OLDREV NEWREV
+cache_set_if_unset () {
+	oldrev="$1"
+	newrev="$2"
+	test -e "$cachedir/$oldrev" ||
 	echo "$newrev" >"$cachedir/$oldrev"
 }
 
@@ -439,13 +459,13 @@ find_existing_splits () {
 			then
 				# squash commits refer to a subtree
 				debug "  Squash: $sq from $sub"
-				cache_set "$sq" "$sub"
+				cache_set_if_unset "$sq" "$sub"
 			fi
 			if test -n "$main" -a -n "$sub"
 			then
 				debug "  Prior: $main -> $sub"
-				cache_set $main $sub
-				cache_set $sub $sub
+				cache_set_if_unset $main $sub
+				cache_set_if_unset $sub $sub
 				try_remove_previous "$main"
 				try_remove_previous "$sub"
 			fi
@@ -784,6 +804,8 @@ process_split_commit () {
 		if test -n "$newparents"
 		then
 			cache_set "$rev" "$rev"
+		else
+			cache_set "$rev" ""
 		fi
 		return
 	fi
@@ -904,7 +926,7 @@ cmd_split () {
 			# the 'onto' history is already just the subdir, so
 			# any parent we find there can be used verbatim
 			debug "cache: $rev"
-			cache_set "$rev" "$rev"
+			cache_set_if_unset "$rev" "$rev"
 		done || exit $?
 	fi
 
@@ -917,7 +939,7 @@ cmd_split () {
 		git rev-list --topo-order --skip=1 $mainline |
 		while read rev
 		do
-			cache_set "$rev" ""
+			cache_set_if_unset "$rev" ""
 		done || exit $?
 	fi
 
