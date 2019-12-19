@@ -28,6 +28,7 @@ fi
 OPTS_SPEC="\
 git subtree add   --prefix=<prefix> <commit>
 git subtree add   --prefix=<prefix> <repository> <ref>
+git subtree map   --prefix=<prefix> <mainline> <subtree>
 git subtree merge --prefix=<prefix> <commit>
 git subtree split --prefix=<prefix> [<commit>]
 git subtree pull  --prefix=<prefix> <repository> <ref>
@@ -138,6 +139,8 @@ main () {
 	split|push)
 		allow_split=1
 		allow_addmerge=$arg_split_rejoin
+		;;
+	map)
 		;;
 	*)
 		die "Unknown command '$arg_command'"
@@ -894,6 +897,22 @@ cmd_add_commit () {
 	git reset "$commit" || exit $?
 
 	say >&2 "Added dir '$dir'"
+}
+
+# Usage: cmd_map OLDREV NEWREV
+cmd_map () {
+	oldrev="$1"
+	newrev="$2"
+
+	if test -z "$oldrev"
+	then
+		die "You must provide a revision to map"
+	fi
+
+	cache_setup || exit $?
+	cache_set "$oldrev" "$newrev"
+
+	say "Mapped $oldrev => $newrev"
 }
 
 # Usage: cmd_split [REV]
