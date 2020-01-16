@@ -1467,6 +1467,9 @@ ifneq ($(filter address,$(SANITIZERS)),)
 NO_REGEX = NeededForASAN
 SANITIZE_ADDRESS = YesCompiledWithIt
 endif
+ifneq ($(filter address,$(SANITIZERS)),)
+NO_REGEX = NeededForASAN
+endif
 endif
 
 ifndef sysconfdir

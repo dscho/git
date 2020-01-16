@@ -27,6 +27,11 @@
 extern "C" {
 #endif
 
+#define regcomp git_regcomp
+#define regexec git_regexec
+#define regerror git_regerror
+#define regfree git_regfree
+
 /* Define __USE_GNU to declare GNU extensions that violate the
    POSIX name space rules.  */
 #ifdef _GNU_SOURCE
