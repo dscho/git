@@ -43,6 +43,21 @@ int cmd__simple_ipc(int argc, const char **argv)
 	if (argc == 2 && !strcmp(argv[1], "SUPPORTS_SIMPLE_IPC"))
 		return 0;
 
+	if (argc == 2 && !strcmp(argv[1], "is-active")) {
+		/*
+		 * The test script will start the daemon in the background,
+		 * meaning that it might not be fully set up by the time we are
+		 * verifying that the IPC is active. So let's keep trying for
+		 * up to 2.5 seconds.
+		 */
+		for (i = 0; i < 50; i++)
+			if (ipc_is_active(path))
+				return 0;
+			else
+				sleep_millisec(50);
+		return 1;
+	}
+
 	if (argc == 2 && !strcmp(argv[1], "daemon")) {
 		struct ipc_command_listener data = {
 			.path = path,

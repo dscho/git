@@ -31,6 +31,22 @@ static int initialize_pipe_name(const char *path, wchar_t *wpath, size_t alloc)
 	return 0;
 }
 
+static int is_active(wchar_t *pipe_path)
+{
+	return WaitNamedPipeW(pipe_path, 1) ||
+		GetLastError() != ERROR_FILE_NOT_FOUND;
+}
+
+int ipc_is_active(const char *path)
+{
+	wchar_t pipe_path[MAX_PATH];
+
+	if (initialize_pipe_name(path, pipe_path, ARRAY_SIZE(pipe_path)) < 0)
+		return 0;
+
+	return is_active(pipe_path);
+}
+
 struct ipc_handle_client_data {
 	struct ipc_command_listener *server;
 	HANDLE pipe;
@@ -88,6 +104,9 @@ int ipc_listen_for_commands(struct ipc_command_listener *server)
 	if (initialize_pipe_name(server->path, server->pipe_path,
 				 ARRAY_SIZE(server->pipe_path)) < 0)
 		return -1;
+
+	if (is_active(server->pipe_path))
+		return error(_("server already running at %s"), server->path);
 
 	data.pipe = CreateNamedPipeW(server->pipe_path,
 		PIPE_ACCESS_INBOUND | PIPE_ACCESS_OUTBOUND,
@@ -188,6 +207,18 @@ leave_send_command:
 
 static const char *fsmonitor_listener_path;
 
+static int is_active(const char *path)
+{
+	struct stat st;
+
+	return !lstat(path, &st) && (st.st_mode & S_IFMT) == S_IFSOCK;
+}
+
+int ipc_is_active(const char *path)
+{
+	return is_active(path);
+}
+
 static void set_socket_blocking_flag(int fd, int make_nonblocking)
 {
 	int flags;
@@ -226,6 +257,9 @@ static void unlink_listener_path(void)
 int ipc_listen_for_commands(struct ipc_command_listener *listener)
 {
 	int ret = 0, fd;
+
+	if (is_active(listener->path))
+		return error(_("server already running at %s"), listener->path);
 
 	fd = unix_stream_listen(listener->path);
 	if (fd < 0)

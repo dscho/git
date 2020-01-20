@@ -22,6 +22,11 @@ test_expect_success 'start simple command server' '
 	test_atexit stop_simple_IPC_server
 '
 
+test_expect_success 'servers cannot share the same path' '
+	test_must_fail test-tool simple-ipc daemon &&
+	test-tool simple-ipc is-active
+'
+
 test_expect_success 'simple command server' '
 	test-tool simple-ipc send ping >actual &&
 	echo pong >expect &&
@@ -30,6 +35,7 @@ test_expect_success 'simple command server' '
 
 test_expect_success '`quit` works' '
 	test-tool simple-ipc send quit &&
+	test_must_fail test-tool simple-ipc is-active &&
 	test_must_fail test-tool simple-ipc send ping
 '
 

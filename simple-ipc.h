@@ -36,5 +36,6 @@ struct ipc_command_listener {
 int ipc_listen_for_commands(struct ipc_command_listener *data);
 int ipc_send_command(const char *path, const char *message,
 		     struct strbuf *answer);
+int ipc_is_active(const char *path);
 
 #endif
