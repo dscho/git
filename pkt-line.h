@@ -115,6 +115,12 @@ char *packet_read_line_r(int fd, int *size, char *buffer, size_t buffer_size);
  * length of the packet is written to it.
  */
 int packet_read_line_gently(int fd, int *size, char **dst_line);
+/*
+ * Version of `packet_read_line_gently()` that uses a supplied buffer
+ * rather than a static buffer.
+ */
+int packet_read_line_gently_r(int fd, int *size, char **dst_line,
+			      char *buffer, size_t buffer_size);
 
 /*
  * Same as packet_read_line, but read from a buf rather than a descriptor;

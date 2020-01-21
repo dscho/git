@@ -409,16 +409,23 @@ char *packet_read_line(int fd, int *len_p)
 				  packet_buffer, sizeof(packet_buffer));
 }
 
-int packet_read_line_gently(int fd, int *dst_len, char **dst_line)
+int packet_read_line_gently_r(int fd, int *dst_len, char **dst_line,
+			      char *buffer, size_t buffer_size)
 {
 	int len = packet_read(fd, NULL, NULL,
-			      packet_buffer, sizeof(packet_buffer),
+			      buffer, buffer_size,
 			      PACKET_READ_CHOMP_NEWLINE|PACKET_READ_GENTLE_ON_EOF);
 	if (dst_len)
 		*dst_len = len;
 	if (dst_line)
-		*dst_line = (len > 0) ? packet_buffer : NULL;
+		*dst_line = (len > 0) ? buffer : NULL;
 	return len;
+}
+
+int packet_read_line_gently(int fd, int *dst_len, char **dst_line)
+{
+	return packet_read_line_gently_r(fd, dst_len, dst_line,
+					 packet_buffer, sizeof(packet_buffer));
 }
 
 char *packet_read_line_buf(char **src, size_t *src_len, int *dst_len)
