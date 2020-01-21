@@ -397,10 +397,16 @@ static char *packet_read_line_generic_r(int fd,
 	return (len > 0) ? buffer : NULL;
 }
 
-char *packet_read_line(int fd, int *len_p)
+char *packet_read_line_r(int fd, int *len_p, char *buffer, size_t buffer_size)
 {
 	return packet_read_line_generic_r(fd, NULL, NULL, len_p,
-					  packet_buffer, sizeof(packet_buffer));
+					  buffer, buffer_size);
+}
+
+char *packet_read_line(int fd, int *len_p)
+{
+	return packet_read_line_r(fd, len_p,
+				  packet_buffer, sizeof(packet_buffer));
 }
 
 int packet_read_line_gently(int fd, int *dst_len, char **dst_line)

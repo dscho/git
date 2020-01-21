@@ -99,6 +99,11 @@ enum packet_read_status packet_read_with_status(int fd, char **src_buffer,
  * packet is written to it.
  */
 char *packet_read_line(int fd, int *size);
+/*
+ * Version of `packet_read_line()` that uses a supplied buffer
+ * rather than a static buffer.
+ */
+char *packet_read_line_r(int fd, int *size, char *buffer, size_t buffer_size);
 
 /*
  * Convenience wrapper for packet_read that sets the PACKET_READ_GENTLE_ON_EOF
