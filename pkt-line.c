@@ -152,19 +152,21 @@ static void format_packet(struct strbuf *out, const char *prefix,
 static int packet_write_fmt_1(int fd, int gently, const char *prefix,
 			      const char *fmt, va_list args)
 {
-	static struct strbuf buf = STRBUF_INIT;
+	struct strbuf buf = STRBUF_INIT;
+	int err = 0;
 
-	strbuf_reset(&buf);
 	format_packet(&buf, prefix, fmt, args);
 	if (write_in_full(fd, buf.buf, buf.len) < 0) {
 		if (!gently) {
 			check_pipe(errno);
 			die_errno(_("packet write with format failed"));
 		}
-		return error(_("packet write with format failed"));
+		err = error(_("packet write with format failed"));
 	}
 
-	return 0;
+	strbuf_release(&buf);
+
+	return err;
 }
 
 void packet_write_fmt(int fd, const char *fmt, ...)
