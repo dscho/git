@@ -201,6 +201,12 @@ enum packet_read_status packet_reader_peek(struct packet_reader *reader);
 #define DEFAULT_PACKET_MAX 1000
 #define LARGE_PACKET_MAX 65520
 #define LARGE_PACKET_DATA_MAX (LARGE_PACKET_MAX - 4)
+
+/*
+ * Warning: `packet_buffer` is public and directly referenced from many
+ * source files.  This makes threaded use of packet_ routines unsafe.
+ * TODO Eventually, we should phase this out with a proper API.
+ */
 extern char packet_buffer[LARGE_PACKET_MAX];
 
 struct packet_writer {

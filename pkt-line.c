@@ -2,7 +2,13 @@
 #include "pkt-line.h"
 #include "run-command.h"
 
+/*
+ * Warning: `packet_buffer` is public and directly referenced from many
+ * source files.  This makes threaded use of packet_ routines unsafe.
+ * TODO Eventually, we should phase this out with a proper API.
+ */
 char packet_buffer[LARGE_PACKET_MAX];
+
 static const char *packet_trace_prefix = "git";
 static struct trace_key trace_packet = TRACE_KEY_INIT(PACKET);
 static struct trace_key trace_pack = TRACE_KEY_INIT(PACKFILE);
@@ -378,21 +384,23 @@ int packet_read(int fd, char **src_buffer, size_t *src_len,
 	return pktlen;
 }
 
-static char *packet_read_line_generic(int fd,
-				      char **src, size_t *src_len,
-				      int *dst_len)
+static char *packet_read_line_generic_r(int fd,
+					char **src, size_t *src_len,
+					int *dst_len,
+					char *buffer, size_t buffer_size)
 {
 	int len = packet_read(fd, src, src_len,
-			      packet_buffer, sizeof(packet_buffer),
+			      buffer, buffer_size,
 			      PACKET_READ_CHOMP_NEWLINE);
 	if (dst_len)
 		*dst_len = len;
-	return (len > 0) ? packet_buffer : NULL;
+	return (len > 0) ? buffer : NULL;
 }
 
 char *packet_read_line(int fd, int *len_p)
 {
-	return packet_read_line_generic(fd, NULL, NULL, len_p);
+	return packet_read_line_generic_r(fd, NULL, NULL, len_p,
+					  packet_buffer, sizeof(packet_buffer));
 }
 
 int packet_read_line_gently(int fd, int *dst_len, char **dst_line)
@@ -409,7 +417,8 @@ int packet_read_line_gently(int fd, int *dst_len, char **dst_line)
 
 char *packet_read_line_buf(char **src, size_t *src_len, int *dst_len)
 {
-	return packet_read_line_generic(-1, src, src_len, dst_len);
+	return packet_read_line_generic_r(-1, src, src_len, dst_len,
+					  packet_buffer, sizeof(packet_buffer));
 }
 
 ssize_t read_packetized_to_strbuf(int fd_in, struct strbuf *sb_out)
