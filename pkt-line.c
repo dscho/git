@@ -9,7 +9,14 @@
  */
 char packet_buffer[LARGE_PACKET_MAX];
 
+/*
+ * Warning: `packet_trace_prefix` and the static variables `in_pack`
+ * and `sideband` inside of `packet_trace()` make packet tracing not
+ * safe for threaded or concurrent operations.
+ * TODO Eventually, we should revisit this.
+ */
 static const char *packet_trace_prefix = "git";
+
 static struct trace_key trace_packet = TRACE_KEY_INIT(PACKET);
 static struct trace_key trace_pack = TRACE_KEY_INIT(PACKFILE);
 
