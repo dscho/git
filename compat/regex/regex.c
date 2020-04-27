@@ -62,6 +62,7 @@
    GNU regex allows.  Include it before <regex.h>, which correctly
    #undefs RE_DUP_MAX and sets it to the right value.  */
 #include <limits.h>
+#include <stdlib.h>
 
 #include <regex.h>
 #include "regex_internal.h"
