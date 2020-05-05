@@ -889,7 +889,7 @@ static int apply_multi_file_filter(const char *path, const char *src, size_t len
 	if (fd >= 0)
 		err = write_packetized_from_fd(fd, process->in);
 	else
-		err = write_packetized_from_buf(src, len, process->in);
+		err = write_packetized_from_buf(src, len, process->in, 1);
 	if (err)
 		goto done;
 
@@ -906,7 +906,7 @@ static int apply_multi_file_filter(const char *path, const char *src, size_t len
 		if (err)
 			goto done;
 
-		err = read_packetized_to_strbuf(process->out, &nbuf) < 0;
+		err = read_packetized_to_strbuf(process->out, &nbuf, 0) < 0;
 		if (err)
 			goto done;
 
