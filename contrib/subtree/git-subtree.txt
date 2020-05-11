@@ -53,6 +53,12 @@ useful elsewhere, you can extract its entire history and publish
 that as its own git repository, without accidentally
 intermingling the history of your application project.
 
+Although the relationship between subtree and mainline commits is stored
+in regular git history, it is also cached between subtree runs. In most
+cases this is merely a performance improvement, but for projects with
+large and complex histories the cache can be manipulated directly
+with the use, ignore and map commands.
+
 [TIP]
 In order to keep your commit messages clean, we recommend that
 people split their commits between the subtrees and the main
@@ -123,6 +129,22 @@ push <repository> [+][<local-commit>:]<remote-ref>::
 	as with 'split', if no <local-commit> is given, then HEAD is
 	used.  The optional leading '+' is ignored.
 
+ignore::
+	Mark a commit and all of its history as irrelevant to subtree split.
+	In most cases this would be handled automatically based on metadata
+	from subtree join commits. Intended for improving performance on
+	extremely large repos and excluding complex history that turns out
+	to be otherwise problematic.
+
+use::
+	Mark a commit and all of its history as part of an existing subtree.
+	In normal circumstances this would be handled based on the metadata
+	from the subtree join commit. Similar to the --onto option of split.
+
+map::
+	Manually override the normal output of split for a particular commit.
+	Extreme flexibility for advanced troubleshooting purposes only.
+
 OPTIONS FOR ALL COMMANDS
 ------------------------
 -q::
@@ -145,6 +167,12 @@ These options for 'add' and 'merge' may also be given to 'pull' (which
 wraps 'merge'), 'split --rejoin' (which wraps either 'add' or 'merge'
 as appropriate), and 'push --rejoin' (which wraps 'split --rejoin').
 
+--clear-cache::
+	Reset the subtree cache and recalculate all subtree mappings from the
+	commit history
+
+OPTIONS FOR add, merge, push, pull
+----------------------------------
 --squash::
 	Instead of merging the entire history from the subtree project, produce
 	only a single commit that contains all the differences you want to
