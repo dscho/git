@@ -2,8 +2,21 @@
 #include "pkt-line.h"
 #include "run-command.h"
 
+/*
+ * Warning: `packet_buffer` is public and directly referenced from many
+ * source files.  This makes threaded use of packet_ routines unsafe.
+ * TODO Eventually, we should phase this out with a proper API.
+ */
 char packet_buffer[LARGE_PACKET_MAX];
+
+/*
+ * Warning: `packet_trace_prefix` and the static variables `in_pack`
+ * and `sideband` inside of `packet_trace()` make packet tracing not
+ * safe for threaded or concurrent operations.
+ * TODO Eventually, we should revisit this.
+ */
 static const char *packet_trace_prefix = "git";
+
 static struct trace_key trace_packet = TRACE_KEY_INIT(PACKET);
 static struct trace_key trace_pack = TRACE_KEY_INIT(PACKFILE);
 
@@ -152,19 +165,21 @@ static void format_packet(struct strbuf *out, const char *prefix,
 static int packet_write_fmt_1(int fd, int gently, const char *prefix,
 			      const char *fmt, va_list args)
 {
-	static struct strbuf buf = STRBUF_INIT;
+	struct strbuf buf = STRBUF_INIT;
+	int err = 0;
 
-	strbuf_reset(&buf);
 	format_packet(&buf, prefix, fmt, args);
 	if (write_in_full(fd, buf.buf, buf.len) < 0) {
 		if (!gently) {
 			check_pipe(errno);
 			die_errno(_("packet write with format failed"));
 		}
-		return error(_("packet write with format failed"));
+		err = error(_("packet write with format failed"));
 	}
 
-	return 0;
+	strbuf_release(&buf);
+
+	return err;
 }
 
 void packet_write_fmt(int fd, const char *fmt, ...)
@@ -189,7 +204,7 @@ int packet_write_fmt_gently(int fd, const char *fmt, ...)
 
 static int packet_write_gently(const int fd_out, const char *buf, size_t size)
 {
-	static char packet_write_buffer[LARGE_PACKET_MAX];
+	char packet_write_buffer[LARGE_PACKET_MAX];
 	size_t packet_size;
 
 	if (size > sizeof(packet_write_buffer) - 4)
@@ -237,7 +252,7 @@ void packet_buf_write_len(struct strbuf *buf, const char *data, size_t len)
 
 int write_packetized_from_fd(int fd_in, int fd_out)
 {
-	static char buf[LARGE_PACKET_DATA_MAX];
+	char buf[LARGE_PACKET_DATA_MAX];
 	int err = 0;
 	ssize_t bytes_to_write;
 
@@ -376,38 +391,54 @@ int packet_read(int fd, char **src_buffer, size_t *src_len,
 	return pktlen;
 }
 
-static char *packet_read_line_generic(int fd,
-				      char **src, size_t *src_len,
-				      int *dst_len)
+static char *packet_read_line_generic_r(int fd,
+					char **src, size_t *src_len,
+					int *dst_len,
+					char *buffer, size_t buffer_size)
 {
 	int len = packet_read(fd, src, src_len,
-			      packet_buffer, sizeof(packet_buffer),
+			      buffer, buffer_size,
 			      PACKET_READ_CHOMP_NEWLINE);
 	if (dst_len)
 		*dst_len = len;
-	return (len > 0) ? packet_buffer : NULL;
+	return (len > 0) ? buffer : NULL;
+}
+
+char *packet_read_line_r(int fd, int *len_p, char *buffer, size_t buffer_size)
+{
+	return packet_read_line_generic_r(fd, NULL, NULL, len_p,
+					  buffer, buffer_size);
 }
 
 char *packet_read_line(int fd, int *len_p)
 {
-	return packet_read_line_generic(fd, NULL, NULL, len_p);
+	return packet_read_line_r(fd, len_p,
+				  packet_buffer, sizeof(packet_buffer));
 }
 
-int packet_read_line_gently(int fd, int *dst_len, char **dst_line)
+int packet_read_line_gently_r(int fd, int *dst_len, char **dst_line,
+			      char *buffer, size_t buffer_size)
 {
 	int len = packet_read(fd, NULL, NULL,
-			      packet_buffer, sizeof(packet_buffer),
+			      buffer, buffer_size,
 			      PACKET_READ_CHOMP_NEWLINE|PACKET_READ_GENTLE_ON_EOF);
 	if (dst_len)
 		*dst_len = len;
 	if (dst_line)
-		*dst_line = (len > 0) ? packet_buffer : NULL;
+		*dst_line = (len > 0) ? buffer : NULL;
 	return len;
+}
+
+int packet_read_line_gently(int fd, int *dst_len, char **dst_line)
+{
+	return packet_read_line_gently_r(fd, dst_len, dst_line,
+					 packet_buffer, sizeof(packet_buffer));
 }
 
 char *packet_read_line_buf(char **src, size_t *src_len, int *dst_len)
 {
-	return packet_read_line_generic(-1, src, src_len, dst_len);
+	return packet_read_line_generic_r(-1, src, src_len, dst_len,
+					  packet_buffer, sizeof(packet_buffer));
 }
 
 ssize_t read_packetized_to_strbuf(int fd_in, struct strbuf *sb_out)

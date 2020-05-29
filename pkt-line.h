@@ -99,6 +99,11 @@ enum packet_read_status packet_read_with_status(int fd, char **src_buffer,
  * packet is written to it.
  */
 char *packet_read_line(int fd, int *size);
+/*
+ * Version of `packet_read_line()` that uses a supplied buffer
+ * rather than a static buffer.
+ */
+char *packet_read_line_r(int fd, int *size, char *buffer, size_t buffer_size);
 
 /*
  * Convenience wrapper for packet_read that sets the PACKET_READ_GENTLE_ON_EOF
@@ -110,6 +115,12 @@ char *packet_read_line(int fd, int *size);
  * length of the packet is written to it.
  */
 int packet_read_line_gently(int fd, int *size, char **dst_line);
+/*
+ * Version of `packet_read_line_gently()` that uses a supplied buffer
+ * rather than a static buffer.
+ */
+int packet_read_line_gently_r(int fd, int *size, char **dst_line,
+			      char *buffer, size_t buffer_size);
 
 /*
  * Same as packet_read_line, but read from a buf rather than a descriptor;
@@ -201,6 +212,12 @@ enum packet_read_status packet_reader_peek(struct packet_reader *reader);
 #define DEFAULT_PACKET_MAX 1000
 #define LARGE_PACKET_MAX 65520
 #define LARGE_PACKET_DATA_MAX (LARGE_PACKET_MAX - 4)
+
+/*
+ * Warning: `packet_buffer` is public and directly referenced from many
+ * source files.  This makes threaded use of packet_ routines unsafe.
+ * TODO Eventually, we should phase this out with a proper API.
+ */
 extern char packet_buffer[LARGE_PACKET_MAX];
 
 struct packet_writer {
