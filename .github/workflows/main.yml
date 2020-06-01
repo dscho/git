@@ -128,6 +128,8 @@ jobs:
           make -C t DEFAULT_TEST_TARGET=prove GIT_TEST_OPTS=\"--verbose-log -x --write-junit-xml\"
         "@
   regular:
+    needs: ci-config
+    if: needs.ci-config.outputs.enabled == 'yes'
     strategy:
       matrix:
         vector:
