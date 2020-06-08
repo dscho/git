@@ -240,7 +240,7 @@ $ git switch -c staging staging/main
 $ mkdir project.git
 $ cd project.git
 $ git init
-$ git remote add -f -t master -m master origin git://example.com/git.git/
+$ git remote add -f -t main -m main origin git://example.com/git.git/
 $ git merge origin
 ------------
 

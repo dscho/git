@@ -50,7 +50,7 @@ endif
 
 MAN_XML = $(patsubst %.txt,%.xml,$(MAN_TXT))
 MAN_HTML = $(patsubst %.txt,%.html,$(MAN_TXT))
-GIT_MAN_REF = master
+GIT_MAN_REF = main
 
 OBSOLETE_HTML += everyday.html
 OBSOLETE_HTML += git-remote-helpers.html
