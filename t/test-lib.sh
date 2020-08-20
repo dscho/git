@@ -256,12 +256,8 @@ case "$TRASH_DIRECTORY" in
  *) TRASH_DIRECTORY="$TEST_OUTPUT_DIRECTORY/$TRASH_DIRECTORY" ;;
 esac
 
-case "$TEST_NUMBER" in
-[0-8]*|9[0-4]*)
-	GIT_TEST_DEFAULT_INITIAL_BRANCH_NAME=main
-	export GIT_TEST_DEFAULT_INITIAL_BRANCH_NAME
-	;;
-esac
+GIT_TEST_DEFAULT_INITIAL_BRANCH_NAME=main
+export GIT_TEST_DEFAULT_INITIAL_BRANCH_NAME
 
 # If --stress was passed, run this test repeatedly in several parallel loops.
 if test "$GIT_TEST_STRESS_STARTED" = "done"
