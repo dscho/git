@@ -257,7 +257,7 @@ case "$TRASH_DIRECTORY" in
 esac
 
 case "$TEST_NUMBER" in
-[0-4]*|5[0-4]*|55[01]*)
+[0-4]*|5[0-4]*|55[0-3]*)
 	GIT_TEST_DEFAULT_INITIAL_BRANCH_NAME=main
 	export GIT_TEST_DEFAULT_INITIAL_BRANCH_NAME
 	;;
