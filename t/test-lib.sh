@@ -256,6 +256,13 @@ case "$TRASH_DIRECTORY" in
  *) TRASH_DIRECTORY="$TEST_OUTPUT_DIRECTORY/$TRASH_DIRECTORY" ;;
 esac
 
+case "$TEST_NUMBER" in
+[01]*)
+	GIT_TEST_DEFAULT_INITIAL_BRANCH_NAME=main
+	export GIT_TEST_DEFAULT_INITIAL_BRANCH_NAME
+	;;
+esac
+
 # If --stress was passed, run this test repeatedly in several parallel loops.
 if test "$GIT_TEST_STRESS_STARTED" = "done"
 then
@@ -1702,6 +1709,7 @@ test_lazy_prereq SHA1 '
 test_lazy_prereq REBASE_P '
 	test -z "$GIT_TEST_SKIP_REBASE_P"
 '
+
 # Special-purpose prereq for transitioning to a new default branch name:
 # Some tests need more than just a mindless (case-preserving) s/master/main/g
 # replacement. The non-trivial adjustments are guarded behind this
