@@ -330,7 +330,7 @@ EOF
 	test_cmp expect actual
 '
 
-test_expect_success 'git branch --column with an extremely long branch name' '
+test_expect_success PREPARE_FOR_MAIN_BRANCH 'git branch --column with an extremely long branch name' '
 	long=this/is/a/part/of/long/branch/name &&
 	long=z$long/$long/$long/$long &&
 	test_when_finished "git branch -d $long" &&
@@ -345,7 +345,7 @@ test_expect_success 'git branch --column with an extremely long branch name' '
   j/k
   l
   m/m
-* master
+* main
   mb
   n
   o/o
@@ -388,7 +388,7 @@ test_expect_success PREPARE_FOR_MAIN_BRANCH 'git branch -v with column.ui ignore
   j/k
   l
   m/m
-* master
+* main
   mb
   n
   o/o
