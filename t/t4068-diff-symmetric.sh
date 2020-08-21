@@ -6,10 +6,10 @@ test_description='behavior of diff with symmetric-diff setups'
 
 # build these situations:
 #  - normal merge with one merge base (br1...b2r);
-#  - criss-cross merge ie 2 merge bases (br1...master);
-#  - disjoint subgraph (orphan branch, br3...master).
+#  - criss-cross merge ie 2 merge bases (br1...main);
+#  - disjoint subgraph (orphan branch, br3...main).
 #
-#     B---E   <-- master
+#     B---E   <-- main
 #    / \ /
 #   A   X
 #    \ / \
@@ -32,9 +32,9 @@ test_expect_success setup '
 	git add c &&
 	git commit -m C &&
 	git tag commit-C &&
-	git merge -m D master &&
+	git merge -m D main &&
 	git tag commit-D &&
-	git checkout master &&
+	git checkout main &&
 	git merge -m E commit-C &&
 	git checkout -b br2 commit-C &&
 	echo f >f &&
@@ -58,7 +58,7 @@ test_expect_success 'diff with one merge base' '
 # It should have one of those two, which comes out
 # to seven lines.
 test_expect_success 'diff with two merge bases' '
-	git diff br1...master >tmp 2>err &&
+	git diff br1...main >tmp 2>err &&
 	test_line_count = 7 tmp &&
 	test_line_count = 1 err
 '
@@ -69,22 +69,22 @@ test_expect_success 'diff with no merge bases' '
 '
 
 test_expect_success 'diff with too many symmetric differences' '
-	test_must_fail git diff br1...master br2...br3 >tmp 2>err &&
+	test_must_fail git diff br1...main br2...br3 >tmp 2>err &&
 	test_i18ngrep "usage" err
 '
 
 test_expect_success 'diff with symmetric difference and extraneous arg' '
-	test_must_fail git diff master br1...master >tmp 2>err &&
+	test_must_fail git diff main br1...main >tmp 2>err &&
 	test_i18ngrep "usage" err
 '
 
 test_expect_success 'diff with two ranges' '
-	test_must_fail git diff master br1..master br2..br3 >tmp 2>err &&
+	test_must_fail git diff main br1..main br2..br3 >tmp 2>err &&
 	test_i18ngrep "usage" err
 '
 
 test_expect_success 'diff with ranges and extra arg' '
-	test_must_fail git diff master br1..master commit-D >tmp 2>err &&
+	test_must_fail git diff main br1..main commit-D >tmp 2>err &&
 	test_i18ngrep "usage" err
 '
 
