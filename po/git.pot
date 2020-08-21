@@ -17946,7 +17946,7 @@ msgstr ""
 
 #: builtin/remote.c:18
 msgid ""
-"git remote add [-t <branch>] [-m <master>] [-f] [--tags | --no-tags] [--"
+"git remote add [-t <branch>] [-m <main>] [-f] [--tags | --no-tags] [--"
 "mirror=<fetch|push>] <name> <url>"
 msgstr ""
 
@@ -18052,7 +18052,7 @@ msgid "branch(es) to track"
 msgstr ""
 
 #: builtin/remote.c:172
-msgid "master branch"
+msgid "main branch"
 msgstr ""
 
 #: builtin/remote.c:174
@@ -18060,7 +18060,7 @@ msgid "set up remote as a mirror to push to or fetch from"
 msgstr ""
 
 #: builtin/remote.c:186
-msgid "specifying a master branch makes no sense with --mirror"
+msgid "specifying a main branch makes no sense with --mirror"
 msgstr ""
 
 #: builtin/remote.c:188
@@ -18079,7 +18079,7 @@ msgstr ""
 
 #: builtin/remote.c:239
 #, c-format
-msgid "Could not setup master '%s'"
+msgid "Could not setup main '%s'"
 msgstr ""
 
 #: builtin/remote.c:354

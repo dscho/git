@@ -19047,10 +19047,10 @@ msgstr "git remote [-v | --verbose]"
 
 #: builtin/remote.c:18
 msgid ""
-"git remote add [-t <branch>] [-m <master>] [-f] [--tags | --no-tags] [--"
+"git remote add [-t <branch>] [-m <main>] [-f] [--tags | --no-tags] [--"
 "mirror=<fetch|push>] <name> <url>"
 msgstr ""
-"git remote add [-t <分支>] [-m <master>] [-f] [--tags | --no-tags] [--"
+"git remote add [-t <分支>] [-m <main>] [-f] [--tags | --no-tags] [--"
 "mirror=<fetch|push>] <名稱> <位址>"
 
 #: builtin/remote.c:19 builtin/remote.c:39
@@ -19157,16 +19157,16 @@ msgid "branch(es) to track"
 msgstr "追蹤的分支"
 
 #: builtin/remote.c:172
-msgid "master branch"
-msgstr "master 分支"
+msgid "main branch"
+msgstr "main 分支"
 
 #: builtin/remote.c:174
 msgid "set up remote as a mirror to push to or fetch from"
 msgstr "把遠端設定為用以推送或抓取的鏡像"
 
 #: builtin/remote.c:186
-msgid "specifying a master branch makes no sense with --mirror"
-msgstr "指定一個 master 分支並使用 --mirror 選項沒有意義"
+msgid "specifying a main branch makes no sense with --mirror"
+msgstr "指定一個 main 分支並使用 --mirror 選項沒有意義"
 
 #: builtin/remote.c:188
 msgid "specifying branches to track makes sense only with fetch mirrors"
@@ -19184,8 +19184,8 @@ msgstr "'%s' 不是一個有效的遠端名稱"
 
 #: builtin/remote.c:239
 #, c-format
-msgid "Could not setup master '%s'"
-msgstr "無法設定 master '%s'"
+msgid "Could not setup main '%s'"
+msgstr "無法設定 main '%s'"
 
 #: builtin/remote.c:354
 #, c-format

@@ -19224,10 +19224,10 @@ msgstr "git remote [-v | --verbose]"
 
 #: builtin/remote.c:18
 msgid ""
-"git remote add [-t <branch>] [-m <master>] [-f] [--tags | --no-tags] [--"
+"git remote add [-t <branch>] [-m <main>] [-f] [--tags | --no-tags] [--"
 "mirror=<fetch|push>] <name> <url>"
 msgstr ""
-"git remote add [-t <dal>] [-m <master>] [-f] [--tags | --no-tags] [--"
+"git remote add [-t <dal>] [-m <main>] [-f] [--tags | --no-tags] [--"
 "mirror=<getir|it>] <ad> <url>"
 
 #: builtin/remote.c:19 builtin/remote.c:39
@@ -19335,7 +19335,7 @@ msgid "branch(es) to track"
 msgstr "izlenecek dal(lar)"
 
 #: builtin/remote.c:172
-msgid "master branch"
+msgid "main branch"
 msgstr "ana dal"
 
 #: builtin/remote.c:174
@@ -19345,7 +19345,7 @@ msgstr ""
 "ayarla"
 
 #: builtin/remote.c:186
-msgid "specifying a master branch makes no sense with --mirror"
+msgid "specifying a main branch makes no sense with --mirror"
 msgstr "--mirror ile bir ana dal belirtmek anlam ifade etmiyor"
 
 #: builtin/remote.c:188
@@ -19365,7 +19365,7 @@ msgstr "'%s' geçerli bir uzak konum adı değil"
 
 #: builtin/remote.c:239
 #, c-format
-msgid "Could not setup master '%s'"
+msgid "Could not setup main '%s'"
 msgstr "'%s' ana dalı ayarlanamadı"
 
 #: builtin/remote.c:354

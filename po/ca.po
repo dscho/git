@@ -19426,7 +19426,7 @@ msgstr "git remote [-v | --verbose]"
 
 #: builtin/remote.c:18
 msgid ""
-"git remote add [-t <branch>] [-m <master>] [-f] [--tags | --no-tags] [--"
+"git remote add [-t <branch>] [-m <main>] [-f] [--tags | --no-tags] [--"
 "mirror=<fetch|push>] <name> <url>"
 msgstr ""
 "git remote add [-t <branca>] [-m <mestra>] [-f] [--tags | --no-tags] [--"
@@ -19538,7 +19538,7 @@ msgid "branch(es) to track"
 msgstr "branques a seguir"
 
 #: builtin/remote.c:172
-msgid "master branch"
+msgid "main branch"
 msgstr "branca mestra"
 
 #: builtin/remote.c:174
@@ -19546,7 +19546,7 @@ msgid "set up remote as a mirror to push to or fetch from"
 msgstr "estableix el remot com a mirall al qual pujar o del qual obtenir"
 
 #: builtin/remote.c:186
-msgid "specifying a master branch makes no sense with --mirror"
+msgid "specifying a main branch makes no sense with --mirror"
 msgstr "especificar una branca mestra no té sentit amb --mirror"
 
 #: builtin/remote.c:188
@@ -19566,7 +19566,7 @@ msgstr "«%s» no és un nom de remot vàlid"
 
 #: builtin/remote.c:239
 #, c-format
-msgid "Could not setup master '%s'"
+msgid "Could not setup main '%s'"
 msgstr "No s'ha pogut configurar la mestra «%s»"
 
 #: builtin/remote.c:354

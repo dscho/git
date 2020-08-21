@@ -19541,10 +19541,10 @@ msgstr "git remote [-v | --verbose]"
 
 #: builtin/remote.c:18
 msgid ""
-"git remote add [-t <branch>] [-m <master>] [-f] [--tags | --no-tags] [--"
+"git remote add [-t <branch>] [-m <main>] [-f] [--tags | --no-tags] [--"
 "mirror=<fetch|push>] <name> <url>"
 msgstr ""
-"git remote add [-t <branche>] [-m <master>] [-f] [--tags | --no-tags] [--"
+"git remote add [-t <branche>] [-m <principal>] [-f] [--tags | --no-tags] [--"
 "mirror=<fetch|push>] <nom> <url>"
 
 #: builtin/remote.c:19 builtin/remote.c:39
@@ -19654,7 +19654,7 @@ msgid "branch(es) to track"
 msgstr "branche(s) à suivre"
 
 #: builtin/remote.c:172
-msgid "master branch"
+msgid "main branch"
 msgstr "branche maîtresse"
 
 #: builtin/remote.c:174
@@ -19663,7 +19663,7 @@ msgstr ""
 "paramétrer la distante comme miroir pour pousser ou pour rapatrier depuis"
 
 #: builtin/remote.c:186
-msgid "specifying a master branch makes no sense with --mirror"
+msgid "specifying a main branch makes no sense with --mirror"
 msgstr "spécifier une branche maîtresse n'a pas de sens avec --mirror"
 
 #: builtin/remote.c:188
@@ -19684,7 +19684,7 @@ msgstr "'%s' n'est pas un nom valide de distante"
 
 #: builtin/remote.c:239
 #, c-format
-msgid "Could not setup master '%s'"
+msgid "Could not setup main '%s'"
 msgstr "Impossible de paramétrer la maîtresse '%s'"
 
 #: builtin/remote.c:354

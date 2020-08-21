@@ -12708,10 +12708,10 @@ msgstr "git remote [-v | --verbose]"
 
 #: builtin/remote.c:15
 msgid ""
-"git remote add [-t <branch>] [-m <master>] [-f] [--tags | --no-tags] [--"
+"git remote add [-t <branch>] [-m <main>] [-f] [--tags | --no-tags] [--"
 "mirror=<fetch|push>] <name> <url>"
 msgstr ""
-"git remote add [-t <브랜치>] [-m <master>] [-f] [--tags | --no-tags] [--"
+"git remote add [-t <브랜치>] [-m <main>] [-f] [--tags | --no-tags] [--"
 "mirror=<fetch|push>] <이름> <url>"
 
 #: builtin/remote.c:16 builtin/remote.c:36
@@ -12819,7 +12819,7 @@ msgid "branch(es) to track"
 msgstr "추적할 브랜치"
 
 #: builtin/remote.c:169
-msgid "master branch"
+msgid "main branch"
 msgstr "마스터 브랜치"
 
 #: builtin/remote.c:170
@@ -12831,7 +12831,7 @@ msgid "set up remote as a mirror to push to or fetch from"
 msgstr "리모트를 푸시 또는 가져올 때 사용할 미러로 설정합니다"
 
 #: builtin/remote.c:183
-msgid "specifying a master branch makes no sense with --mirror"
+msgid "specifying a main branch makes no sense with --mirror"
 msgstr "--mirror 옵션과 같이 마스터 브랜치를 지정하면 앞뒤가 맞지 않습니다"
 
 #: builtin/remote.c:185
@@ -12850,7 +12850,7 @@ msgstr "'%s'은(는) 올바른 리모트 이름이 아닙니다"
 
 #: builtin/remote.c:236
 #, c-format
-msgid "Could not setup master '%s'"
+msgid "Could not setup main '%s'"
 msgstr "마스터 '%s'을(를) 설정할 수 없습니다"
 
 #: builtin/remote.c:342

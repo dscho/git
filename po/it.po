@@ -19559,10 +19559,10 @@ msgstr "git remote [-v | --verbose]"
 
 #: builtin/remote.c:18
 msgid ""
-"git remote add [-t <branch>] [-m <master>] [-f] [--tags | --no-tags] [--"
+"git remote add [-t <branch>] [-m <main>] [-f] [--tags | --no-tags] [--"
 "mirror=<fetch|push>] <name> <url>"
 msgstr ""
-"git remote add [-t <branch>] [-m <master>] [-f] [--tags | --no-tags] [--"
+"git remote add [-t <branch>] [-m <main>] [-f] [--tags | --no-tags] [--"
 "mirror=<fetch|push>] <nome> <URL>"
 
 #: builtin/remote.c:19 builtin/remote.c:39
@@ -19670,8 +19670,8 @@ msgid "branch(es) to track"
 msgstr "branch da tracciare"
 
 #: builtin/remote.c:172
-msgid "master branch"
-msgstr "branch master"
+msgid "main branch"
+msgstr "branch main"
 
 #: builtin/remote.c:174
 msgid "set up remote as a mirror to push to or fetch from"
@@ -19679,8 +19679,8 @@ msgstr ""
 "imposta il remoto come mirror su cui eseguire push o da cui recuperare dati"
 
 #: builtin/remote.c:186
-msgid "specifying a master branch makes no sense with --mirror"
-msgstr "specificare un branch master con --mirror non ha senso"
+msgid "specifying a main branch makes no sense with --mirror"
+msgstr "specificare un branch main con --mirror non ha senso"
 
 #: builtin/remote.c:188
 msgid "specifying branches to track makes sense only with fetch mirrors"
@@ -19700,8 +19700,8 @@ msgstr "'%s' non è un nome di remoto valido"
 
 #: builtin/remote.c:239
 #, c-format
-msgid "Could not setup master '%s'"
-msgstr "Impossibile configurare il master '%s'"
+msgid "Could not setup main '%s'"
+msgstr "Impossibile configurare il main '%s'"
 
 #: builtin/remote.c:354
 #, c-format
