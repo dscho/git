@@ -115,6 +115,8 @@ struct credential {
 	 */
 	struct string_list helpers;
 
+	struct string_list cookies;
+
 	unsigned approved:1,
 		 configured:1,
 		 quit:1,
@@ -128,7 +130,7 @@ struct credential {
 	char *path;
 };
 
-#define CREDENTIAL_INIT { STRING_LIST_INIT_DUP }
+#define CREDENTIAL_INIT { STRING_LIST_INIT_DUP, STRING_LIST_INIT_DUP }
 
 /* Initialize a credential structure, setting all fields to empty. */
 void credential_init(struct credential *);
