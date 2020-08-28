@@ -726,9 +726,12 @@ NORETURN void help_unknown_ref(const char *ref, const char *cmd,
 static struct cmdname_help *find_cmdname_help(const char *name)
 {
 	int i;
+	const char *p;
 
+	skip_prefix(name, "git-", &name);
 	for (i = 0; i < ARRAY_SIZE(command_list); i++) {
-		if (!strcmp(command_list[i].name, name))
+		if (skip_prefix(command_list[i].name, "git-", &p) &&
+		    !strcmp(p, name))
 			return &command_list[i];
 	}
 	return NULL;

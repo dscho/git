@@ -873,7 +873,8 @@ int cmd_main(int argc, const char **argv)
 	 * that one cannot handle it.
 	 */
 	if (skip_prefix(cmd, "git-", &cmd)) {
-		warn_on_dashed_git(argv[0]);
+		strip_extension(&cmd);
+		warn_on_dashed_git(cmd);
 
 		argv[0] = cmd;
 		handle_builtin(argc, argv);
