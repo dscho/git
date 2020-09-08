@@ -1,0 +1,5 @@
+tasks:
+  - init: |
+      ./contrib/vscode/init.sh &&
+      echo "PS1='\[\033[33m\]\w\[\033[36m\]`__git_ps1`\[\033[0m\]\n$ '" >>$HOME/.profile &&
+      git config --global user.name "$(curl -s https://api.github.com/users/$GITPOD_GIT_USER_NAME | jq -r .name)"
