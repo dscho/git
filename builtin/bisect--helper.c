@@ -660,18 +660,13 @@ static enum bisect_error bisect_start(struct bisect_terms *terms, const char **a
 			terms->term_bad = xstrdup(arg);
 		} else if (starts_with(arg, "--")) {
 			return error(_("unrecognized option: '%s'"), arg);
-		} else {
-			char *commit_id = xstrfmt("%s^{commit}", arg);
-			if (get_oid(commit_id, &oid) && has_double_dash) {
-				error(_("'%s' does not appear to be a valid "
-					"revision"), arg);
-				free(commit_id);
-				return BISECT_FAILED;
-			}
-
+		} else if (!get_oid_committish(arg, &oid))
 			string_list_append(&revs, oid_to_hex(&oid));
-			free(commit_id);
-		}
+		else if (has_double_dash)
+			die(_("'%s' does not appear to be a valid "
+			      "revision"), arg);
+		else
+			break;
 	}
 	pathspec_pos = i;
 
