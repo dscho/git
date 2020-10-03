@@ -19603,7 +19603,7 @@ msgstr "git remote [-v | --verbose]"
 
 #: builtin/remote.c:18
 msgid ""
-"git remote add [-t <branch>] [-m <master>] [-f] [--tags | --no-tags] [--"
+"git remote add [-t <branch>] [-m <main>] [-f] [--tags | --no-tags] [--"
 "mirror=<fetch|push>] <name> <url>"
 msgstr ""
 "git remote add [-t КЛОН] [-m ОСНОВЕН_КЛОН] [-f] [--tags | --no-tags] [--"
@@ -19715,7 +19715,7 @@ msgid "branch(es) to track"
 msgstr "клон/и за следене"
 
 #: builtin/remote.c:172
-msgid "master branch"
+msgid "main branch"
 msgstr "основен клон"
 
 #: builtin/remote.c:174
@@ -19724,7 +19724,7 @@ msgstr ""
 "настройване на отдалечено хранилище, от което да се издърпва или доставя"
 
 #: builtin/remote.c:186
-msgid "specifying a master branch makes no sense with --mirror"
+msgid "specifying a main branch makes no sense with --mirror"
 msgstr ""
 "няма смисъл да се указва основен клон при използване на опцията „--mirror“"
 
@@ -19746,7 +19746,7 @@ msgstr "„%s“ е неправилно име за отдалечено хра
 
 #: builtin/remote.c:239
 #, c-format
-msgid "Could not setup master '%s'"
+msgid "Could not setup main '%s'"
 msgstr "Основният клон „%s“ не може да бъде настроен"
 
 #: builtin/remote.c:354

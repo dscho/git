@@ -11753,7 +11753,7 @@ msgstr "git remote [-v | --verbose]"
 
 #: builtin/remote.c:13
 msgid ""
-"git remote add [-t <branch>] [-m <master>] [-f] [--tags | --no-tags] [--"
+"git remote add [-t <branch>] [-m <main>] [-f] [--tags | --no-tags] [--"
 "mirror=<fetch|push>] <name> <url>"
 msgstr ""
 "git remote add [-t <ramo>] [-m <mestre>] [-f] [--tags | --no-tags] [--"
@@ -11864,7 +11864,7 @@ msgid "branch(es) to track"
 msgstr "ramos a seguir"
 
 #: builtin/remote.c:167
-msgid "master branch"
+msgid "main branch"
 msgstr "ramo mestre"
 
 #: builtin/remote.c:168
@@ -11876,7 +11876,7 @@ msgid "set up remote as a mirror to push to or fetch from"
 msgstr "configurar o remoto como um espelho para publicar ou obter"
 
 #: builtin/remote.c:181
-msgid "specifying a master branch makes no sense with --mirror"
+msgid "specifying a main branch makes no sense with --mirror"
 msgstr "especificar um ramo mestre não faz sentido com --mirror"
 
 #: builtin/remote.c:183
@@ -11895,7 +11895,7 @@ msgstr "'%s' não é um nome de remoto válido"
 
 #: builtin/remote.c:234
 #, c-format
-msgid "Could not setup master '%s'"
+msgid "Could not setup main '%s'"
 msgstr "Não foi possível configuração o ramo mestre '%s'"
 
 #: builtin/remote.c:336

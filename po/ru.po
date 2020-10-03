@@ -16343,7 +16343,7 @@ msgstr "git remote [-v | --verbose]"
 
 #: builtin/remote.c:17
 msgid ""
-"git remote add [-t <branch>] [-m <master>] [-f] [--tags | --no-tags] "
+"git remote add [-t <branch>] [-m <main>] [-f] [--tags | --no-tags] "
 "[--mirror=<fetch|push>] <name> <url>"
 msgstr "git remote add [-t <ветка>] [-m <мастер-ветка>] [-f] [--tags | --no-tags] [--mirror=<fetch|push>] <имя> <адрес>"
 
@@ -16449,7 +16449,7 @@ msgid "branch(es) to track"
 msgstr "отслеживаемые ветки"
 
 #: builtin/remote.c:171
-msgid "master branch"
+msgid "main branch"
 msgstr "мастер ветка"
 
 #: builtin/remote.c:173
@@ -16457,7 +16457,7 @@ msgid "set up remote as a mirror to push to or fetch from"
 msgstr "настроить внешний репозиторий как зеркало для отправки или извлечения изменений"
 
 #: builtin/remote.c:185
-msgid "specifying a master branch makes no sense with --mirror"
+msgid "specifying a main branch makes no sense with --mirror"
 msgstr "указание мастер ветки не имеет смысла с параметром --mirror"
 
 #: builtin/remote.c:187
@@ -16476,7 +16476,7 @@ msgstr "«%s» не является допустимым именем внеш�
 
 #: builtin/remote.c:238
 #, c-format
-msgid "Could not setup master '%s'"
+msgid "Could not setup main '%s'"
 msgstr "Не удалось настроить мастер ветку «%s»"
 
 #: builtin/remote.c:344
