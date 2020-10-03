@@ -5,12 +5,10 @@
 
 test_description='Test proc-receive hook'
 
-. ./test-lib.sh
+GIT_TEST_DEFAULT_INITIAL_BRANCH_NAME=main
+export GIT_TEST_DEFAULT_INITIAL_BRANCH_NAME
 
-test_have_prereq PREPARE_FOR_MAIN_BRANCH || {
-	test_skip="In transit for the default branch name 'main'"
-	test_done
-}
+. ./test-lib.sh
 
 . "$TEST_DIRECTORY"/t5411/common-functions.sh
 
