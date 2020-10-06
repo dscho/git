@@ -1019,6 +1019,39 @@ static void xdl_mark_ignorable(xdchange_t *xscr, xdfenv_t *xe, long flags)
 	}
 }
 
+static void
+xdl_mark_ignorable_regex(xdchange_t *xscr, const xdfenv_t *xe,
+			 const char *ignore_regex)
+{
+	xdchange_t *xch;
+	regex_t regex;
+
+	if (regcomp(&regex, ignore_regex, REG_EXTENDED | REG_NEWLINE))
+		die("invalid regex: %s", ignore_regex);
+
+	for (xch = xscr; xch; xch = xch->next) {
+		regmatch_t regmatch;
+		xrecord_t **rec;
+		int ignore = 1;
+		long i;
+
+		rec = &xe->xdf1.recs[xch->i1];
+		for (i = 0; i < xch->chg1 && ignore; i++)
+			ignore = !regexec_buf(&regex, rec[i]->ptr, rec[i]->size,
+					      1, &regmatch, 0);
+
+		rec = &xe->xdf2.recs[xch->i2];
+		for (i = 0; i < xch->chg2 && ignore; i++)
+			ignore = !regexec_buf(&regex, rec[i]->ptr, rec[i]->size,
+					      1, &regmatch, 0);
+
+		/*
+		 * Do not override --ignore-blank-lines.
+		 */
+		xch->ignore |= ignore;
+	}
+}
+
 int xdl_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	     xdemitconf_t const *xecfg, xdemitcb_t *ecb) {
 	xdchange_t *xscr;
@@ -1039,6 +1072,9 @@ int xdl_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	if (xscr) {
 		if (xpp->flags & XDF_IGNORE_BLANK_LINES)
 			xdl_mark_ignorable(xscr, &xe, xpp->flags);
+
+		if ((xpp->flags & XDF_IGNORE_REGEX) && xpp->ignore_regex)
+			xdl_mark_ignorable_regex(xscr, &xe, xpp->ignore_regex);
 
 		if (ef(&xe, xscr, ecb, xecfg) < 0) {
 

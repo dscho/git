@@ -40,6 +40,7 @@ extern "C" {
 			      XDF_IGNORE_CR_AT_EOL)
 
 #define XDF_IGNORE_BLANK_LINES (1 << 7)
+#define XDF_IGNORE_REGEX (1 << 8)
 
 #define XDF_PATIENCE_DIFF (1 << 14)
 #define XDF_HISTOGRAM_DIFF (1 << 15)
@@ -78,6 +79,7 @@ typedef struct s_mmbuffer {
 
 typedef struct s_xpparam {
 	unsigned long flags;
+	const char *ignore_regex;
 
 	/* See Documentation/diff-options.txt. */
 	char **anchors;
