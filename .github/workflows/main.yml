@@ -6,19 +6,20 @@ env:
   DEVELOPER: 1
 
 jobs:
-  dockerized:
+  regular:
     strategy:
       matrix:
         vector:
-        - jobname: Linux32
-          image: daald/ubuntu32:xenial
+          - jobname: linux-gcc
+            cc: gcc
+            pool: ubuntu-latest
     env:
+      CC: ${{matrix.vector.cc}}
       jobname: ${{matrix.vector.jobname}}
-    runs-on: ubuntu-latest
-    container: ${{matrix.vector.image}}
+    runs-on: ${{matrix.vector.pool}}
     steps:
     - uses: actions/checkout@v1
-    - run: ci/install-docker-dependencies.sh
+    - run: ci/install-dependencies.sh
     - run: ci/run-build-and-tests.sh
     - name: Setup tmate session
       if: failure()
