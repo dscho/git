@@ -260,6 +260,11 @@ http.followRedirects::
 	the base for the follow-up requests, this is generally
 	sufficient. The default is `initial`.
 
+http.retryLimit::
+	Some HTTP status codes (eg: 429, 503) can reasonably be retried if
+	they're encountered.  This value configures the number of retry attempts
+	before giving up.  The default retry limit is 3.
+
 http.<url>.*::
 	Any of the http.* options above can be applied selectively to some URLs.
 	For a config key to match a URL, each element of the config key is

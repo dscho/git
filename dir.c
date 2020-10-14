@@ -1655,12 +1655,6 @@ struct dir_entry *dir_add_ignored(struct dir_struct *dir,
 	return dir->ignored[dir->ignored_nr++] = dir_entry_new(pathname, len);
 }
 
-enum exist_status {
-	index_nonexistent = 0,
-	index_directory,
-	index_gitdir
-};
-
 /*
  * Do not use the alphabetically sorted index to look up
  * the directory name; instead, use the case insensitive
@@ -1688,8 +1682,8 @@ static enum exist_status directory_exists_in_index_icase(struct index_state *ist
  * the files it contains) will sort with the '/' at the
  * end.
  */
-static enum exist_status directory_exists_in_index(struct index_state *istate,
-						   const char *dirname, int len)
+enum exist_status directory_exists_in_index(struct index_state *istate,
+					    const char *dirname, int len)
 {
 	int pos;
 

@@ -33,6 +33,7 @@
 #include "commit-reach.h"
 #include "rebase-interactive.h"
 #include "reset.h"
+#include "merge-strategies.h"
 
 #define GIT_REFLOG_ACTION "GIT_REFLOG_ACTION"
 
@@ -1161,22 +1162,23 @@ static int run_prepare_commit_msg_hook(struct repository *r,
 				       const char *commit)
 {
 	int ret = 0;
-	const char *name, *arg1 = NULL, *arg2 = NULL;
+	struct strvec args = STRVEC_INIT;
+	const char *name = git_path_commit_editmsg();
 
-	name = git_path_commit_editmsg();
+	strvec_push(&args, name);
 	if (write_message(msg->buf, msg->len, name, 0))
 		return -1;
 
 	if (commit) {
-		arg1 = "commit";
-		arg2 = commit;
+		strvec_push(&args, "commit");
+		strvec_push(&args, commit);
 	} else {
-		arg1 = "message";
+		strvec_push(&args, "message");
 	}
-	if (run_commit_hook(0, r->index_file, "prepare-commit-msg", name,
-			    arg1, arg2, NULL))
+	if (run_commit_hook(0, r->index_file, "prepare-commit-msg", &args))
 		ret = error(_("'prepare-commit-msg' hook failed"));
 
+	strvec_clear(&args);
 	return ret;
 }
 
@@ -2008,9 +2010,18 @@ static int do_pick_commit(struct repository *r,
 
 		commit_list_insert(base, &common);
 		commit_list_insert(next, &remotes);
-		res |= try_merge_command(r, opts->strategy,
-					 opts->xopts_nr, (const char **)opts->xopts,
-					common, oid_to_hex(&head), remotes);
+
+		if (!strcmp(opts->strategy, "resolve")) {
+			repo_read_index(r);
+			res |= merge_strategies_resolve(r, common, oid_to_hex(&head), remotes);
+		} else if (!strcmp(opts->strategy, "octopus")) {
+			repo_read_index(r);
+			res |= merge_strategies_octopus(r, common, oid_to_hex(&head), remotes);
+		} else
+			res |= try_merge_command(r, opts->strategy,
+						 opts->xopts_nr, (const char **)opts->xopts,
+						 common, oid_to_hex(&head), remotes);
+
 		free_commit_list(common);
 		free_commit_list(remotes);
 	}
@@ -3677,7 +3688,7 @@ static int do_merge(struct repository *r,
 		strvec_push(&cmd.args, "-F");
 		strvec_push(&cmd.args, git_path_merge_msg(r));
 		if (opts->gpg_sign)
-			strvec_push(&cmd.args, opts->gpg_sign);
+			strvec_pushf(&cmd.args, "-S%s", opts->gpg_sign);
 
 		/* Add the tips to be merged */
 		for (j = to_merge; j; j = j->next)

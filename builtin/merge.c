@@ -41,6 +41,8 @@
 #include "commit-reach.h"
 #include "wt-status.h"
 #include "commit-graph.h"
+#include "hook.h"
+#include "merge-strategies.h"
 
 #define DEFAULT_TWOHEAD (1<<0)
 #define DEFAULT_OCTOPUS (1<<1)
@@ -740,7 +742,13 @@ static int try_merge_strategy(const char *strategy, struct commit_list *common,
 				       COMMIT_LOCK | SKIP_IF_UNCHANGED))
 			die(_("unable to write %s"), get_index_file());
 		return clean ? 0 : 1;
-	} else {
+	} else if (!strcmp(strategy, "resolve"))
+		return merge_strategies_resolve(the_repository, common,
+						head_arg, remoteheads);
+	else if (!strcmp(strategy, "octopus"))
+		return merge_strategies_octopus(the_repository, common,
+						head_arg, remoteheads);
+	else {
 		return try_merge_command(the_repository,
 					 strategy, xopts_nr, xopts,
 					 common, head_arg, remoteheads);
@@ -820,17 +828,22 @@ static void write_merge_heads(struct commit_list *);
 static void prepare_to_commit(struct commit_list *remoteheads)
 {
 	struct strbuf msg = STRBUF_INIT;
+	struct strvec hook_args = STRVEC_INIT;
+	struct strbuf hook_name = STRBUF_INIT;
 	const char *index_file = get_index_file();
 
-	if (!no_verify && run_commit_hook(0 < option_edit, index_file, "pre-merge-commit", NULL))
+	if (!no_verify && run_commit_hook(0 < option_edit, index_file,
+					  "pre-merge-commit", &hook_args))
 		abort_commit(remoteheads, NULL);
+
 	/*
 	 * Re-read the index as pre-merge-commit hook could have updated it,
 	 * and write it out as a tree.  We must do this before we invoke
 	 * the editor and after we invoke run_status above.
 	 */
-	if (find_hook("pre-merge-commit"))
+	if (hook_exists("pre-merge-commit"))
 		discard_cache();
+
 	read_cache_from(index_file);
 	strbuf_addbuf(&msg, &merge_msg);
 	if (squash)
@@ -850,17 +863,22 @@ static void prepare_to_commit(struct commit_list *remoteheads)
 		append_signoff(&msg, ignore_non_trailer(msg.buf, msg.len), 0);
 	write_merge_heads(remoteheads);
 	write_file_buf(git_path_merge_msg(the_repository), msg.buf, msg.len);
+
+	strvec_clear(&hook_args);
+	strvec_pushl(&hook_args, git_path_merge_msg(the_repository), "merge", NULL);
 	if (run_commit_hook(0 < option_edit, get_index_file(), "prepare-commit-msg",
-			    git_path_merge_msg(the_repository), "merge", NULL))
+			    &hook_args))
 		abort_commit(remoteheads, NULL);
+
 	if (0 < option_edit) {
 		if (launch_editor(git_path_merge_msg(the_repository), NULL, NULL))
 			abort_commit(remoteheads, NULL);
 	}
 
+	strvec_clear(&hook_args);
+	strvec_push(&hook_args, git_path_merge_msg(the_repository));
 	if (!no_verify && run_commit_hook(0 < option_edit, get_index_file(),
-					  "commit-msg",
-					  git_path_merge_msg(the_repository), NULL))
+					  "commit-msg", &hook_args))
 		abort_commit(remoteheads, NULL);
 
 	read_merge_msg(&msg);
@@ -870,6 +888,8 @@ static void prepare_to_commit(struct commit_list *remoteheads)
 	strbuf_release(&merge_msg);
 	strbuf_addbuf(&merge_msg, &msg);
 	strbuf_release(&msg);
+	strbuf_release(&hook_name);
+	strvec_clear(&hook_args);
 }
 
 static int merge_trivial(struct commit *head, struct commit_list *remoteheads)

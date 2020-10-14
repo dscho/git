@@ -80,6 +80,10 @@ typedef struct s_xpparam {
 	unsigned long flags;
 
 	/* See Documentation/diff-options.txt. */
+	regex_t **ignore_regex;
+	size_t ignore_regex_nr;
+
+	/* See Documentation/diff-options.txt. */
 	char **anchors;
 	size_t anchors_nr;
 } xpparam_t;

@@ -756,6 +756,19 @@ test_expect_success 'partial clone using HTTP' '
 	partial_clone "$HTTPD_DOCUMENT_ROOT_PATH/server" "$HTTPD_URL/smart/server"
 '
 
+test_expect_success 'partial clone using HTTP with redirect' '
+	_NONCE=$(gen_nonce) &&
+	curl "$HTTPD_URL/error_ntime/${_NONCE}/3/502/10/smart/server" &&
+	curl "$HTTPD_URL/error_ntime/${_NONCE}/3/502/10/smart/server" &&
+	curl "$HTTPD_URL/error_ntime/${_NONCE}/3/502/10/smart/server" &&
+	partial_clone "$HTTPD_DOCUMENT_ROOT_PATH/server" "$HTTPD_URL/error_ntime/${_NONCE}/3/502/10/smart/server"
+'
+
+test_expect_success 'partial clone with retry' '
+	partial_clone "$HTTPD_DOCUMENT_ROOT_PATH/server" "$HTTPD_URL/error_ntime/$(gen_nonce)/3/429/1/smart/server" 2>err &&
+	test_i18ngrep "got HTTP response 429" err
+'
+
 # DO NOT add non-httpd-specific tests here, because the last part of this
 # test script is only executed when httpd is available and enabled.
 
