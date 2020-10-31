@@ -83,6 +83,7 @@ int protect_hfs = PROTECT_HFS_DEFAULT;
 #define PROTECT_NTFS_DEFAULT 1
 #endif
 int protect_ntfs = PROTECT_NTFS_DEFAULT;
+int translate_illegal_filename_characters = 0;
 const char *core_fsmonitor;
 
 /*
