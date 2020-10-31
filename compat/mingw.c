@@ -3163,8 +3163,7 @@ int mingw_is_mount_point(struct strbuf *path)
 		(findbuf.dwReserved0 == IO_REPARSE_TAG_MOUNT_POINT);
 }
 
-static int xutftowcsn_1(wchar_t *wcs, const char *utfs, size_t wcslen,
-			int utflen, int is_path)
+int xutftowcsn(wchar_t *wcs, const char *utfs, size_t wcslen, int utflen)
 {
 	int upos = 0, wpos = 0;
 	const unsigned char *utf = (const unsigned char*) utfs;
@@ -3190,28 +3189,6 @@ static int xutftowcsn_1(wchar_t *wcs, const char *utfs, size_t wcslen,
 
 		if (c < 0x80) {
 			/* ASCII */
-			if (is_path && translate_illegal_filename_characters)
-				switch (c) {
-				case ':':
-					if (upos != 1)
-						/* DOS drive prefix was already skipped */
-						c += 0xf000;
-					break;
-				case '<': case '>': case '"': case '|':
-				case '?': case '*': case '\x01': case '\x02':
-				case '\x03': case '\x04': case '\x05':
-				case '\x06': case '\x07': case '\x08':
-				case '\x09': case '\x0a': case '\x0b':
-				case '\x0c': case '\x0d': case '\x0e':
-				case '\x0f': case '\x10': case '\x11':
-				case '\x12': case '\x13': case '\x14':
-				case '\x15': case '\x16': case '\x17':
-				case '\x18': case '\x19': case '\x1a':
-				case '\x1b': case '\x1c': case '\x1d':
-				case '\x1e': case '\x1f':
-					c += 0xf000;
-					break;
-				}
 			wcs[wpos++] = c;
 		} else if (c >= 0xc2 && c < 0xe0 && upos < utflen &&
 				(utf[upos] & 0xc0) == 0x80) {
@@ -3256,16 +3233,6 @@ static int xutftowcsn_1(wchar_t *wcs, const char *utfs, size_t wcslen,
 	}
 	wcs[wpos] = 0;
 	return wpos;
-}
-
-int xutftowcsn(wchar_t *wcs, const char *utfs, size_t wcslen, int utflen)
-{
-	return xutftowcsn_1(wcs, utfs, wcslen, utflen, 0);
-}
-
-int xutftowcsn_path(wchar_t *wcs, const char *utfs, size_t wcslen, int utflen)
-{
-	return xutftowcsn_1(wcs, utfs, wcslen, utflen, 1);
 }
 
 int xwcstoutf(char *utf, const wchar_t *wcs, size_t utflen)
@@ -3541,12 +3508,9 @@ not_a_reserved_name:
 		case ':': /* DOS drive prefix was already skipped */
 		case '<': case '>': case '"': case '|': case '?': case '*':
 			/* illegal character */
-			if (!translate_illegal_filename_characters)
-				return 0;
-			break;
+			return 0;
 		default:
-			if (!translate_illegal_filename_characters &&
-			    c > '\0' && c < '\x20')
+			if (c > '\0' && c < '\x20')
 				/* illegal character */
 				return 0;
 		}

@@ -586,12 +586,6 @@ int handle_long_path(wchar_t *path, int len, int max_path, int expand);
  */
 int xutftowcsn(wchar_t *wcs, const char *utf, size_t wcslen, int utflen);
 
-/*
- * Like xutftowcsn(), but potentially translates illegal filename characters to
- * the private Unicode page.
- */
-int xutftowcsn_path(wchar_t *wcs, const char *utf, size_t wcslen, int utflen);
-
 /**
  * Simplified variant of xutftowcsn, assumes input string is \0-terminated.
  */
@@ -608,7 +602,7 @@ static inline int xutftowcs(wchar_t *wcs, const char *utf, size_t wcslen)
 static inline int xutftowcs_path_ex(wchar_t *wcs, const char *utf,
 		size_t wcslen, int utflen, int max_path, int expand)
 {
-	int result = xutftowcsn_path(wcs, utf, wcslen, utflen);
+	int result = xutftowcsn(wcs, utf, wcslen, utflen);
 	if (result < 0 && errno == ERANGE)
 		errno = ENAMETOOLONG;
 	if (result >= 0)
