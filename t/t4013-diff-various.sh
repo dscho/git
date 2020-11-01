@@ -333,8 +333,8 @@ log --first-parent --diff-merges=off -p main
 log -p --first-parent main
 log -m -p --first-parent main
 log -m -p main
-:failure log --cc -m -p main
-:failure log -c -m -p main
+log --cc -m -p main
+log -c -m -p main
 log -SF main
 log -S F main
 log -SF -p main
