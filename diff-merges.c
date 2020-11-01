@@ -67,6 +67,8 @@ void diff_merges_suppress(struct rev_info *revs) {
 void diff_merges_default_to_first_parent(struct rev_info *revs) {
 	if (revs->ignore_merges < 0)		/* No -m */
 		revs->ignore_merges = 0;
+	if (!revs->combine_merges)		/* No -c/--cc" */
+		revs->first_parent_merges = 1;
 }
 
 void diff_merges_default_to_dense_combined(struct rev_info *revs) {
