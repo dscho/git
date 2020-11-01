@@ -331,6 +331,7 @@ log --no-diff-merges -p --first-parent main
 log --diff-merges=off -p --first-parent main
 log --first-parent --diff-merges=off -p main
 log -p --first-parent main
+log -p --diff-merges=first-parent main
 log -m -p --first-parent main
 log -m -p main
 log --cc -m -p main
