@@ -9,6 +9,12 @@ static void suppress(struct rev_info *revs) {
 	revs->dense_combined_merges = 0;
 }
 
+static void set_dense_combined(struct rev_info *revs) {
+	revs->combine_merges = 1;
+	revs->dense_combined_merges = 1;
+}
+
+
 /*
  * Public functions. They are in the order they are called.
  */
@@ -71,6 +77,11 @@ void diff_merges_default_to_dense_combined(struct rev_info *revs) {
 			revs->dense_combined_merges = 1;
 		}
 	}
+}
+
+void diff_merges_set_dense_combined_if_unset(struct rev_info *revs) {
+	if (!revs->combine_merges)
+		set_dense_combined(revs);
 }
 
 void diff_merges_setup_revs(struct rev_info *revs)
