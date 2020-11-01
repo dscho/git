@@ -2,6 +2,10 @@
 
 #include "revision.h"
 
+/*
+ * Public functions. They are in the order they are called.
+ */
+
 void diff_merges_init_revs(struct rev_info *revs) {
 	revs->ignore_merges = -1;
 }
@@ -44,16 +48,6 @@ int diff_merges_parse_opts(struct rev_info *revs, const char **argv) {
 	return 1;
 }
 
-void diff_merges_setup_revs(struct rev_info *revs)
-{
-	if (revs->combine_merges && revs->ignore_merges < 0)
-		revs->ignore_merges = 0;
-	if (revs->ignore_merges < 0)
-		revs->ignore_merges = 1;
-	if (revs->combined_all_paths && !revs->combine_merges)
-		die("--combined-all-paths makes no sense without -c or --cc");
-}
-
 void diff_merges_default_to_first_parent(struct rev_info *revs) {
 	if (revs->ignore_merges < 0)		/* No -m */
 		revs->ignore_merges = 0;
@@ -67,4 +61,14 @@ void diff_merges_default_to_dense_combined(struct rev_info *revs) {
 			revs->dense_combined_merges = 1;
 		}
 	}
+}
+
+void diff_merges_setup_revs(struct rev_info *revs)
+{
+	if (revs->combine_merges && revs->ignore_merges < 0)
+		revs->ignore_merges = 0;
+	if (revs->ignore_merges < 0)
+		revs->ignore_merges = 1;
+	if (revs->combined_all_paths && !revs->combine_merges)
+		die("--combined-all-paths makes no sense without -c or --cc");
 }
