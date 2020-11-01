@@ -19,9 +19,6 @@ static void set_dense_combined(struct rev_info *revs) {
  * Public functions. They are in the order they are called.
  */
 
-void diff_merges_init_revs(struct rev_info *revs) {
-}
-
 int diff_merges_parse_opts(struct rev_info *revs, const char **argv) {
 	int argcount;
 	const char *optarg;
