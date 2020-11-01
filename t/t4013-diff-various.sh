@@ -333,6 +333,8 @@ log --first-parent --diff-merges=off -p main
 log -p --first-parent main
 log -m -p --first-parent main
 log -m -p main
+:failure log --cc -m -p main
+:failure log -c -m -p main
 log -SF main
 log -S F main
 log -SF -p main
@@ -342,7 +344,6 @@ log -SF main --max-count=2
 log -GF main
 log -GF -p main
 log -GF -p --pickaxe-all main
-log -IA -IB -I1 -I2 -p main
 log --decorate --all
 log --decorate=full --all
 
