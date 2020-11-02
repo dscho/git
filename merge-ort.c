@@ -77,6 +77,51 @@ static int err(struct merge_options *opt, const char *err, ...)
 	return -1;
 }
 
+static void setup_path_info(struct merge_options *opt,
+			    struct string_list_item *result,
+			    const char *current_dir_name,
+			    int current_dir_name_len,
+			    char *fullpath, /* we'll take over ownership */
+			    struct name_entry *names,
+			    struct name_entry *merged_version,
+			    unsigned is_null,     /* boolean */
+			    unsigned df_conflict, /* boolean */
+			    unsigned filemask,
+			    unsigned dirmask,
+			    int resolved          /* boolean */)
+{
+	struct conflict_info *path_info;
+
+	assert(!is_null || resolved);
+	assert(!df_conflict || !resolved); /* df_conflict implies !resolved */
+	assert(resolved == (merged_version != NULL));
+
+	path_info = xcalloc(1, resolved ? sizeof(struct merged_info) :
+					  sizeof(struct conflict_info));
+	path_info->merged.directory_name = current_dir_name;
+	path_info->merged.basename_offset = current_dir_name_len;
+	path_info->merged.clean = !!resolved;
+	if (resolved) {
+		path_info->merged.result.mode = merged_version->mode;
+		oidcpy(&path_info->merged.result.oid, &merged_version->oid);
+		path_info->merged.is_null = !!is_null;
+	} else {
+		int i;
+
+		for (i = 0; i < 3; i++) {
+			path_info->pathnames[i] = fullpath;
+			path_info->stages[i].mode = names[i].mode;
+			oidcpy(&path_info->stages[i].oid, &names[i].oid);
+		}
+		path_info->filemask = filemask;
+		path_info->dirmask = dirmask;
+		path_info->df_conflict = !!df_conflict;
+	}
+	strmap_put(&opt->priv->paths, fullpath, path_info);
+	result->string = fullpath;
+	result->util = path_info;
+}
+
 static int collect_merge_info_callback(int n,
 				       unsigned long mask,
 				       unsigned long dirmask,
@@ -91,10 +136,12 @@ static int collect_merge_info_callback(int n,
 	 */
 	struct merge_options *opt = info->data;
 	struct merge_options_internal *opti = opt->priv;
-	struct conflict_info *ci;
+	struct string_list_item pi;  /* Path Info */
+	struct conflict_info *ci; /* pi.util when there's a conflict */
 	struct name_entry *p;
 	size_t len;
 	char *fullpath;
+	const char *dirname = opti->current_dir_name;
 	unsigned filemask = mask & ~dirmask;
 	unsigned match_mask = 0; /* will be updated below */
 	unsigned mbase_null = !(mask & 1);
@@ -157,13 +204,13 @@ static int collect_merge_info_callback(int n,
 	make_traverse_path(fullpath, len+1, info, p->path, p->pathlen);
 
 	/*
-	 * TODO: record information about the path other than all zeros,
-	 * so we can resolve later in process_entries.
+	 * Record information about the path so we can resolve later in
+	 * process_entries.
 	 */
-	ci = xcalloc(1, sizeof(struct conflict_info));
-	ci->df_conflict = df_conflict;
+	setup_path_info(opt, &pi, dirname, info->pathlen, fullpath,
+			names, NULL, 0, df_conflict, filemask, dirmask, 0);
+	ci = pi.util;
 	ci->match_mask = match_mask;
-	strmap_put(&opti->paths, fullpath, ci);
 
 	/* If dirmask, recurse into subdirectories */
 	if (dirmask) {
@@ -204,7 +251,7 @@ static int collect_merge_info_callback(int n,
 		}
 
 		original_dir_name = opti->current_dir_name;
-		opti->current_dir_name = fullpath;
+		opti->current_dir_name = pi.string;
 		ret = traverse_trees(NULL, 3, t, &newinfo);
 		opti->current_dir_name = original_dir_name;
 
