@@ -353,6 +353,9 @@ static int string_list_df_name_compare(const char *one, const char *two)
 
 struct directory_versions {
 	struct string_list versions;
+	struct string_list offsets;
+	const char *last_directory;
+	unsigned last_directory_len;
 };
 
 static void write_tree(struct object_id *result_oid,
@@ -409,10 +412,98 @@ static void record_entry_for_tree(struct directory_versions *dir_metadata,
 		/* nothing to record */
 		return;
 
+	/*
+	 * Note: write_completed_directories() already added
+	 * entries for directories to dir_metadata->versions,
+	 * so no need to handle ci->filemask == 0 again.
+	 */
+	if (!ci->merged.clean && !ci->filemask)
+		return;
+
 	basename = path + ci->merged.basename_offset;
 	assert(strchr(basename, '/') == NULL);
 	string_list_append(&dir_metadata->versions,
 			   basename)->util = &ci->merged.result;
+}
+
+static void write_completed_directories(struct merge_options *opt,
+					const char *new_directory_name,
+					struct directory_versions *info)
+{
+	const char *prev_dir;
+	struct merged_info *dir_info = NULL;
+	unsigned int offset;
+	int wrote_a_new_tree = 0;
+
+	if (new_directory_name == info->last_directory)
+		return;
+
+	/*
+	 * If we are just starting (last_directory is NULL), or last_directory
+	 * is a prefix of the current directory, then we can just update
+	 * last_directory and record the offset where we started this directory.
+	 */
+	if (info->last_directory == NULL ||
+	    !strncmp(new_directory_name, info->last_directory,
+		     info->last_directory_len)) {
+		uintptr_t offset = info->versions.nr;
+
+		info->last_directory = new_directory_name;
+		info->last_directory_len = strlen(info->last_directory);
+		string_list_append(&info->offsets,
+				   info->last_directory)->util = (void*)offset;
+		return;
+	}
+
+	/*
+	 * At this point, ne (next entry) is within a different directory
+	 * than the last entry, so we need to create a tree object for all
+	 * the entries in info->versions that are under info->last_directory.
+	 */
+	dir_info = strmap_get(&opt->priv->paths, info->last_directory);
+	assert(dir_info);
+	offset = (uintptr_t)info->offsets.items[info->offsets.nr-1].util;
+	if (offset == info->versions.nr) {
+		dir_info->is_null = 1;
+	} else {
+		dir_info->result.mode = S_IFDIR;
+		write_tree(&dir_info->result.oid, &info->versions, offset);
+		wrote_a_new_tree = 1;
+	}
+
+	/*
+	 * We've now used several entries from info->versions and one entry
+	 * from info->offsets, so we get rid of those values.
+	 */
+	info->offsets.nr--;
+	info->versions.nr = offset;
+
+	/*
+	 * Now we've got an OID for last_directory in dir_info.  We need to
+	 * add it to info->versions for it to be part of the computation of
+	 * its parent directories' OID.  But first, we have to find out what
+	 * its' parent name was and whether that matches the previous
+	 * info->offsets or we need to set up a new one.
+	 */
+	prev_dir = info->offsets.nr == 0 ? NULL :
+		   info->offsets.items[info->offsets.nr-1].string;
+	if (new_directory_name != prev_dir) {
+		uintptr_t c = info->versions.nr;
+		string_list_append(&info->offsets,
+				   new_directory_name)->util = (void*)c;
+	}
+
+	/*
+	 * Okay, finally record OID for last_directory in info->versions,
+	 * and update last_directory.
+	 */
+	if (wrote_a_new_tree) {
+		const char *dir_name = strrchr(info->last_directory, '/');
+		dir_name = dir_name ? dir_name+1 : info->last_directory;
+		string_list_append(&info->versions, dir_name)->util = dir_info;
+	}
+	info->last_directory = new_directory_name;
+	info->last_directory_len = strlen(info->last_directory);
 }
 
 /* Per entry merge function */
@@ -528,6 +619,9 @@ static void process_entries(struct merge_options *opt,
 
 	/* other setup */
 	string_list_init(&dir_metadata.versions, 0);
+	string_list_init(&dir_metadata.offsets, 0);
+	dir_metadata.last_directory = NULL;
+	dir_metadata.last_directory_len = 0;
 
 	/*
 	 * Iterate over the items in reverse order, so we can handle paths
@@ -541,22 +635,27 @@ static void process_entries(struct merge_options *opt,
 		 */
 		struct conflict_info *ci = entry->util;
 
+		write_completed_directories(opt, ci->merged.directory_name,
+					    &dir_metadata);
 		if (ci->merged.clean)
 			record_entry_for_tree(&dir_metadata, path, ci);
 		else
 			process_entry(opt, path, ci, &dir_metadata);
 	}
 
-	/*
-	 * TODO: We can't actually write a tree yet, because dir_metadata just
-	 * contains all basenames of all files throughout the tree with their
-	 * mode and hash.  Not only is that a nonsensical tree, it will have
-	 * lots of duplicates for paths such as "Makefile" or ".gitignore".
-	 */
-	die("Not yet implemented; need to process subtrees separately");
+	if (dir_metadata.offsets.nr != 1 ||
+	    (uintptr_t)dir_metadata.offsets.items[0].util != 0) {
+		printf("dir_metadata.offsets.nr = %d (should be 1)\n",
+		       dir_metadata.offsets.nr);
+		printf("dir_metadata.offsets.items[0].util = %u (should be 0)\n",
+		       (unsigned)(uintptr_t)dir_metadata.offsets.items[0].util);
+		fflush(stdout);
+		BUG("dir_metadata accounting completely off; shouldn't happen");
+	}
 	write_tree(result_oid, &dir_metadata.versions, 0);
 	string_list_clear(&plist, 0);
 	string_list_clear(&dir_metadata.versions, 0);
+	string_list_clear(&dir_metadata.offsets, 0);
 }
 
 void merge_switch_to_result(struct merge_options *opt,
