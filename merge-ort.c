@@ -96,6 +96,7 @@ static int collect_merge_info_callback(int n,
 	size_t len;
 	char *fullpath;
 	unsigned filemask = mask & ~dirmask;
+	unsigned match_mask = 0; /* will be updated below */
 	unsigned mbase_null = !(mask & 1);
 	unsigned side1_null = !(mask & 2);
 	unsigned side2_null = !(mask & 4);
@@ -108,6 +109,13 @@ static int collect_merge_info_callback(int n,
 	unsigned sides_match = (!side1_null && !side2_null &&
 				names[1].mode == names[2].mode &&
 				oideq(&names[1].oid, &names[2].oid));
+	/*
+	 * Note: We only label files with df_conflict, not directories.
+	 * Since directories stay where they are, and files move out of the
+	 * way to make room for a directory, we don't care if there was a
+	 * directory/file conflict for a parent directory of the current path.
+	 */
+	unsigned df_conflict = (filemask != 0) && (dirmask != 0);
 
 	/* n = 3 is a fundamental assumption. */
 	if (n != 3)
@@ -127,6 +135,14 @@ static int collect_merge_info_callback(int n,
 	/* Other invariant checks, mostly for documentation purposes. */
 	assert(mask == (dirmask | filemask));
 
+	/* Determine match_mask */
+	if (side1_matches_mbase)
+		match_mask = (side2_matches_mbase ? 7 : 3);
+	else if (side2_matches_mbase)
+		match_mask = 5;
+	else if (sides_match)
+		match_mask = 6;
+
 	/*
 	 * Get the name of the relevant filepath, which we'll pass to
 	 * setup_path_info() for tracking.
@@ -145,6 +161,8 @@ static int collect_merge_info_callback(int n,
 	 * so we can resolve later in process_entries.
 	 */
 	ci = xcalloc(1, sizeof(struct conflict_info));
+	ci->df_conflict = df_conflict;
+	ci->match_mask = match_mask;
 	strmap_put(&opti->paths, fullpath, ci);
 
 	/* If dirmask, recurse into subdirectories */
@@ -161,6 +179,13 @@ static int collect_merge_info_callback(int n,
 		newinfo.name = p->path;
 		newinfo.namelen = p->pathlen;
 		newinfo.pathlen = st_add3(newinfo.pathlen, p->pathlen, 1);
+		/*
+		 * If we did care about parent directories having a D/F
+		 * conflict, then we'd include
+		 *    newinfo.df_conflicts |= (mask & ~dirmask);
+		 * here.  But we don't.  (See comment near setting of local
+		 * df_conflict variable near the beginning of this function).
+		 */
 
 		for (i = 0; i < 3; i++, dirmask >>= 1) {
 			if (i == 1 && side1_matches_mbase)
