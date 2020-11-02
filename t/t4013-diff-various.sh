@@ -9,6 +9,7 @@ GIT_TEST_DEFAULT_INITIAL_BRANCH_NAME=main
 export GIT_TEST_DEFAULT_INITIAL_BRANCH_NAME
 
 . ./test-lib.sh
+. "$TEST_DIRECTORY"/diff-lib.sh
 
 test_expect_success setup '
 
@@ -321,9 +322,6 @@ log --root --patch-with-stat --summary main
 log --root -c --patch-with-stat --summary main
 # improved by Timo's patch
 log --root --cc --patch-with-stat --summary main
-log --no-diff-merges -p --first-parent main
-log --diff-merges=off -p --first-parent main
-log --first-parent --diff-merges=off -p main
 log -p --first-parent main
 log -m -p --first-parent main
 log -m -p main
@@ -336,6 +334,7 @@ log -SF main --max-count=2
 log -GF main
 log -GF -p main
 log -GF -p --pickaxe-all main
+log -IA -IB -I1 -I2 -p main
 log --decorate --all
 log --decorate=full --all
 
@@ -474,6 +473,45 @@ test_expect_success 'diff-tree --stdin with log formatting' '
 	EOF
 	git rev-list main | git diff-tree --stdin --format=%s -s >actual &&
 	test_cmp expect actual
+'
+
+test_expect_success 'diff -I<regex>: setup' '
+	git checkout main &&
+	test_seq 50 >file0 &&
+	git commit -m "Set up -I<regex> test file" file0 &&
+	test_seq 50 | sed -e "s/13/ten and three/" -e "/7\$/d" >file0 &&
+	echo >>file0
+'
+test_expect_success 'diff -I<regex>' '
+	git diff --ignore-blank-lines -I"ten.*e" -I"^[124-9]" >actual &&
+	cat >expect <<-\EOF &&
+	diff --git a/file0 b/file0
+	--- a/file0
+	+++ b/file0
+	@@ -34,7 +31,6 @@
+	 34
+	 35
+	 36
+	-37
+	 38
+	 39
+	 40
+	EOF
+	compare_diff_patch expect actual
+'
+
+test_expect_success 'diff -I<regex> --stat' '
+	git diff --stat --ignore-blank-lines -I"ten.*e" -I"^[124-9]" >actual &&
+	cat >expect <<-\EOF &&
+	 file0 | 1 -
+	 1 file changed, 1 deletion(-)
+	EOF
+	test_cmp expect actual
+'
+
+test_expect_success 'diff -I<regex>: detect malformed regex' '
+	test_expect_code 129 git diff --ignore-matching-lines="^[124-9" 2>error &&
+	test_i18ngrep "invalid regex given to -I: " error
 '
 
 test_done
