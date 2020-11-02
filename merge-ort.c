@@ -350,10 +350,31 @@ static int string_list_df_name_compare(const char *one, const char *two)
 	return onelen - twolen;
 }
 
+struct directory_versions {
+	struct string_list versions;
+};
+
+static void record_entry_for_tree(struct directory_versions *dir_metadata,
+				  const char *path,
+				  struct conflict_info *ci)
+{
+	const char *basename;
+
+	if (ci->merged.is_null)
+		/* nothing to record */
+		return;
+
+	basename = path + ci->merged.basename_offset;
+	assert(strchr(basename, '/') == NULL);
+	string_list_append(&dir_metadata->versions,
+			   basename)->util = &ci->merged.result;
+}
+
 /* Per entry merge function */
 static void process_entry(struct merge_options *opt,
 			  const char *path,
-			  struct conflict_info *ci)
+			  struct conflict_info *ci,
+			  struct directory_versions *dir_metadata)
 {
 	assert(!ci->merged.clean);
 	assert(ci->filemask >= 0 && ci->filemask <= 7);
@@ -433,6 +454,7 @@ static void process_entry(struct merge_options *opt,
 	 */
 	if (!ci->merged.clean)
 		strmap_put(&opt->priv->unmerged, path, ci);
+	record_entry_for_tree(dir_metadata, path, ci);
 }
 
 static void process_entries(struct merge_options *opt,
@@ -442,6 +464,7 @@ static void process_entries(struct merge_options *opt,
 	struct strmap_entry *e;
 	struct string_list plist = STRING_LIST_INIT_NODUP;
 	struct string_list_item *entry;
+	struct directory_versions dir_metadata;
 
 	if (strmap_empty(&opt->priv->paths)) {
 		oidcpy(result_oid, opt->repo->hash_algo->empty_tree);
@@ -458,6 +481,9 @@ static void process_entries(struct merge_options *opt,
 	plist.cmp = string_list_df_name_compare;
 	string_list_sort(&plist);
 
+	/* other setup */
+	string_list_init(&dir_metadata.versions, 0);
+
 	/*
 	 * Iterate over the items in reverse order, so we can handle paths
 	 * below a directory before needing to handle the directory itself.
@@ -470,11 +496,14 @@ static void process_entries(struct merge_options *opt,
 		 */
 		struct conflict_info *ci = entry->util;
 
-		if (!ci->merged.clean)
-			process_entry(opt, path, ci);
+		if (ci->merged.clean)
+			record_entry_for_tree(&dir_metadata, path, ci);
+		else
+			process_entry(opt, path, ci, &dir_metadata);
 	}
 
 	string_list_clear(&plist, 0);
+	string_list_clear(&dir_metadata.versions, 0);
 	die("Tree creation not yet implemented");
 }
 
