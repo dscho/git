@@ -19,6 +19,7 @@
 
 #include "diff.h"
 #include "diffcore.h"
+#include "object-store.h"
 #include "strmap.h"
 #include "tree.h"
 #include "xdiff-interface.h"
@@ -354,6 +355,50 @@ struct directory_versions {
 	struct string_list versions;
 };
 
+static void write_tree(struct object_id *result_oid,
+		       struct string_list *versions,
+		       unsigned int offset)
+{
+	size_t maxlen = 0;
+	unsigned int nr = versions->nr - offset;
+	struct strbuf buf = STRBUF_INIT;
+	struct string_list relevant_entries = STRING_LIST_INIT_NODUP;
+	int i;
+
+	/*
+	 * We want to sort the last (versions->nr-offset) entries in versions.
+	 * Do so by abusing the string_list API a bit: make another string_list
+	 * that contains just those entries and then sort them.
+	 *
+	 * We won't use relevant_entries again and will let it just pop off the
+	 * stack, so there won't be allocation worries or anything.
+	 */
+	relevant_entries.items = versions->items + offset;
+	relevant_entries.nr = versions->nr - offset;
+	string_list_sort(&relevant_entries);
+
+	/* Pre-allocate some space in buf */
+	for (i = 0; i < nr; i++) {
+		maxlen += strlen(versions->items[offset+i].string) + 34;
+	}
+	strbuf_reset(&buf);
+	strbuf_grow(&buf, maxlen);
+
+	/* Write each entry out to buf */
+	for (i = 0; i < nr; i++) {
+		struct merged_info *mi = versions->items[offset+i].util;
+		struct version_info *ri = &mi->result;
+		strbuf_addf(&buf, "%o %s%c",
+			    ri->mode,
+			    versions->items[offset+i].string, '\0');
+		strbuf_add(&buf, ri->oid.hash, the_hash_algo->rawsz);
+	}
+
+	/* Write this object file out, and record in result_oid */
+	write_object_file(buf.buf, buf.len, tree_type, result_oid);
+	strbuf_release(&buf);
+}
+
 static void record_entry_for_tree(struct directory_versions *dir_metadata,
 				  const char *path,
 				  struct conflict_info *ci)
@@ -502,9 +547,16 @@ static void process_entries(struct merge_options *opt,
 			process_entry(opt, path, ci, &dir_metadata);
 	}
 
+	/*
+	 * TODO: We can't actually write a tree yet, because dir_metadata just
+	 * contains all basenames of all files throughout the tree with their
+	 * mode and hash.  Not only is that a nonsensical tree, it will have
+	 * lots of duplicates for paths such as "Makefile" or ".gitignore".
+	 */
+	die("Not yet implemented; need to process subtrees separately");
+	write_tree(result_oid, &dir_metadata.versions, 0);
 	string_list_clear(&plist, 0);
 	string_list_clear(&dir_metadata.versions, 0);
-	die("Tree creation not yet implemented");
 }
 
 void merge_switch_to_result(struct merge_options *opt,
