@@ -17,6 +17,46 @@
 #include "cache.h"
 #include "merge-ort.h"
 
+#include "strmap.h"
+
+struct merge_options_internal {
+	struct strmap paths;    /* maps path -> (merged|conflict)_info */
+	struct strmap unmerged; /* maps path -> conflict_info */
+	const char *current_dir_name;
+	int call_depth;
+};
+
+struct version_info {
+	struct object_id oid;
+	unsigned short mode;
+};
+
+struct merged_info {
+	struct version_info result;
+	unsigned is_null:1;
+	unsigned clean:1;
+	size_t basename_offset;
+	 /*
+	  * Containing directory name.  Note that we assume directory_name is
+	  * constructed such that
+	  *    strcmp(dir1_name, dir2_name) == 0 iff dir1_name == dir2_name,
+	  * i.e. string equality is equivalent to pointer equality.  For this
+	  * to hold, we have to be careful setting directory_name.
+	  */
+	const char *directory_name;
+};
+
+struct conflict_info {
+	struct merged_info merged;
+	struct version_info stages[3];
+	const char *pathnames[3];
+	unsigned df_conflict:1;
+	unsigned path_conflict:1;
+	unsigned filemask:3;
+	unsigned dirmask:3;
+	unsigned match_mask:3;
+};
+
 void merge_switch_to_result(struct merge_options *opt,
 			    struct tree *head,
 			    struct merge_result *result,
