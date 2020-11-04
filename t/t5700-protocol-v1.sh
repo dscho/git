@@ -182,7 +182,7 @@ test_expect_success 'push with invalid --base' '
 	# Server does not have "six".
 	test_must_fail git -C file_child -c protocol.version=0 \
 		push --base=an_invalid_object origin HEAD:client_branch_six 2>log &&
-	grep "is not a valid object" log
+	test_i18ngrep "is not a valid object" log
 '
 
 test_expect_success 'push with --base that does not exist on server' '
