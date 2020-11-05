@@ -35,6 +35,8 @@ static int fetch_fsck_objects = -1;
 static int transfer_fsck_objects = -1;
 static int agent_supported;
 static int server_supports_filtering;
+static int server_sent_trace2_sid;
+static int advertise_trace2_sid;
 static struct shallow_lock shallow_lock;
 static const char *alternate_shallow_file;
 static struct strbuf fsck_msg_types = STRBUF_INIT;
@@ -326,6 +328,8 @@ static int find_common(struct fetch_negotiator *negotiator,
 			if (deepen_not_ok)      strbuf_addstr(&c, " deepen-not");
 			if (agent_supported)    strbuf_addf(&c, " agent=%s",
 							    git_user_agent_sanitized());
+			if (advertise_trace2_sid && server_sent_trace2_sid && trace2_is_enabled())
+				strbuf_addf(&c, " trace2-sid=%s", trace2_session_id());
 			if (args->filter_options.choice)
 				strbuf_addstr(&c, " filter");
 			packet_buf_write(&req_buf, "want %s%s\n", remote_hex, c.buf);
@@ -979,6 +983,9 @@ static struct ref *do_fetch_pack(struct fetch_pack_args *args,
 				      agent_len, agent_feature);
 	}
 
+	if (server_supports("trace2-sid"))
+		server_sent_trace2_sid = 1;
+
 	if (server_supports("shallow"))
 		print_verbose(args, _("Server supports %s"), "shallow");
 	else if (args->depth > 0 || is_repository_shallow(r))
@@ -1191,6 +1198,8 @@ static int send_fetch_request(struct fetch_negotiator *negotiator, int fd_out,
 		packet_buf_write(&req_buf, "command=fetch");
 	if (server_supports_v2("agent", 0))
 		packet_buf_write(&req_buf, "agent=%s", git_user_agent_sanitized());
+	if (advertise_trace2_sid && server_supports_v2("trace2-sid", 0) && trace2_is_enabled())
+		packet_buf_write(&req_buf, "trace2-sid=%s", trace2_session_id());
 	if (args->server_options && args->server_options->nr &&
 	    server_supports_v2("server-option", 1)) {
 		int i;
@@ -1711,6 +1720,7 @@ static void fetch_pack_config(void)
 	git_config_get_bool("repack.usedeltabaseoffset", &prefer_ofs_delta);
 	git_config_get_bool("fetch.fsckobjects", &fetch_fsck_objects);
 	git_config_get_bool("transfer.fsckobjects", &transfer_fsck_objects);
+	git_config_get_bool("trace2.advertisesid", &advertise_trace2_sid);
 	if (!uri_protocols.nr) {
 		char *str;
 
