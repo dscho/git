@@ -503,6 +503,31 @@ test_expect_success 'untracked changes in added submodule (AM S..U)' '
 		1 AM S..U 000000 160000 160000 $ZERO_OID $HSUB sub1
 		EOF
 
+		git status --porcelain=v2 --branch --untracked-files=all --ignore-submodules=none >actual &&
+		test_cmp expect actual
+	)
+'
+
+test_expect_success 'untracked changes in added submodule (A. S...) (untracked ignored)' '
+	(	cd super_repo &&
+		## create untracked file in the submodule.
+		(	cd sub1 &&
+			echo "xxxx" >file_in_sub
+		) &&
+
+		HMOD=$(git hash-object -t blob -- .gitmodules) &&
+		HSUP=$(git rev-parse HEAD) &&
+		HSUB=$HSUP &&
+
+		cat >expect <<-EOF &&
+		# branch.oid $HSUP
+		# branch.head master
+		# branch.upstream origin/master
+		# branch.ab +0 -0
+		1 A. N... 000000 100644 100644 $ZERO_OID $HMOD .gitmodules
+		1 A. S... 000000 160000 160000 $ZERO_OID $HSUB sub1
+		EOF
+
 		git status --porcelain=v2 --branch --untracked-files=all >actual &&
 		test_cmp expect actual
 	)
@@ -580,6 +605,33 @@ test_expect_success 'staged and untracked changes in added submodule (AM S.MU)' 
 		# branch.ab +0 -0
 		1 A. N... 000000 100644 100644 $ZERO_OID $HMOD .gitmodules
 		1 AM S.MU 000000 160000 160000 $ZERO_OID $HSUB sub1
+		EOF
+
+		git status --porcelain=v2 --branch --untracked-files=all --ignore-submodules=none >actual &&
+		test_cmp expect actual
+	)
+'
+
+test_expect_success 'staged and untracked changes in added submodule (AM S.M.) (untracked ignored)' '
+	(	cd super_repo &&
+		(	cd sub1 &&
+			## stage new changes in tracked file.
+			git add file_in_sub &&
+			## create new untracked file.
+			echo "yyyy" >>another_file_in_sub
+		) &&
+
+		HMOD=$(git hash-object -t blob -- .gitmodules) &&
+		HSUP=$(git rev-parse HEAD) &&
+		HSUB=$HSUP &&
+
+		cat >expect <<-EOF &&
+		# branch.oid $HSUP
+		# branch.head master
+		# branch.upstream origin/master
+		# branch.ab +0 -0
+		1 A. N... 000000 100644 100644 $ZERO_OID $HMOD .gitmodules
+		1 AM S.M. 000000 160000 160000 $ZERO_OID $HSUB sub1
 		EOF
 
 		git status --porcelain=v2 --branch --untracked-files=all >actual &&

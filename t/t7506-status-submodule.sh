@@ -94,8 +94,15 @@ test_expect_success 'status with added file in submodule (short)' '
 test_expect_success 'status with untracked file in submodule' '
 	(cd sub && git reset --hard) &&
 	echo "content" >sub/new-file &&
-	git status >output &&
+	git status --ignore-submodules=none >output &&
 	test_i18ngrep "modified:   sub (untracked content)" output
+'
+
+test_expect_success 'status with untracked file in submodule (untracked ignored)' '
+	(cd sub && git reset --hard) &&
+	echo "content" >sub/new-file &&
+	git status >output &&
+	test_i18ngrep "^nothing to commit" output
 '
 
 test_expect_success 'status -uno with untracked file in submodule' '
@@ -104,24 +111,41 @@ test_expect_success 'status -uno with untracked file in submodule' '
 '
 
 test_expect_success 'status with untracked file in submodule (porcelain)' '
-	git status --porcelain >output &&
+	git status --porcelain --ignore-submodules=none >output &&
 	diff output - <<-\EOF
 	 M sub
 	EOF
 '
 
+test_expect_success 'status with untracked file in submodule (porcelain) (untracked ignored)' '
+	git status --porcelain >output &&
+	test_must_be_empty output
+'
+
 test_expect_success 'status with untracked file in submodule (short)' '
-	git status --short >output &&
+	git status --short --ignore-submodules=none >output &&
 	diff output - <<-\EOF
 	 ? sub
 	EOF
 '
 
+test_expect_success 'status with untracked file in submodule (short) (untracked ignored)' '
+	git status --short >output &&
+	test_must_be_empty output
+'
+
 test_expect_success 'status with added and untracked file in submodule' '
 	(cd sub && git reset --hard && echo >foo && git add foo) &&
 	echo "content" >sub/new-file &&
-	git status >output &&
+	git status --ignore-submodules=none >output &&
 	test_i18ngrep "modified:   sub (modified content, untracked content)" output
+'
+
+test_expect_success 'status with added and untracked file in submodule (untracked ignored)' '
+	(cd sub && git reset --hard && echo >foo && git add foo) &&
+	echo "content" >sub/new-file &&
+	git status >output &&
+	test_i18ngrep "modified:   sub (modified content)" output
 '
 
 test_expect_success 'status with added and untracked file in submodule (porcelain)' '
@@ -168,8 +192,15 @@ test_expect_success 'status with added file in modified submodule (porcelain)' '
 test_expect_success 'status with untracked file in modified submodule' '
 	(cd sub && git reset --hard) &&
 	echo "content" >sub/new-file &&
-	git status >output &&
+	git status --ignore-submodules=none >output &&
 	test_i18ngrep "modified:   sub (new commits, untracked content)" output
+'
+
+test_expect_success 'status with untracked file in modified submodule (untracked ignored)' '
+	(cd sub && git reset --hard) &&
+	echo "content" >sub/new-file &&
+	git status >output &&
+	test_i18ngrep "modified:   sub (new commits)" output
 '
 
 test_expect_success 'status with untracked file in modified submodule (porcelain)' '
@@ -182,8 +213,15 @@ test_expect_success 'status with untracked file in modified submodule (porcelain
 test_expect_success 'status with added and untracked file in modified submodule' '
 	(cd sub && git reset --hard && echo >foo && git add foo) &&
 	echo "content" >sub/new-file &&
-	git status >output &&
+	git status --ignore-submodules=none >output &&
 	test_i18ngrep "modified:   sub (new commits, modified content, untracked content)" output
+'
+
+test_expect_success 'status with added and untracked file in modified submodule (untracked ignored)' '
+	(cd sub && git reset --hard && echo >foo && git add foo) &&
+	echo "content" >sub/new-file &&
+	git status >output &&
+	test_i18ngrep "modified:   sub (new commits, modified content)" output
 '
 
 test_expect_success 'status with added and untracked file in modified submodule (porcelain)' '
@@ -349,7 +387,7 @@ test_expect_success 'setup superproject with untracked file in nested submodule'
 '
 
 test_expect_success 'status with untracked file in nested submodule (porcelain)' '
-	git -C super status --porcelain >output &&
+	git -C super status --porcelain --ignore-submodules=none >output &&
 	diff output - <<-\EOF
 	 M sub1
 	 M sub2
@@ -357,8 +395,13 @@ test_expect_success 'status with untracked file in nested submodule (porcelain)'
 	EOF
 '
 
+test_expect_success 'status with untracked file in nested submodule (porcelain) (untracked ignored)' '
+	git -C super status --porcelain >output &&
+	test_must_be_empty output
+'
+
 test_expect_success 'status with untracked file in nested submodule (porcelain=2)' '
-	git -C super status --porcelain=2 >output &&
+	git -C super status --porcelain=2 --ignore-submodules=none >output &&
 	sanitize_output output &&
 	diff output - <<-\EOF
 	1 .M S..U 160000 160000 160000 HASH HASH sub1
@@ -367,13 +410,23 @@ test_expect_success 'status with untracked file in nested submodule (porcelain=2
 	EOF
 '
 
+test_expect_success 'status with untracked file in nested submodule (porcelain=2) (untracked ignored)' '
+	git -C super status --porcelain=2 >output &&
+	test_must_be_empty output
+'
+
 test_expect_success 'status with untracked file in nested submodule (short)' '
-	git -C super status --short >output &&
+	git -C super status --short --ignore-submodules=none >output &&
 	diff output - <<-\EOF
 	 ? sub1
 	 ? sub2
 	 ? sub3
 	EOF
+'
+
+test_expect_success 'status with untracked file in nested submodule (short) (untracked ignored)' '
+	git -C super status --short >output &&
+	test_must_be_empty output
 '
 
 test_expect_success 'setup superproject with modified file in nested submodule' '
@@ -382,7 +435,7 @@ test_expect_success 'setup superproject with modified file in nested submodule' 
 '
 
 test_expect_success 'status with added file in nested submodule (porcelain)' '
-	git -C super status --porcelain >output &&
+	git -C super status --porcelain --ignore-submodules=none >output &&
 	diff output - <<-\EOF
 	 M sub1
 	 M sub2
@@ -390,8 +443,16 @@ test_expect_success 'status with added file in nested submodule (porcelain)' '
 	EOF
 '
 
+test_expect_success 'status with added file in nested submodule (porcelain) (untracked ignored)' '
+	git -C super status --porcelain >output &&
+	diff output - <<-\EOF
+	 M sub1
+	 M sub2
+	EOF
+'
+
 test_expect_success 'status with added file in nested submodule (porcelain=2)' '
-	git -C super status --porcelain=2 >output &&
+	git -C super status --porcelain=2 --ignore-submodules=none >output &&
 	sanitize_output output &&
 	diff output - <<-\EOF
 	1 .M S.M. 160000 160000 160000 HASH HASH sub1
@@ -400,12 +461,29 @@ test_expect_success 'status with added file in nested submodule (porcelain=2)' '
 	EOF
 '
 
+test_expect_success 'status with added file in nested submodule (porcelain=2) (untracked ignored)' '
+	git -C super status --porcelain=2 >output &&
+	sanitize_output output &&
+	diff output - <<-\EOF
+	1 .M S.M. 160000 160000 160000 HASH HASH sub1
+	1 .M S.M. 160000 160000 160000 HASH HASH sub2
+	EOF
+'
+
 test_expect_success 'status with added file in nested submodule (short)' '
-	git -C super status --short >output &&
+	git -C super status --short --ignore-submodules=none >output &&
 	diff output - <<-\EOF
 	 m sub1
 	 m sub2
 	 ? sub3
+	EOF
+'
+
+test_expect_success 'status with added file in nested submodule (short) (untracked ignored)' '
+	git -C super status --short >output &&
+	diff output - <<-\EOF
+	 m sub1
+	 m sub2
 	EOF
 '
 
