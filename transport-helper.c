@@ -27,6 +27,7 @@ struct helper_data {
 		export : 1,
 		option : 1,
 		push : 1,
+		push_base : 1,
 		connect : 1,
 		stateless_connect : 1,
 		signed_tags : 1,
@@ -186,6 +187,8 @@ static struct child_process *get_helper(struct transport *transport)
 			data->option = 1;
 		else if (!strcmp(capname, "push"))
 			data->push = 1;
+		else if (!strcmp(capname, "push-base"))
+			data->push_base = 1;
 		else if (!strcmp(capname, "import"))
 			data->import = 1;
 		else if (!strcmp(capname, "bidi-import"))
@@ -1191,6 +1194,18 @@ static struct ref *get_refs_list_using_list(struct transport *transport,
 		write_str_in_full(helper->in, "option object-format\n");
 		if (recvline(data, &buf) || strcmp(buf.buf, "ok"))
 			exit(128);
+	}
+
+	if (!is_null_oid(&data->transport_options.push_base)) {
+		if (data->push_base) {
+			write_str_in_full(helper->in, "option push-base ");
+			write_str_in_full(helper->in, oid_to_hex(&data->transport_options.push_base));
+			write_str_in_full(helper->in, "\n");
+			if (recvline(data, &buf) || strcmp(buf.buf, "ok"))
+				exit(128);
+		} else {
+			warning(_("transport does not support --base"));
+		}
 	}
 
 	if (data->push && for_push)

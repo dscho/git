@@ -1,0 +1,61 @@
+Push with base design notes
+===========================
+
+This feature allows clients, when pushing, to indicate that a
+certain object is an ancestor of all pushed commits and that they
+believe that the server knows of this object. This in turn allows
+servers to send an abbreviated ref advertisement containing only that
+object.
+
+Besides bandwidth savings, this also ensures that the ref
+advertisement contains information relevant to the client. For
+example, at least one project (Gerrit [1]) have included workarounds
+to send ancestors of refs that move often, even though the ref
+advertisement is only meant to contain refs.
+
+[1] https://gerrit.googlesource.com/gerrit/+/refs/heads/master/java/com/google/gerrit/server/git/receive/HackPushNegotiateHook.java
+
+
+Design overview
+---------------
+
+The "base" being sent is sent as an Extra Parameter, supported in the
+git://, ssh://, and http(s):// protocols. By sending it as an Extra
+Parameter, the server is aware of this parameter before it generates
+the ref advertisement, thus making it able to tailor the ref
+advertisement accordingly. Sending it as an Extra Parameter also makes
+this protocol backwards-compatible, as servers will ignore any Extra
+Parameters they do not understand. (The push will then proceed as if
+neither party had this feature.)
+
+The remote helper protocol has been extended to support the
+"push-base" capability and an option of the same name. When a remote
+helper advertises this capability, it thus indicates that it supports
+this option. Git then will send "option push-base" if the user
+specifies it when invoking "git push".
+
+The remote-curl remote helper bundled with Git has been updated to
+support this capability and option.
+
+
+Future work
+-----------
+
+In the future, we might want a way to automatically determine the base
+instead of always having the user specify it. However, this does not
+make obsolete any of the current work - once the base is automatically
+determined, we still need this protocol to communicate it to the
+server, and allowing the user to specify the base manually is still
+useful.
+
+
+Alternatives
+------------
+
+- Making a more substantial protocol change like "fetch" protocol v2.
+  This would eliminate the need for some of the remote helper updates;
+  as part of the protocol change, the protocol could be made to
+  support "stateless-connect" and thus no remote helper updates (like
+  "push-base") would be needed. For "fetch", the protocol change has
+  enabled features like wanted-refs and packfile-uris, but I do not
+  have any similar ideas in mind for "push".

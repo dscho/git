@@ -116,6 +116,9 @@ Supported commands: 'stateless-connect'.
 +
 Supported commands: 'list for-push', 'push'.
 
+'push-base'::
+	Indicates that this remote helper supports the 'push-base' option.
+
 'export'::
 	Can discover remote refs and push specified objects from a
 	fast-import stream to remote refs.
@@ -540,6 +543,11 @@ set by Git if the remote helper has the 'option' capability.
 +
 If set to an algorithm, indicate that the caller wants to interact with
 the remote side using that algorithm.
+
+'option push-base' <ref>::
+	Only supported if this remote helper advertises the 'push-base'
+	capability. Indicate that <ref> is an ancestor of the commits to be
+	pushed, and it is believed to be known by the server.
 
 SEE ALSO
 --------

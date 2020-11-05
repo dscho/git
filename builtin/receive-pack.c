@@ -321,13 +321,38 @@ static void show_one_alternate_ref(const struct object_id *oid,
 	show_ref(".have", oid);
 }
 
-static void write_head_info(void)
+struct check_connected_for_one_args {
+	struct object_id *base;
+	unsigned already_emitted : 1;
+};
+static int check_connected_for_one(void *args, struct object_id *oid)
+{
+	struct check_connected_for_one_args *a = args;
+
+	if (a->already_emitted)
+		return -1;
+	oidcpy(oid, a->base);
+	a->already_emitted = 1;
+	return 0;
+}
+
+static void write_head_info(struct object_id *base)
 {
 	static struct oidset seen = OIDSET_INIT;
+
+	if (base) {
+		struct check_connected_for_one_args args = {base};
+
+		if (!check_connected(check_connected_for_one, &args, NULL)) {
+			show_ref(".have", base);
+			goto refs_shown;
+		}
+	}
 
 	for_each_ref(show_ref_cb, &seen);
 	for_each_alternate_ref(show_one_alternate_ref, &seen);
 	oidset_clear(&seen);
+refs_shown:
 	if (!sent_capabilities)
 		show_ref("capabilities^{}", &null_oid);
 
@@ -2432,6 +2457,7 @@ int cmd_receive_pack(int argc, const char **argv, const char *prefix)
 	struct oid_array ref = OID_ARRAY_INIT;
 	struct shallow_info si;
 	struct packet_reader reader;
+	struct strbuf base_sb = STRBUF_INIT;
 
 	struct option options[] = {
 		OPT__QUIET(&quiet, N_("quiet")),
@@ -2466,7 +2492,7 @@ int cmd_receive_pack(int argc, const char **argv, const char *prefix)
 	else if (0 <= receive_unpack_limit)
 		unpack_limit = receive_unpack_limit;
 
-	switch (determine_protocol_version_server()) {
+	switch (determine_protocol_version_server(&base_sb)) {
 	case protocol_v2:
 		/*
 		 * push support for protocol v2 has not been implemented yet,
@@ -2489,10 +2515,21 @@ int cmd_receive_pack(int argc, const char **argv, const char *prefix)
 	}
 
 	if (advertise_refs || !stateless_rpc) {
-		write_head_info();
+		if (base_sb.len) {
+			struct object_id oid;
+			const char *p;
+
+			if (parse_oid_hex(base_sb.buf, &oid, &p) || *p != '\0')
+				die("invalid base");
+			write_head_info(&oid);
+		} else {
+			write_head_info(NULL);
+		}
 	}
-	if (advertise_refs)
+	if (advertise_refs) {
+		strbuf_release(&base_sb);
 		return 0;
+	}
 
 	packet_reader_init(&reader, 0, NULL, 0,
 			   PACKET_READ_CHOMP_NEWLINE |
@@ -2555,6 +2592,7 @@ int cmd_receive_pack(int argc, const char **argv, const char *prefix)
 	}
 	if (use_sideband)
 		packet_flush(1);
+	strbuf_release(&base_sb);
 	oid_array_clear(&shallow);
 	oid_array_clear(&ref);
 	free((void *)push_cert_nonce);

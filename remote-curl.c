@@ -29,6 +29,7 @@ struct options {
 	struct string_list deepen_not;
 	struct string_list push_options;
 	char *filter;
+	struct object_id push_base;
 	unsigned progress : 1,
 		check_self_contained_and_connected : 1,
 		cloning : 1,
@@ -214,6 +215,10 @@ static int set_option(const char *name, const char *value)
 			options.hash_algo = &hash_algos[algo];
 		}
 		return 0;
+	} else if (!strcmp(name, "push-base")) {
+		if (get_oid(value, &options.push_base))
+			die(_("%s is not a valid object"), value);
+		return 0;
 	} else {
 		return 1 /* unsupported */;
 	}
@@ -373,16 +378,21 @@ static int show_http_message(struct strbuf *type, struct strbuf *charset,
 }
 
 static int get_protocol_http_header(enum protocol_version version,
+				    const struct object_id *base,
 				    struct strbuf *header)
 {
-	if (version > 0) {
+	if (version > 0)
 		strbuf_addf(header, GIT_PROTOCOL_HEADER ": version=%d",
 			    version);
-
-		return 1;
+	if (!is_null_oid(base)) {
+		if (version > 0)
+			strbuf_addch(header, ':');
+		else
+			strbuf_addstr(header, GIT_PROTOCOL_HEADER ": ");
+		strbuf_addf(header, "base=%s", oid_to_hex(base));
 	}
 
-	return 0;
+	return !!(version > 0 || !(is_null_oid(base)));
 }
 
 static void check_smart_http(struct discovery *d, const char *service,
@@ -478,7 +488,7 @@ static struct discovery *discover_refs(const char *service, int for_push)
 		version = protocol_v0;
 
 	/* Add the extra Git-Protocol header */
-	if (get_protocol_http_header(version, &protocol_header))
+	if (get_protocol_http_header(version, &options.push_base, &protocol_header))
 		string_list_append(&extra_headers, protocol_header.buf);
 
 	memset(&http_options, 0, sizeof(http_options));
@@ -1083,7 +1093,7 @@ static int rpc_service(struct rpc_state *rpc, struct discovery *heads,
 	strbuf_addf(&buf, "Accept: application/x-%s-result", svc);
 	rpc->hdr_accept = strbuf_detach(&buf, NULL);
 
-	if (get_protocol_http_header(heads->version, &buf))
+	if (get_protocol_http_header(heads->version, &options.push_base, &buf))
 		rpc->protocol_header = strbuf_detach(&buf, NULL);
 	else
 		rpc->protocol_header = NULL;
@@ -1418,7 +1428,7 @@ static int stateless_connect(const char *service_name)
 	rpc.service_url = xstrfmt("%s%s", url.buf, rpc.service_name);
 	rpc.hdr_content_type = xstrfmt("Content-Type: application/x-%s-request", rpc.service_name);
 	rpc.hdr_accept = xstrfmt("Accept: application/x-%s-result", rpc.service_name);
-	if (get_protocol_http_header(discover->version, &buf)) {
+	if (get_protocol_http_header(discover->version, &options.push_base, &buf)) {
 		rpc.protocol_header = strbuf_detach(&buf, NULL);
 	} else {
 		rpc.protocol_header = NULL;
@@ -1550,6 +1560,7 @@ int cmd_main(int argc, const char **argv)
 			printf("push\n");
 			printf("check-connectivity\n");
 			printf("object-format\n");
+			printf("push-base\n");
 			printf("\n");
 			fflush(stdout);
 		} else if (skip_prefix(buf.buf, "stateless-connect ", &arg)) {

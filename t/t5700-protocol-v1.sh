@@ -146,6 +146,56 @@ test_expect_success 'push with file:// using protocol v1' '
 	grep "push< version 1" log
 '
 
+test_expect_success 'push with file:// using protocol v1 and --base' '
+	test_commit -C file_child four &&
+	COMMON_HASH=$(git -C file_child rev-parse three) &&
+
+	# Push to another branch, as the target repository has the
+	# master branch checked out and we cannot push into it.
+	GIT_TRACE_PACKET=1 git -C file_child -c protocol.version=1 \
+		push --base=three origin HEAD:client_branch_four 2>log &&
+
+	# Server responded using protocol v1
+	grep "push< version 1" log &&
+	# Server advertised only the expected object
+	grep "$COMMON_HASH .have" log
+'
+
+test_expect_success 'push with file:// using protocol v0 and --base' '
+	test_commit -C file_child five &&
+	COMMON_HASH=$(git -C file_child rev-parse four) &&
+
+	# Push to another branch, as the target repository has the
+	# master branch checked out and we cannot push into it.
+	GIT_TRACE_PACKET=1 git -C file_child -c protocol.version=0 \
+		push --base=four origin HEAD:client_branch_five 2>log &&
+
+	# Server did not respond with any version
+	! grep "push< version" log &&
+	# Server advertised only the expected object
+	grep "$COMMON_HASH .have" log
+'
+
+test_expect_success 'push with invalid --base' '
+	test_commit -C file_child six &&
+
+	# Server does not have "six".
+	test_must_fail git -C file_child -c protocol.version=0 \
+		push --base=an_invalid_object origin HEAD:client_branch_six 2>log &&
+	grep "is not a valid object" log
+'
+
+test_expect_success 'push with --base that does not exist on server' '
+	COMMON_HASH=$(git -C file_child rev-parse six) &&
+
+	# The push still succeeds.
+	GIT_TRACE_PACKET=1 git -C file_child -c protocol.version=0 \
+		push --base=six origin HEAD:client_branch_six 2>log &&
+
+	# Server did not advertise "six", since it does not know it
+	! grep "$COMMON_HASH .have" log
+'
+
 # Test protocol v1 with 'ssh://' transport
 #
 test_expect_success 'setup ssh wrapper' '
@@ -226,6 +276,36 @@ test_expect_success 'push with ssh:// using protocol v1' '
 	grep "push< version 1" log
 '
 
+test_expect_success 'push with ssh:// using protocol v1 and --base' '
+	test_commit -C ssh_child four &&
+	COMMON_HASH=$(git -C ssh_child rev-parse three) &&
+
+	# Push to another branch, as the target repository has the
+	# master branch checked out and we cannot push into it.
+	GIT_TRACE_PACKET=1 git -C ssh_child -c protocol.version=1 \
+		push --base="$COMMON_HASH" origin HEAD:client_branch_four 2>log &&
+
+	# Server responded using protocol v1
+	grep "push< version 1" log &&
+	# Server advertised only the expected object
+	grep "$COMMON_HASH .have" log
+'
+
+test_expect_success 'push with ssh:// using protocol v0 and --base' '
+	test_commit -C ssh_child five &&
+	COMMON_HASH=$(git -C ssh_child rev-parse four) &&
+
+	# Push to another branch, as the target repository has the
+	# master branch checked out and we cannot push into it.
+	GIT_TRACE_PACKET=1 git -C ssh_child -c protocol.version=0 \
+		push --base="$COMMON_HASH" origin HEAD:client_branch_five 2>log &&
+
+	# Server did not respond with any version
+	! grep "push< version" log &&
+	# Server advertised only the expected object
+	grep "$COMMON_HASH .have" log
+'
+
 # Test protocol v1 with 'http://' transport
 #
 . "$TEST_DIRECTORY"/lib-httpd.sh
@@ -291,6 +371,37 @@ test_expect_success 'push with http:// using protocol v1' '
 
 	# Server responded using protocol v1
 	grep "git< version 1" log
+'
+
+test_expect_success 'push with http:// using protocol v1 and --base' '
+	test_commit -C http_child four &&
+	COMMON_HASH=$(git -C http_child rev-parse three) &&
+
+	# Push to another branch, as the target repository has the
+	# master branch checked out and we cannot push into it.
+	test_might_fail env GIT_TRACE_PACKET=1 \
+		git -C http_child -c protocol.version=1 \
+		push --base=three origin HEAD:client_branch_four 2>log &&
+
+	# Server responded using protocol v1
+	grep "git< version 1" log &&
+	# Server advertised only the expected object
+	grep "$COMMON_HASH .have" log
+'
+
+test_expect_success 'push with http:// using protocol v0 and --base' '
+	test_commit -C http_child five &&
+	COMMON_HASH=$(git -C http_child rev-parse four) &&
+
+	# Push to another branch, as the target repository has the
+	# master branch checked out and we cannot push into it.
+	GIT_TRACE_PACKET=1 git -C http_child -c protocol.version=0 \
+		push --base=four origin HEAD:client_branch_five 2>log &&
+
+	# Server did not respond with any version
+	! grep "git< version" log &&
+	# Server advertised only the expected object
+	grep "$COMMON_HASH .have" log
 '
 
 # DO NOT add non-httpd-specific tests here, because the last part of this

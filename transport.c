@@ -236,6 +236,10 @@ static int set_git_option(struct git_transport_options *opts,
 		list_objects_filter_die_if_populated(&opts->filter_options);
 		parse_list_objects_filter(&opts->filter_options, value);
 		return 0;
+	} else if (!strcmp(name, TRANS_OPT_PUSH_BASE)) {
+		if (get_oid(value, &opts->push_base))
+			die(_("transport: '%s' is not a valid object"), value);
+		return 0;
 	}
 	return 1;
 }
@@ -244,6 +248,7 @@ static int connect_setup(struct transport *transport, int for_push)
 {
 	struct git_transport_data *data = transport->data;
 	int flags = transport->verbose > 0 ? CONNECT_VERBOSE : 0;
+	char *extra_parameters = NULL;
 
 	if (data->conn)
 		return 0;
@@ -254,11 +259,16 @@ static int connect_setup(struct transport *transport, int for_push)
 	case TRANSPORT_FAMILY_IPV6: flags |= CONNECT_IPV6; break;
 	}
 
+	if (!is_null_oid(&data->options.push_base))
+		extra_parameters = xstrfmt("base=%s",
+					   oid_to_hex(&data->options.push_base));
+
 	data->conn = git_connect(data->fd, transport->url,
 				 for_push ? data->options.receivepack :
 				 data->options.uploadpack,
-				 flags);
+				 flags, extra_parameters);
 
+	free(extra_parameters);
 	return 0;
 }
 
@@ -832,7 +842,7 @@ static int connect_git(struct transport *transport, const char *name,
 {
 	struct git_transport_data *data = transport->data;
 	data->conn = git_connect(data->fd, transport->url,
-				 executable, 0);
+				 executable, 0, NULL);
 	fd[0] = data->fd[0];
 	fd[1] = data->fd[1];
 	return 0;

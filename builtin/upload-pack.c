@@ -48,7 +48,7 @@ int cmd_upload_pack(int argc, const char **argv, const char *prefix)
 	if (!enter_repo(dir, strict))
 		die("'%s' does not appear to be a git repository", dir);
 
-	switch (determine_protocol_version_server()) {
+	switch (determine_protocol_version_server(NULL)) {
 	case protocol_v2:
 		serve_opts.advertise_capabilities = opts.advertise_refs;
 		serve_opts.stateless_rpc = opts.stateless_rpc;

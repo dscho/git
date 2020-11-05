@@ -22,8 +22,11 @@ enum protocol_version get_protocol_version_config(void);
  * by setting appropriate values for the key 'version'.  If a client doesn't
  * request a particular protocol version, a default of 'protocol_v0' will be
  * used.
+ *
+ * If base_sb is not NULL and an extra parameter "base" is specified, this
+ * function will append its value to base_sb.
  */
-enum protocol_version determine_protocol_version_server(void);
+enum protocol_version determine_protocol_version_server(struct strbuf *base_sb);
 
 /*
  * Used by a client to determine which protocol version the server is speaking

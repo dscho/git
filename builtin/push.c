@@ -396,7 +396,8 @@ static int push_with_options(struct transport *transport, struct refspec *rs,
 
 static int do_push(int flags,
 		   const struct string_list *push_options,
-		   struct remote *remote)
+		   struct remote *remote,
+		   const char *push_base)
 {
 	int i, errs;
 	const char **url;
@@ -420,6 +421,8 @@ static int do_push(int flags,
 				transport_get(remote, url[i]);
 			if (flags & TRANSPORT_PUSH_OPTIONS)
 				transport->push_options = push_options;
+			if (push_base)
+				transport_set_option(transport, TRANS_OPT_PUSH_BASE, push_base);
 			if (push_with_options(transport, push_refspec, flags))
 				errs++;
 		}
@@ -428,6 +431,8 @@ static int do_push(int flags,
 			transport_get(remote, NULL);
 		if (flags & TRANSPORT_PUSH_OPTIONS)
 			transport->push_options = push_options;
+		if (push_base)
+			transport_set_option(transport, TRANS_OPT_PUSH_BASE, push_base);
 		if (push_with_options(transport, push_refspec, flags))
 			errs++;
 	}
@@ -547,6 +552,7 @@ int cmd_push(int argc, const char **argv, const char *prefix)
 	struct string_list *push_options;
 	const struct string_list_item *item;
 	struct remote *remote;
+	const char *push_base = NULL;
 
 	struct option options[] = {
 		OPT__VERBOSITY(&verbosity),
@@ -586,6 +592,8 @@ int cmd_push(int argc, const char **argv, const char *prefix)
 				TRANSPORT_FAMILY_IPV4),
 		OPT_SET_INT('6', "ipv6", &family, N_("use IPv6 addresses only"),
 				TRANSPORT_FAMILY_IPV6),
+		OPT_STRING(0, "base", &push_base, N_("revision"),
+			   N_("ancestor of commits to be pushed that is believed to be known by the server")),
 		OPT_END()
 	};
 
@@ -656,7 +664,7 @@ int cmd_push(int argc, const char **argv, const char *prefix)
 		if (strchr(item->string, '\n'))
 			die(_("push options must not have new line characters"));
 
-	rc = do_push(flags, push_options, remote);
+	rc = do_push(flags, push_options, remote, push_base);
 	string_list_clear(&push_options_cmdline, 0);
 	string_list_clear(&push_options_config, 0);
 	if (rc == -1)
