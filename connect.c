@@ -1201,14 +1201,13 @@ static struct child_process *git_connect_git(int fd[2], char *hostandport,
  */
 static void push_ssh_options(struct strvec *args, struct strvec *env,
 			     enum ssh_variant variant, const char *port,
-			     enum protocol_version version, int flags)
+			     const char *extra_parameters, int flags)
 {
-	if (variant == VARIANT_SSH &&
-	    version > 0) {
+	if (variant == VARIANT_SSH && extra_parameters) {
 		strvec_push(args, "-o");
 		strvec_push(args, "SendEnv=" GIT_PROTOCOL_ENVIRONMENT);
-		strvec_pushf(env, GIT_PROTOCOL_ENVIRONMENT "=version=%d",
-			     version);
+		strvec_pushf(env, GIT_PROTOCOL_ENVIRONMENT "=%s",
+			     extra_parameters);
 	}
 
 	if (flags & CONNECT_IPV4) {
@@ -1261,7 +1260,7 @@ static void push_ssh_options(struct strvec *args, struct strvec *env,
 
 /* Prepare a child_process for use by Git's SSH-tunneled transport. */
 static void fill_ssh_args(struct child_process *conn, const char *ssh_host,
-			  const char *port, enum protocol_version version,
+			  const char *port, const char *extra_parameters,
 			  int flags)
 {
 	const char *ssh;
@@ -1296,14 +1295,14 @@ static void fill_ssh_args(struct child_process *conn, const char *ssh_host,
 		strvec_push(&detect.args, ssh);
 		strvec_push(&detect.args, "-G");
 		push_ssh_options(&detect.args, &detect.env_array,
-				 VARIANT_SSH, port, version, flags);
+				 VARIANT_SSH, port, extra_parameters, flags);
 		strvec_push(&detect.args, ssh_host);
 
 		variant = run_command(&detect) ? VARIANT_SIMPLE : VARIANT_SSH;
 	}
 
 	strvec_push(&conn->args, ssh);
-	push_ssh_options(&conn->args, &conn->env_array, variant, port, version, flags);
+	push_ssh_options(&conn->args, &conn->env_array, variant, port, extra_parameters, flags);
 	strvec_push(&conn->args, ssh_host);
 }
 
@@ -1319,7 +1318,8 @@ static void fill_ssh_args(struct child_process *conn, const char *ssh_host,
  * the connection failed).
  */
 struct child_process *git_connect(int fd[2], const char *url,
-				  const char *prog, int flags)
+				  const char *prog, int flags,
+				  const char *other_extra_parameters)
 {
 	char *hostandport, *path;
 	struct child_process *conn;
@@ -1352,6 +1352,7 @@ struct child_process *git_connect(int fd[2], const char *url,
 	} else {
 		struct strbuf cmd = STRBUF_INIT;
 		const char *const *var;
+		struct strbuf extra_parameters = STRBUF_INIT;
 
 		conn = xmalloc(sizeof(*conn));
 		child_process_init(conn);
@@ -1366,6 +1367,14 @@ struct child_process *git_connect(int fd[2], const char *url,
 		/* remove repo-local variables from the environment */
 		for (var = local_repo_env; *var; var++)
 			strvec_push(&conn->env_array, *var);
+
+		if (version > 0)
+			strbuf_addf(&extra_parameters, "version=%d", version);
+		if (other_extra_parameters) {
+			if (extra_parameters.len)
+				strbuf_addch(&extra_parameters, ':');
+			strbuf_addstr(&extra_parameters, other_extra_parameters);
+		}
 
 		conn->use_shell = 1;
 		conn->in = conn->out = -1;
@@ -1392,15 +1401,16 @@ struct child_process *git_connect(int fd[2], const char *url,
 				return NULL;
 			}
 			conn->trace2_child_class = "transport/ssh";
-			fill_ssh_args(conn, ssh_host, port, version, flags);
+			fill_ssh_args(conn, ssh_host, port,
+				      extra_parameters.len ? extra_parameters.buf : NULL,
+				      flags);
 		} else {
 			transport_check_allowed("file");
 			conn->trace2_child_class = "transport/file";
-			if (version > 0) {
+			if (extra_parameters.len)
 				strvec_pushf(&conn->env_array,
-					     GIT_PROTOCOL_ENVIRONMENT "=version=%d",
-					     version);
-			}
+					     GIT_PROTOCOL_ENVIRONMENT "=%s",
+					     extra_parameters.buf);
 		}
 		strvec_push(&conn->args, cmd.buf);
 
@@ -1409,6 +1419,7 @@ struct child_process *git_connect(int fd[2], const char *url,
 
 		fd[0] = conn->out; /* read from child's stdout */
 		fd[1] = conn->in;  /* write to child's stdin */
+		strbuf_release(&extra_parameters);
 		strbuf_release(&cmd);
 	}
 	free(hostandport);

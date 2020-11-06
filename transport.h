@@ -46,6 +46,12 @@ struct git_transport_options {
 	 * transport_set_option().
 	 */
 	struct oid_array *negotiation_tips;
+
+	/*
+	 * When pushing, if this is not a null OID, indicates an ancestor of
+	 * the commits to be pushed that is believed to be known by the server.
+	 */
+	struct object_id push_base;
 };
 
 enum transport_family {
@@ -211,6 +217,9 @@ void transport_check_allowed(const char *type);
 
 /* Require remote changes to be integrated locally. */
 #define TRANS_OPT_FORCE_IF_INCLUDES "force-if-includes"
+
+/* See "push_base" in struct git_transport_options */
+#define TRANS_OPT_PUSH_BASE "push-base"
 
 /**
  * Returns 0 if the option was used, non-zero otherwise. Prints a

@@ -42,7 +42,7 @@ enum protocol_version get_protocol_version_config(void)
 	return protocol_v2;
 }
 
-enum protocol_version determine_protocol_version_server(void)
+enum protocol_version determine_protocol_version_server(struct strbuf *base_sb)
 {
 	const char *git_protocol = getenv(GIT_PROTOCOL_ENVIRONMENT);
 	enum protocol_version version = protocol_v0;
@@ -67,6 +67,9 @@ enum protocol_version determine_protocol_version_server(void)
 				v = parse_protocol_version(value);
 				if (v > version)
 					version = v;
+			} else if (skip_prefix(item->string, "base=", &value)) {
+				if (base_sb)
+					strbuf_addstr(base_sb, value);
 			}
 		}
 

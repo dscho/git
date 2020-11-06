@@ -59,9 +59,9 @@ Parameters", and are supported by the Git, SSH, and HTTP protocols.
 Each Extra Parameter takes the form of `<key>=<value>` or `<key>`.
 
 Servers that receive any such Extra Parameters MUST ignore all
-unrecognized keys. Currently, the only Extra Parameter recognized is
-"version" with a value of '1' or '2'.  See protocol-v2.txt for more
-information on protocol version 2.
+unrecognized keys. Currently, the only Extra Parameters recognized are
+"version" with a value of '1' or '2' and, for push, "base" with an OID.  See
+protocol-v2.txt for more information on protocol version 2.
 
 Git Transport
 -------------
@@ -505,6 +505,10 @@ in packet-line format to the client, followed by a flush-pkt.  The only
 real difference is that the capability listing is different - the only
 possible values are 'report-status', 'report-status-v2', 'delete-refs',
 'ofs-delta', 'atomic' and 'push-options'.
+
+If a "base=<oid>" Extra Parameter was sent by the client, and the
+server recognizes that object, the server MAY send "<oid> .have" in
+lieu of all the reference obj-ids and names.
 
 Reference Update Request and Packfile Transfer
 ----------------------------------------------

@@ -207,7 +207,7 @@ int cmd_fetch_pack(int argc, const char **argv, const char *prefix)
 		if (args.diag_url)
 			flags |= CONNECT_DIAG_URL;
 		conn = git_connect(fd, dest, args.uploadpack,
-				   flags);
+				   flags, NULL);
 		if (!conn)
 			return args.diag_url ? 0 : 1;
 	}

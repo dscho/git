@@ -27,8 +27,8 @@ and 'push-cert' capabilities are sent and recognized by the receive-pack
 (push to server) process.
 
 The 'ofs-delta' and 'side-band-64k' capabilities are sent and recognized
-by both upload-pack and receive-pack protocols.  The 'agent' capability
-may optionally be sent in both protocols.
+by both upload-pack and receive-pack protocols.  The 'agent' and 'trace2-sid'
+capabilities may optionally be sent in both protocols.
 
 All other capabilities are only recognized by the upload-pack (fetch
 from server) process.
@@ -365,3 +365,12 @@ If the upload-pack server advertises the 'filter' capability,
 fetch-pack may send "filter" commands to request a partial clone
 or partial fetch and request that the server omit various objects
 from the packfile.
+
+trace2-sid=<session-id>
+-----------------------
+
+If trace2 tracing is enabled on the server, it may advertise its session ID via
+this capability. The client may choose to log the server's session ID in its
+trace logs, and advertise its own session ID back to the server for it to log
+as well. This allows for easier debugging of remote sessions when both client
+and server logs are available.

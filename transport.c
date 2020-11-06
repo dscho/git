@@ -236,6 +236,10 @@ static int set_git_option(struct git_transport_options *opts,
 		list_objects_filter_die_if_populated(&opts->filter_options);
 		parse_list_objects_filter(&opts->filter_options, value);
 		return 0;
+	} else if (!strcmp(name, TRANS_OPT_PUSH_BASE)) {
+		if (get_oid(value, &opts->push_base))
+			die(_("transport: '%s' is not a valid object"), value);
+		return 0;
 	}
 	return 1;
 }
@@ -244,6 +248,7 @@ static int connect_setup(struct transport *transport, int for_push)
 {
 	struct git_transport_data *data = transport->data;
 	int flags = transport->verbose > 0 ? CONNECT_VERBOSE : 0;
+	char *extra_parameters = NULL;
 
 	if (data->conn)
 		return 0;
@@ -254,11 +259,16 @@ static int connect_setup(struct transport *transport, int for_push)
 	case TRANSPORT_FAMILY_IPV6: flags |= CONNECT_IPV6; break;
 	}
 
+	if (!is_null_oid(&data->options.push_base))
+		extra_parameters = xstrfmt("base=%s",
+					   oid_to_hex(&data->options.push_base));
+
 	data->conn = git_connect(data->fd, transport->url,
 				 for_push ? data->options.receivepack :
 				 data->options.uploadpack,
-				 flags);
+				 flags, extra_parameters);
 
+	free(extra_parameters);
 	return 0;
 }
 
@@ -286,6 +296,8 @@ static struct ref *handshake(struct transport *transport, int for_push,
 	struct git_transport_data *data = transport->data;
 	struct ref *refs = NULL;
 	struct packet_reader reader;
+	int sid_len;
+	const char *server_trace2_sid;
 
 	connect_setup(transport, for_push);
 
@@ -297,6 +309,8 @@ static struct ref *handshake(struct transport *transport, int for_push,
 	data->version = discover_version(&reader);
 	switch (data->version) {
 	case protocol_v2:
+		if (server_feature_v2("trace2-sid", &server_trace2_sid))
+			trace2_data_string("trace2", NULL, "server-sid", server_trace2_sid);
 		if (must_list_refs)
 			get_remote_refs(data->fd[1], &reader, &refs, for_push,
 					ref_prefixes,
@@ -310,6 +324,12 @@ static struct ref *handshake(struct transport *transport, int for_push,
 				 for_push ? REF_NORMAL : 0,
 				 &data->extra_have,
 				 &data->shallow);
+		server_trace2_sid = server_feature_value("trace2-sid", &sid_len);
+		if (server_trace2_sid) {
+			char *server_sid = xstrndup(server_trace2_sid, sid_len);
+			trace2_data_string("trace2", NULL, "server-sid", server_sid);
+			free(server_sid);
+		}
 		break;
 	case protocol_unknown_version:
 		BUG("unknown protocol version");
@@ -822,7 +842,7 @@ static int connect_git(struct transport *transport, const char *name,
 {
 	struct git_transport_data *data = transport->data;
 	data->conn = git_connect(data->fd, transport->url,
-				 executable, 0);
+				 executable, 0, NULL);
 	fd[0] = data->fd[0];
 	fd[1] = data->fd[1];
 	return 0;

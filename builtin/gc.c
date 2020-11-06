@@ -31,6 +31,7 @@
 #include "refs.h"
 #include "remote.h"
 #include "object-store.h"
+#include "exec-cmd.h"
 
 #define FAILED_RUN "failed to run %s"
 
@@ -703,14 +704,51 @@ int cmd_gc(int argc, const char **argv, const char *prefix)
 	return 0;
 }
 
-static const char * const builtin_maintenance_run_usage[] = {
-	N_("git maintenance run [--auto] [--[no-]quiet] [--task=<task>]"),
+static const char *const builtin_maintenance_run_usage[] = {
+	N_("git maintenance run [--auto] [--[no-]quiet] [--task=<task>] [--schedule]"),
 	NULL
 };
+
+enum schedule_priority {
+	SCHEDULE_NONE = 0,
+	SCHEDULE_WEEKLY = 1,
+	SCHEDULE_DAILY = 2,
+	SCHEDULE_HOURLY = 3,
+};
+
+static enum schedule_priority parse_schedule(const char *value)
+{
+	if (!value)
+		return SCHEDULE_NONE;
+	if (!strcasecmp(value, "hourly"))
+		return SCHEDULE_HOURLY;
+	if (!strcasecmp(value, "daily"))
+		return SCHEDULE_DAILY;
+	if (!strcasecmp(value, "weekly"))
+		return SCHEDULE_WEEKLY;
+	return SCHEDULE_NONE;
+}
+
+static int maintenance_opt_schedule(const struct option *opt, const char *arg,
+				    int unset)
+{
+	enum schedule_priority *priority = opt->value;
+
+	if (unset)
+		die(_("--no-schedule is not allowed"));
+
+	*priority = parse_schedule(arg);
+
+	if (!*priority)
+		die(_("unrecognized --schedule argument '%s'"), arg);
+
+	return 0;
+}
 
 struct maintenance_run_opts {
 	int auto_flag;
 	int quiet;
+	enum schedule_priority schedule;
 };
 
 /* Remember to update object flag allocation in object.h */
@@ -1168,6 +1206,8 @@ struct maintenance_task {
 	maintenance_auto_fn *auto_condition;
 	unsigned enabled:1;
 
+	enum schedule_priority schedule;
+
 	/* -1 if not selected. */
 	int selected_order;
 };
@@ -1263,6 +1303,9 @@ static int maintenance_run_tasks(struct maintenance_run_opts *opts)
 		     !tasks[i].auto_condition()))
 			continue;
 
+		if (opts->schedule && tasks[i].schedule < opts->schedule)
+			continue;
+
 		trace2_region_enter("maintenance", tasks[i].name, r);
 		if (tasks[i].fn(opts)) {
 			error(_("task '%s' failed"), tasks[i].name);
@@ -1275,21 +1318,54 @@ static int maintenance_run_tasks(struct maintenance_run_opts *opts)
 	return result;
 }
 
-static void initialize_task_config(void)
+static void initialize_maintenance_strategy(void)
+{
+	char *config_str;
+
+	if (git_config_get_string("maintenance.strategy", &config_str))
+		return;
+
+	if (!strcasecmp(config_str, "incremental")) {
+		tasks[TASK_GC].schedule = SCHEDULE_NONE;
+		tasks[TASK_COMMIT_GRAPH].enabled = 1;
+		tasks[TASK_COMMIT_GRAPH].schedule = SCHEDULE_HOURLY;
+		tasks[TASK_PREFETCH].enabled = 1;
+		tasks[TASK_PREFETCH].schedule = SCHEDULE_HOURLY;
+		tasks[TASK_INCREMENTAL_REPACK].enabled = 1;
+		tasks[TASK_INCREMENTAL_REPACK].schedule = SCHEDULE_DAILY;
+		tasks[TASK_LOOSE_OBJECTS].enabled = 1;
+		tasks[TASK_LOOSE_OBJECTS].schedule = SCHEDULE_DAILY;
+	}
+}
+
+static void initialize_task_config(int schedule)
 {
 	int i;
 	struct strbuf config_name = STRBUF_INIT;
 	gc_config();
 
+	if (schedule)
+		initialize_maintenance_strategy();
+
 	for (i = 0; i < TASK__COUNT; i++) {
 		int config_value;
+		char *config_str;
 
-		strbuf_setlen(&config_name, 0);
+		strbuf_reset(&config_name);
 		strbuf_addf(&config_name, "maintenance.%s.enabled",
 			    tasks[i].name);
 
 		if (!git_config_get_bool(config_name.buf, &config_value))
 			tasks[i].enabled = config_value;
+
+		strbuf_reset(&config_name);
+		strbuf_addf(&config_name, "maintenance.%s.schedule",
+			    tasks[i].name);
+
+		if (!git_config_get_string(config_name.buf, &config_str)) {
+			tasks[i].schedule = parse_schedule(config_str);
+			free(config_str);
+		}
 	}
 
 	strbuf_release(&config_name);
@@ -1333,6 +1409,9 @@ static int maintenance_run(int argc, const char **argv, const char *prefix)
 	struct option builtin_maintenance_run_options[] = {
 		OPT_BOOL(0, "auto", &opts.auto_flag,
 			 N_("run tasks based on the state of the repository")),
+		OPT_CALLBACK(0, "schedule", &opts.schedule, N_("frequency"),
+			     N_("run tasks based on frequency"),
+			     maintenance_opt_schedule),
 		OPT_BOOL(0, "quiet", &opts.quiet,
 			 N_("do not report progress or other information over stderr")),
 		OPT_CALLBACK_F(0, "task", NULL, N_("task"),
@@ -1343,7 +1422,6 @@ static int maintenance_run(int argc, const char **argv, const char *prefix)
 	memset(&opts, 0, sizeof(opts));
 
 	opts.quiet = !isatty(2);
-	initialize_task_config();
 
 	for (i = 0; i < TASK__COUNT; i++)
 		tasks[i].selected_order = -1;
@@ -1353,13 +1431,590 @@ static int maintenance_run(int argc, const char **argv, const char *prefix)
 			     builtin_maintenance_run_usage,
 			     PARSE_OPT_STOP_AT_NON_OPTION);
 
+	if (opts.auto_flag && opts.schedule)
+		die(_("use at most one of --auto and --schedule=<frequency>"));
+
+	initialize_task_config(opts.schedule);
+
 	if (argc != 0)
 		usage_with_options(builtin_maintenance_run_usage,
 				   builtin_maintenance_run_options);
 	return maintenance_run_tasks(&opts);
 }
 
-static const char builtin_maintenance_usage[] = N_("git maintenance run [<options>]");
+static int maintenance_register(void)
+{
+	char *config_value;
+	struct child_process config_set = CHILD_PROCESS_INIT;
+	struct child_process config_get = CHILD_PROCESS_INIT;
+
+	/* There is no current repository, so skip registering it */
+	if (!the_repository || !the_repository->gitdir)
+		return 0;
+
+	/* Disable foreground maintenance */
+	git_config_set("maintenance.auto", "false");
+
+	/* Set maintenance strategy, if unset */
+	if (!git_config_get_string("maintenance.strategy", &config_value))
+		free(config_value);
+	else
+		git_config_set("maintenance.strategy", "incremental");
+
+	config_get.git_cmd = 1;
+	strvec_pushl(&config_get.args, "config", "--global", "--get", "maintenance.repo",
+		     the_repository->worktree ? the_repository->worktree
+					      : the_repository->gitdir,
+			 NULL);
+	config_get.out = -1;
+
+	if (start_command(&config_get))
+		return error(_("failed to run 'git config'"));
+
+	/* We already have this value in our config! */
+	if (!finish_command(&config_get))
+		return 0;
+
+	config_set.git_cmd = 1;
+	strvec_pushl(&config_set.args, "config", "--add", "--global", "maintenance.repo",
+		     the_repository->worktree ? the_repository->worktree
+					      : the_repository->gitdir,
+		     NULL);
+
+	return run_command(&config_set);
+}
+
+static int maintenance_unregister(void)
+{
+	struct child_process config_unset = CHILD_PROCESS_INIT;
+
+	if (!the_repository || !the_repository->gitdir)
+		return error(_("no current repository to unregister"));
+
+	config_unset.git_cmd = 1;
+	strvec_pushl(&config_unset.args, "config", "--global", "--unset",
+		     "maintenance.repo",
+		     the_repository->worktree ? the_repository->worktree
+					      : the_repository->gitdir,
+		     NULL);
+
+	return run_command(&config_unset);
+}
+
+#if defined(__APPLE__)
+
+static char *get_service_name(const char *frequency)
+{
+	struct strbuf label = STRBUF_INIT;
+	strbuf_addf(&label, "org.git-scm.git.%s", frequency);
+	return strbuf_detach(&label, NULL);
+}
+
+static char *get_service_filename(const char *name)
+{
+	char *expanded;
+	struct strbuf filename = STRBUF_INIT;
+	strbuf_addf(&filename, "~/Library/LaunchAgents/%s.plist", name);
+
+	expanded = expand_user_path(filename.buf, 1);
+	if (!expanded)
+		die(_("failed to expand path '%s'"), filename.buf);
+
+	strbuf_release(&filename);
+	return expanded;
+}
+
+static const char *get_frequency(enum schedule_priority schedule)
+{
+	switch (schedule) {
+	case SCHEDULE_HOURLY:
+		return "hourly";
+	case SCHEDULE_DAILY:
+		return "daily";
+	case SCHEDULE_WEEKLY:
+		return "weekly";
+	default:
+		BUG("invalid schedule %d", schedule);
+	}
+}
+
+static char *get_uid(void)
+{
+	struct strbuf output = STRBUF_INIT;
+	struct child_process id = CHILD_PROCESS_INIT;
+
+	strvec_pushl(&id.args, "/usr/bin/id", "-u", NULL);
+	if (capture_command(&id, &output, 0))
+		die(_("failed to discover user id"));
+
+	strbuf_trim_trailing_newline(&output);
+	return strbuf_detach(&output, NULL);
+}
+
+static int bootout(const char *filename)
+{
+	int result;
+	struct strvec args = STRVEC_INIT;
+	char *uid = get_uid();
+	const char *launchctl = getenv("GIT_TEST_CRONTAB");
+	if (!launchctl)
+		launchctl = "/bin/launchctl";
+
+	strvec_split(&args, launchctl);
+	strvec_push(&args, "bootout");
+	strvec_pushf(&args, "gui/%s", uid);
+	strvec_push(&args, filename);
+
+	result = run_command_v_opt(args.v, 0);
+
+	strvec_clear(&args);
+	free(uid);
+	return result;
+}
+
+static int bootstrap(const char *filename)
+{
+	int result;
+	struct strvec args = STRVEC_INIT;
+	char *uid = get_uid();
+	const char *launchctl = getenv("GIT_TEST_CRONTAB");
+	if (!launchctl)
+		launchctl = "/bin/launchctl";
+
+	strvec_split(&args, launchctl);
+	strvec_push(&args, "bootstrap");
+	strvec_pushf(&args, "gui/%s", uid);
+	strvec_push(&args, filename);
+
+	result = run_command_v_opt(args.v, 0);
+
+	strvec_clear(&args);
+	free(uid);
+	return result;
+}
+
+static int remove_plist(enum schedule_priority schedule)
+{
+	const char *frequency = get_frequency(schedule);
+	char *name = get_service_name(frequency);
+	char *filename = get_service_filename(name);
+	int result = bootout(filename);
+	free(filename);
+	free(name);
+	return result;
+}
+
+static int remove_plists(void)
+{
+	return remove_plist(SCHEDULE_HOURLY) ||
+		remove_plist(SCHEDULE_DAILY) ||
+		remove_plist(SCHEDULE_WEEKLY);
+}
+
+static int schedule_plist(const char *exec_path, enum schedule_priority schedule)
+{
+	FILE *plist;
+	int i;
+	const char *preamble, *repeat;
+	const char *frequency = get_frequency(schedule);
+	char *name = get_service_name(frequency);
+	char *filename = get_service_filename(name);
+
+	if (safe_create_leading_directories(filename))
+		die(_("failed to create directories for '%s'"), filename);
+	plist = fopen(filename, "w");
+
+	if (!plist)
+		die(_("failed to open '%s'"), filename);
+
+	preamble = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+		   "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
+		   "<plist version=\"1.0\">"
+		   "<dict>\n"
+		   "<key>Label</key><string>%s</string>\n"
+		   "<key>ProgramArguments</key>\n"
+		   "<array>\n"
+		   "<string>%s/git</string>\n"
+		   "<string>--exec-path=%s</string>\n"
+		   "<string>for-each-repo</string>\n"
+		   "<string>--config=maintenance.repo</string>\n"
+		   "<string>maintenance</string>\n"
+		   "<string>run</string>\n"
+		   "<string>--schedule=%s</string>\n"
+		   "</array>\n"
+		   "<key>StartCalendarInterval</key>\n"
+		   "<array>\n";
+	fprintf(plist, preamble, name, exec_path, exec_path, frequency);
+
+	switch (schedule) {
+	case SCHEDULE_HOURLY:
+		repeat = "<dict>\n"
+			 "<key>Hour</key><integer>%d</integer>\n"
+			 "<key>Minute</key><integer>0</integer>\n"
+			 "</dict>\n";
+		for (i = 1; i <= 23; i++)
+			fprintf(plist, repeat, i);
+		break;
+
+	case SCHEDULE_DAILY:
+		repeat = "<dict>\n"
+			 "<key>Day</key><integer>%d</integer>\n"
+			 "<key>Hour</key><integer>0</integer>\n"
+			 "<key>Minute</key><integer>0</integer>\n"
+			 "</dict>\n";
+		for (i = 1; i <= 6; i++)
+			fprintf(plist, repeat, i);
+		break;
+
+	case SCHEDULE_WEEKLY:
+		fprintf(plist,
+			"<dict>\n"
+			"<key>Day</key><integer>0</integer>\n"
+			"<key>Hour</key><integer>0</integer>\n"
+			"<key>Minute</key><integer>0</integer>\n"
+			"</dict>\n");
+		break;
+
+	default:
+		/* unreachable */
+		break;
+	}
+	fprintf(plist, "</array>\n</dict>\n</plist>\n");
+
+	/* bootout might fail if not already running, so ignore */
+	bootout(filename);
+	if (bootstrap(filename))
+		die(_("failed to bootstrap service %s"), filename);
+
+	fclose(plist);
+	free(filename);
+	free(name);
+	return 0;
+}
+
+static int add_plists(void)
+{
+	const char *exec_path = git_exec_path();
+
+	return schedule_plist(exec_path, SCHEDULE_HOURLY) ||
+		schedule_plist(exec_path, SCHEDULE_DAILY) ||
+		schedule_plist(exec_path, SCHEDULE_WEEKLY);
+}
+
+static int platform_update_schedule(int run_maintenance, int fd)
+{
+	if (run_maintenance)
+		return add_plists();
+	else
+		return remove_plists();
+}
+
+#elif defined(GIT_WINDOWS_NATIVE)
+
+static const char *get_frequency(enum schedule_priority schedule)
+{
+	switch (schedule) {
+	case SCHEDULE_HOURLY:
+		return "hourly";
+	case SCHEDULE_DAILY:
+		return "daily";
+	case SCHEDULE_WEEKLY:
+		return "weekly";
+	default:
+		BUG("invalid schedule %d", schedule);
+	}
+}
+
+static char *get_task_name(const char *frequency)
+{
+	struct strbuf label = STRBUF_INIT;
+	strbuf_addf(&label, "Git Maintenance (%s)", frequency);
+	return strbuf_detach(&label, NULL);
+}
+
+static int remove_task(enum schedule_priority schedule)
+{
+	int result;
+	struct strvec args = STRVEC_INIT;
+	const char *frequency = get_frequency(schedule);
+	char *name = get_task_name(frequency);
+	const char *schtasks = getenv("GIT_TEST_CRONTAB");
+	if (!schtasks)
+		schtasks = "schtasks";
+
+	strvec_split(&args, schtasks);
+	strvec_pushl(&args, "/delete", "/tn", name, "/f", NULL);
+
+	result = run_command_v_opt(args.v, 0);
+
+	strvec_clear(&args);
+	free(name);
+	return result;
+}
+
+static int remove_scheduled_tasks(void)
+{
+	return remove_task(SCHEDULE_HOURLY) ||
+		remove_task(SCHEDULE_DAILY) ||
+		remove_task(SCHEDULE_WEEKLY);
+}
+
+static int schedule_task(const char *exec_path, enum schedule_priority schedule)
+{
+	int result;
+	struct strvec args = STRVEC_INIT;
+	const char *xml, *schtasks;
+	char *xmlpath;
+	FILE *xmlfp;
+	const char *frequency = get_frequency(schedule);
+	char *name = get_task_name(frequency);
+
+	xmlpath =  xstrfmt("%s/schedule-%s.xml",
+			   the_repository->objects->odb->path,
+			   frequency);
+	xmlfp = fopen(xmlpath, "w");
+	if (!xmlfp)
+		die(_("failed to open '%s'"), xmlpath);
+
+	xml = "<?xml version=\"1.0\" encoding=\"UTF-16\"?>\n"
+	      "<Task version=\"1.4\" xmlns=\"http://schemas.microsoft.com/windows/2004/02/mit/task\">\n"
+	      "<Triggers>\n"
+	      "<CalendarTrigger>\n";
+	fprintf(xmlfp, xml);
+
+	switch (schedule) {
+	case SCHEDULE_HOURLY:
+		fprintf(xmlfp,
+			"<StartBoundary>2020-01-01T01:00:00</StartBoundary>\n"
+			"<Enabled>true</Enabled>\n"
+			"<ScheduleByDay>\n"
+			"<DaysInterval>1</DaysInterval>\n"
+			"</ScheduleByDay>\n"
+			"<Repetition>\n"
+			"<Interval>PT1H</Interval>\n"
+			"<Duration>PT23H</Duration>\n"
+			"<StopAtDurationEnd>false</StopAtDurationEnd>\n"
+			"</Repetition>\n");
+		break;
+
+	case SCHEDULE_DAILY:
+		fprintf(xmlfp,
+			"<StartBoundary>2020-01-01T00:00:00</StartBoundary>\n"
+			"<Enabled>true</Enabled>\n"
+			"<ScheduleByWeek>\n"
+			"<DaysOfWeek>\n"
+			"<Monday />\n"
+			"<Tuesday />\n"
+			"<Wednesday />\n"
+			"<Thursday />\n"
+			"<Friday />\n"
+			"<Saturday />\n"
+			"</DaysOfWeek>\n"
+			"<WeeksInterval>1</WeeksInterval>\n"
+			"</ScheduleByWeek>\n");
+		break;
+
+	case SCHEDULE_WEEKLY:
+		fprintf(xmlfp,
+			"<StartBoundary>2020-01-01T00:00:00</StartBoundary>\n"
+			"<Enabled>true</Enabled>\n"
+			"<ScheduleByWeek>\n"
+			"<DaysOfWeek>\n"
+			"<Sunday />\n"
+			"</DaysOfWeek>\n"
+			"<WeeksInterval>1</WeeksInterval>\n"
+			"</ScheduleByWeek>\n");
+		break;
+
+	default:
+		break;
+	}
+
+	xml=  "</CalendarTrigger>\n"
+	      "</Triggers>\n"
+	      "<Principals>\n"
+	      "<Principal id=\"Author\">\n"
+	      "<LogonType>InteractiveToken</LogonType>\n"
+	      "<RunLevel>LeastPrivilege</RunLevel>\n"
+	      "</Principal>\n"
+	      "</Principals>\n"
+	      "<Settings>\n"
+	      "<MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>\n"
+	      "<Enabled>true</Enabled>\n"
+	      "<Hidden>true</Hidden>\n"
+	      "<UseUnifiedSchedulingEngine>true</UseUnifiedSchedulingEngine>\n"
+	      "<WakeToRun>false</WakeToRun>\n"
+	      "<ExecutionTimeLimit>PT72H</ExecutionTimeLimit>\n"
+	      "<Priority>7</Priority>\n"
+	      "</Settings>\n"
+	      "<Actions Context=\"Author\">\n"
+	      "<Exec>\n"
+	      "<Command>\"%s\\git.exe\"</Command>\n"
+	      "<Arguments>--exec-path=\"%s\" for-each-repo --config=maintenance.repo maintenance run --schedule=%s</Arguments>\n"
+	      "</Exec>\n"
+	      "</Actions>\n"
+	      "</Task>\n";
+	fprintf(xmlfp, xml, exec_path, exec_path, frequency);
+	fclose(xmlfp);
+
+	schtasks = getenv("GIT_TEST_CRONTAB");
+	if (!schtasks)
+		schtasks = "schtasks";
+	strvec_split(&args, schtasks);
+	strvec_pushl(&args, "/create", "/tn", name, "/f", "/xml", xmlpath, NULL);
+
+	result = run_command_v_opt(args.v, 0);
+
+	strvec_clear(&args);
+	unlink(xmlpath);
+	free(xmlpath);
+	free(name);
+	return result;
+}
+
+static int add_scheduled_tasks(void)
+{
+	const char *exec_path = git_exec_path();
+
+	return schedule_task(exec_path, SCHEDULE_HOURLY) ||
+		schedule_task(exec_path, SCHEDULE_DAILY) ||
+		schedule_task(exec_path, SCHEDULE_WEEKLY);
+}
+
+static int platform_update_schedule(int run_maintenance, int fd)
+{
+	if (run_maintenance)
+		return add_scheduled_tasks();
+	else
+		return remove_scheduled_tasks();
+}
+
+#else
+#define BEGIN_LINE "# BEGIN GIT MAINTENANCE SCHEDULE"
+#define END_LINE "# END GIT MAINTENANCE SCHEDULE"
+
+static int platform_update_schedule(int run_maintenance, int fd)
+{
+	int result = 0;
+	int in_old_region = 0;
+	struct child_process crontab_list = CHILD_PROCESS_INIT;
+	struct child_process crontab_edit = CHILD_PROCESS_INIT;
+	FILE *cron_list, *cron_in;
+	const char *crontab_name;
+	struct strbuf line = STRBUF_INIT;
+
+	crontab_name = getenv("GIT_TEST_CRONTAB");
+	if (!crontab_name)
+		crontab_name = "crontab";
+
+	strvec_split(&crontab_list.args, crontab_name);
+	strvec_push(&crontab_list.args, "-l");
+	crontab_list.in = -1;
+	crontab_list.out = dup(fd);
+	crontab_list.git_cmd = 0;
+
+	if (start_command(&crontab_list)) {
+		return error(_("failed to run 'crontab -l'; your system might not support 'cron'"));
+	}
+
+	/* Ignore exit code, as an empty crontab will return error. */
+	finish_command(&crontab_list);
+
+	/*
+	 * Read from the .lock file, filtering out the old
+	 * schedule while appending the new schedule.
+	 */
+	cron_list = fdopen(fd, "r");
+	rewind(cron_list);
+
+	strvec_split(&crontab_edit.args, crontab_name);
+	crontab_edit.in = -1;
+	crontab_edit.git_cmd = 0;
+
+	if (start_command(&crontab_edit)) {
+		return error(_("failed to run 'crontab'; your system might not support 'cron'"));
+	}
+
+	cron_in = fdopen(crontab_edit.in, "w");
+	if (!cron_in) {
+		result = error(_("failed to open stdin of 'crontab'"));
+		goto done_editing;
+	}
+
+	while (!strbuf_getline_lf(&line, cron_list)) {
+		if (!in_old_region && !strcmp(line.buf, BEGIN_LINE))
+			in_old_region = 1;
+		if (in_old_region)
+			continue;
+		fprintf(cron_in, "%s\n", line.buf);
+		if (in_old_region && !strcmp(line.buf, END_LINE))
+			in_old_region = 0;
+	}
+
+	if (run_maintenance) {
+		struct strbuf line_format = STRBUF_INIT;
+		const char *exec_path = git_exec_path();
+
+		fprintf(cron_in, "%s\n", BEGIN_LINE);
+		fprintf(cron_in,
+			"# The following schedule was created by Git\n");
+		fprintf(cron_in, "# Any edits made in this region might be\n");
+		fprintf(cron_in,
+			"# replaced in the future by a Git command.\n\n");
+
+		strbuf_addf(&line_format,
+			    "%%s %%s * * %%s \"%s/git\" --exec-path=\"%s\" for-each-repo --config=maintenance.repo maintenance run --schedule=%%s\n",
+			    exec_path, exec_path);
+		fprintf(cron_in, line_format.buf, "0", "1-23", "*", "hourly");
+		fprintf(cron_in, line_format.buf, "0", "0", "1-6", "daily");
+		fprintf(cron_in, line_format.buf, "0", "0", "0", "weekly");
+		strbuf_release(&line_format);
+
+		fprintf(cron_in, "\n%s\n", END_LINE);
+	}
+
+	fflush(cron_in);
+	fclose(cron_in);
+	close(crontab_edit.in);
+
+done_editing:
+	if (finish_command(&crontab_edit))
+		result = error(_("'crontab' died"));
+	else
+		fclose(cron_list);
+	return result;
+}
+#endif
+
+static int update_background_schedule(int run_maintenance)
+{
+	int result;
+	struct lock_file lk;
+	char *lock_path = xstrfmt("%s/schedule", the_repository->objects->odb->path);
+
+	if (hold_lock_file_for_update(&lk, lock_path, LOCK_NO_DEREF) < 0)
+		return error(_("another process is scheduling background maintenance"));
+
+	result = platform_update_schedule(run_maintenance, lk.tempfile->fd);
+
+	rollback_lock_file(&lk);
+	return result;
+}
+
+static int maintenance_start(void)
+{
+	if (maintenance_register())
+		warning(_("failed to add repo to global config"));
+
+	return update_background_schedule(1);
+}
+
+static int maintenance_stop(void)
+{
+	return update_background_schedule(0);
+}
+
+static const char builtin_maintenance_usage[] =	N_("git maintenance <subcommand> [<options>]");
 
 int cmd_maintenance(int argc, const char **argv, const char *prefix)
 {
@@ -1369,6 +2024,14 @@ int cmd_maintenance(int argc, const char **argv, const char *prefix)
 
 	if (!strcmp(argv[1], "run"))
 		return maintenance_run(argc - 1, argv + 1, prefix);
+	if (!strcmp(argv[1], "start"))
+		return maintenance_start();
+	if (!strcmp(argv[1], "stop"))
+		return maintenance_stop();
+	if (!strcmp(argv[1], "register"))
+		return maintenance_register();
+	if (!strcmp(argv[1], "unregister"))
+		return maintenance_unregister();
 
 	die(_("invalid subcommand: %s"), argv[1]);
 }

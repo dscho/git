@@ -11,8 +11,12 @@ int is_directory(const char *path)
 	return (!stat(path, &st) && S_ISDIR(st.st_mode));
 }
 
-/* removes the last path component from 'path' except if 'path' is root */
-static void strip_last_component(struct strbuf *path)
+/*
+ * Removes the last path component from 'path' except if 'path' is root.
+ *
+ * If last is not NULL, the last path component is copied to last.
+ */
+static void strip_last_component(struct strbuf *path, struct strbuf *last)
 {
 	size_t offset = offset_1st_component(path->buf);
 	size_t len = path->len;
@@ -20,6 +24,10 @@ static void strip_last_component(struct strbuf *path)
 	/* Find start of the last component */
 	while (offset < len && !is_dir_sep(path->buf[len - 1]))
 		len--;
+
+	if (last)
+		strbuf_addstr(last, path->buf + len);
+
 	/* Skip sequences of multiple path-separators */
 	while (offset < len && is_dir_sep(path->buf[len - 1]))
 		len--;
@@ -118,7 +126,7 @@ char *strbuf_realpath(struct strbuf *resolved, const char *path,
 			continue; /* '.' component */
 		} else if (next.len == 2 && !strcmp(next.buf, "..")) {
 			/* '..' component; strip the last path component */
-			strip_last_component(resolved);
+			strip_last_component(resolved, NULL);
 			continue;
 		}
 
@@ -169,7 +177,7 @@ char *strbuf_realpath(struct strbuf *resolved, const char *path,
 				 * strip off the last component since it will
 				 * be replaced with the contents of the symlink
 				 */
-				strip_last_component(resolved);
+				strip_last_component(resolved, NULL);
 			}
 
 			/*
@@ -200,6 +208,40 @@ error_out:
 		strbuf_reset(resolved);
 
 	return retval;
+}
+
+/*
+ * Like strbuf_realpath, but trailing components which do not exist are copied
+ * through.
+ */
+char *strbuf_realpath_missing(struct strbuf *resolved, const char *path)
+{
+	struct strbuf remaining = STRBUF_INIT;
+	struct strbuf trailing = STRBUF_INIT;
+	struct strbuf component = STRBUF_INIT;
+
+	strbuf_addstr(&remaining, path);
+
+	while (remaining.len) {
+		if (strbuf_realpath(resolved, remaining.buf, 0)) {
+			strbuf_addbuf(resolved, &trailing);
+
+			strbuf_release(&component);
+			strbuf_release(&remaining);
+			strbuf_release(&trailing);
+
+			return resolved->buf;
+		}
+		strip_last_component(&remaining, &component);
+		strbuf_insertstr(&trailing, 0, "/");
+		strbuf_insertstr(&trailing, 1, component.buf);
+		strbuf_reset(&component);
+	}
+
+	strbuf_release(&component);
+	strbuf_release(&remaining);
+	strbuf_release(&trailing);
+	return NULL;
 }
 
 char *real_pathdup(const char *path, int die_on_error)

@@ -492,3 +492,12 @@ form `object-format=X`) to notify the client that the server is able to deal
 with objects using hash algorithm X.  If not specified, the server is assumed to
 only handle SHA-1.  If the client would like to use a hash algorithm other than
 SHA-1, it should specify its object-format string.
+
+trace2-sid=<session-id>
+~~~~~~~~~~~~~~~~~~~~~~~
+
+If trace2 tracing is enabled on the server, it may advertise its session ID via
+this capability. The client may choose to log the server's session ID in its
+trace logs, and advertise its own session ID back to the server for it to log
+as well. This allows for easier debugging of remote sessions when both client
+and server logs are available.

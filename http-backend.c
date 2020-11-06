@@ -544,7 +544,7 @@ static void get_info_refs(struct strbuf *hdr, char *arg)
 		end_headers(hdr);
 
 
-		if (determine_protocol_version_server() != protocol_v2) {
+		if (determine_protocol_version_server(NULL) != protocol_v2) {
 			packet_write_fmt(1, "# service=git-%s\n", svc->name);
 			packet_flush(1);
 		}

@@ -69,3 +69,7 @@ trace2.maxFiles::
 	write additional traces if we would exceed this many files. Instead,
 	write a sentinel file that will block further tracing to this
 	directory. Defaults to 0, which disables this check.
+
+trace2.advertiseSID::
+	Boolean. When true, client and server processes will advertise their
+	trace2 session IDs to their remote counterpart. Defaults to false.

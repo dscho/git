@@ -12,6 +12,7 @@
 #include "color.h"
 #include "commit.h"
 #include "diff.h"
+#include "diff-merges.h"
 #include "revision.h"
 #include "log-tree.h"
 #include "builtin.h"
@@ -183,8 +184,8 @@ static void cmd_log_init_finish(int argc, const char **argv, const char *prefix,
 				N_("pattern"), N_("do not decorate refs that match <pattern>")),
 		OPT_CALLBACK_F(0, "decorate", NULL, NULL, N_("decorate options"),
 			       PARSE_OPT_OPTARG, decorate_callback),
-		OPT_CALLBACK('L', NULL, &line_cb, "n,m:file",
-			     N_("Process line range n,m in file, counting from 1"),
+		OPT_CALLBACK('L', NULL, &line_cb, "range:file",
+			     N_("Trace the evolution of line range <start>,<end> or function :<funcname> in <file>"),
 			     log_line_range_callback),
 		OPT_END()
 	};
@@ -205,6 +206,9 @@ static void cmd_log_init_finish(int argc, const char **argv, const char *prefix,
 	/* Any arguments at this point are not recognized */
 	if (argc > 1)
 		die(_("unrecognized argument: %s"), argv[1]);
+
+	if (rev->line_level_traverse && rev->prune_data.nr)
+		die(_("-L<range>:<file> cannot be used with pathspec"));
 
 	memset(&w, 0, sizeof(w));
 	userformat_find_requirements(NULL, &w);
@@ -598,15 +602,10 @@ static int show_tree_object(const struct object_id *oid,
 static void show_setup_revisions_tweak(struct rev_info *rev,
 				       struct setup_revision_opt *opt)
 {
-	if (rev->ignore_merges < 0) {
-		/* There was no "-m" variant on the command line */
-		rev->ignore_merges = 0;
-		if (!rev->first_parent_only && !rev->combine_merges) {
-			/* No "--first-parent", "-c", or "--cc" */
-			rev->combine_merges = 1;
-			rev->dense_combined_merges = 1;
-		}
-	}
+	if (rev->first_parent_only)
+		diff_merges_default_to_first_parent(rev);
+	else
+		diff_merges_default_to_dense_combined(rev);
 	if (!rev->diffopt.output_format)
 		rev->diffopt.output_format = DIFF_FORMAT_PATCH;
 }
@@ -731,8 +730,8 @@ static void log_setup_revisions_tweak(struct rev_info *rev,
 	if (!rev->diffopt.output_format && rev->combine_merges)
 		rev->diffopt.output_format = DIFF_FORMAT_PATCH;
 
-	if (rev->first_parent_only && rev->ignore_merges < 0)
-		rev->ignore_merges = 0;
+	if (rev->first_parent_only)
+		diff_merges_default_to_first_parent(rev);
 }
 
 int cmd_log(int argc, const char **argv, const char *prefix)
@@ -1153,7 +1152,7 @@ static void get_notes_args(struct strvec *arg, struct rev_info *rev)
 	}
 }
 
-static void make_cover_letter(struct rev_info *rev, int use_stdout,
+static void make_cover_letter(struct rev_info *rev, int use_separate_file,
 			      struct commit *origin,
 			      int nr, struct commit **list,
 			      const char *branch_name,
@@ -1173,7 +1172,7 @@ static void make_cover_letter(struct rev_info *rev, int use_stdout,
 
 	committer = git_committer_info(0);
 
-	if (!use_stdout &&
+	if (use_separate_file &&
 	    open_next_file(NULL, rev->numbered_files ? NULL : "cover-letter", rev, quiet))
 		die(_("failed to create cover-letter file"));
 
@@ -1942,20 +1941,27 @@ int cmd_format_patch(int argc, const char **argv, const char *prefix)
 	if (rev.show_notes)
 		load_display_notes(&rev.notes_opt);
 
-	if (!output_directory && !use_stdout)
-		output_directory = config_output_directory;
+	if (use_stdout + rev.diffopt.close_file + !!output_directory > 1)
+		die(_("--stdout, --output, and --output-directory are mutually exclusive"));
 
-	if (!use_stdout)
-		output_directory = set_outdir(prefix, output_directory);
-	else
+	if (use_stdout) {
 		setup_pager();
-
-	if (output_directory) {
+	} else if (rev.diffopt.close_file) {
+		/*
+		 * The diff code parsed --output; it has already opened the
+		 * file, but but we must instruct it not to close after each
+		 * diff.
+		 */
+		rev.diffopt.close_file = 0;
+	} else {
 		int saved;
+
+		if (!output_directory)
+			output_directory = config_output_directory;
+		output_directory = set_outdir(prefix, output_directory);
+
 		if (rev.diffopt.use_color != GIT_COLOR_ALWAYS)
 			rev.diffopt.use_color = GIT_COLOR_NEVER;
-		if (use_stdout)
-			die(_("standard output, or directory, which one?"));
 		/*
 		 * We consider <outdir> as 'outside of gitdir', therefore avoid
 		 * applying adjust_shared_perm in s-c-l-d.
@@ -2117,7 +2123,7 @@ int cmd_format_patch(int argc, const char **argv, const char *prefix)
 	if (cover_letter) {
 		if (thread)
 			gen_message_id(&rev, "cover");
-		make_cover_letter(&rev, use_stdout,
+		make_cover_letter(&rev, !!output_directory,
 				  origin, nr, list, branch_name, quiet);
 		print_bases(&bases, rev.diffopt.file);
 		print_signature(rev.diffopt.file);
@@ -2172,7 +2178,7 @@ int cmd_format_patch(int argc, const char **argv, const char *prefix)
 			gen_message_id(&rev, oid_to_hex(&commit->object.oid));
 		}
 
-		if (!use_stdout &&
+		if (output_directory &&
 		    open_next_file(rev.numbered_files ? NULL : commit, NULL, &rev, quiet))
 			die(_("failed to create output files"));
 		shown = log_tree_commit(&rev, commit);
@@ -2185,7 +2191,7 @@ int cmd_format_patch(int argc, const char **argv, const char *prefix)
 		 * the log; when using one file per patch, we do
 		 * not want the extra blank line.
 		 */
-		if (!use_stdout)
+		if (output_directory)
 			rev.shown_one = 0;
 		if (shown) {
 			print_bases(&bases, rev.diffopt.file);
@@ -2196,7 +2202,7 @@ int cmd_format_patch(int argc, const char **argv, const char *prefix)
 			else
 				print_signature(rev.diffopt.file);
 		}
-		if (!use_stdout)
+		if (output_directory)
 			fclose(rev.diffopt.file);
 	}
 	stop_progress(&progress);

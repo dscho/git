@@ -4590,6 +4590,9 @@ void repo_diff_setup(struct repository *r, struct diff_options *options)
 
 	options->orderfile = diff_order_file_cfg;
 
+	if (!options->flags.ignore_submodule_set)
+		handle_ignore_submodules_arg(options, "untracked");
+
 	if (diff_no_prefix) {
 		options->a_prefix = options->b_prefix = "";
 	} else if (!diff_mnemonic_prefix) {
@@ -6312,9 +6315,9 @@ static void diff_flush_patch_all_file_pairs(struct diff_options *o)
 			if (o->color_moved == COLOR_MOVED_ZEBRA_DIM)
 				dim_moved_lines(o);
 
-			hashmap_free_entries(&add_lines, struct moved_entry,
+			hashmap_clear_and_free(&add_lines, struct moved_entry,
 						ent);
-			hashmap_free_entries(&del_lines, struct moved_entry,
+			hashmap_clear_and_free(&del_lines, struct moved_entry,
 						ent);
 		}
 
