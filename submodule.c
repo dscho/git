@@ -420,6 +420,7 @@ const char *submodule_strategy_to_string(const struct submodule_update_strategy 
 void handle_ignore_submodules_arg(struct diff_options *diffopt,
 				  const char *arg)
 {
+	diffopt->flags.ignore_submodule_set = 1;
 	diffopt->flags.ignore_submodules = 0;
 	diffopt->flags.ignore_untracked_in_submodules = 0;
 	diffopt->flags.ignore_dirty_submodules = 0;
@@ -1678,6 +1679,8 @@ unsigned is_submodule_modified(const char *path, int ignore_untracked)
 	strvec_pushl(&cp.args, "status", "--porcelain=2", NULL);
 	if (ignore_untracked)
 		strvec_push(&cp.args, "-uno");
+	else
+		strvec_push(&cp.args, "--ignore-submodules=none");
 
 	prepare_submodule_repo_env(&cp.env_array);
 	cp.git_cmd = 1;
