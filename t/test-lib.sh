@@ -1711,3 +1711,13 @@ test_lazy_prereq SHA1 '
 test_lazy_prereq REBASE_P '
 	test -z "$GIT_TEST_SKIP_REBASE_P"
 '
+
+test_lazy_prereq MACOS_MAINTENANCE '
+	launchctl list
+'
+
+# Ensure that no test accidentally triggers a Git command
+# that runs 'crontab', affecting a user's cron schedule.
+# Tests that verify the cron integration must set this locally
+# to avoid errors.
+GIT_TEST_CRONTAB="exit 1"

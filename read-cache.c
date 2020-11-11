@@ -813,8 +813,10 @@ struct cache_entry *make_empty_cache_entry(struct index_state *istate, size_t le
 	return mem_pool__ce_calloc(find_mem_pool(istate), len);
 }
 
-struct cache_entry *make_empty_transient_cache_entry(size_t len)
+struct cache_entry *make_empty_transient_cache_entry(size_t len, struct mem_pool *mp)
 {
+	if (mp)
+		return mem_pool__ce_calloc(mp, len);
 	return xcalloc(1, cache_entry_size(len));
 }
 
@@ -848,8 +850,10 @@ struct cache_entry *make_cache_entry(struct index_state *istate,
 	return ret;
 }
 
-struct cache_entry *make_transient_cache_entry(unsigned int mode, const struct object_id *oid,
-					       const char *path, int stage)
+struct cache_entry *make_transient_cache_entry(unsigned int mode,
+					       const struct object_id *oid,
+					       const char *path, int stage,
+					       struct mem_pool *mp)
 {
 	struct cache_entry *ce;
 	int len;
@@ -860,7 +864,7 @@ struct cache_entry *make_transient_cache_entry(unsigned int mode, const struct o
 	}
 
 	len = strlen(path);
-	ce = make_empty_transient_cache_entry(len);
+	ce = make_empty_transient_cache_entry(len, mp);
 
 	oidcpy(&ce->oid, oid);
 	memcpy(ce->name, path, len);
@@ -947,7 +951,9 @@ static int verify_dotfile(const char *rest, unsigned mode)
 			return 0;
 		if (S_ISLNK(mode)) {
 			rest += 3;
-			if (skip_iprefix(rest, "modules", &rest) &&
+			if ((skip_iprefix(rest, "modules", &rest) ||
+			     skip_iprefix(rest, "ignore", &rest) ||
+			     skip_iprefix(rest, "attributes", &rest)) &&
 			    (*rest == '\0' || is_dir_sep(*rest)))
 				return 0;
 		}
@@ -980,7 +986,9 @@ inside:
 				if (is_hfs_dotgit(path))
 					return 0;
 				if (S_ISLNK(mode)) {
-					if (is_hfs_dotgitmodules(path))
+					if (is_hfs_dotgitmodules(path) ||
+					    is_hfs_dotgitignore(path) ||
+					    is_hfs_dotgitattributes(path))
 						return 0;
 				}
 			}
@@ -992,7 +1000,9 @@ inside:
 				if (is_ntfs_dotgit(path))
 					return 0;
 				if (S_ISLNK(mode)) {
-					if (is_ntfs_dotgitmodules(path))
+					if (is_ntfs_dotgitmodules(path) ||
+					    is_ntfs_dotgitignore(path) ||
+					    is_ntfs_dotgitattributes(path))
 						return 0;
 				}
 			}

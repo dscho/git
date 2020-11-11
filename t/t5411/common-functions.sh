@@ -42,7 +42,7 @@ create_commits_in () {
 make_user_friendly_and_stable_output () {
 	sed \
 		-e "s/  *\$//" \
-		-e "s/   */ /g" \
+		-e "s/  */ /g" \
 		-e "s/'/\"/g" \
 		-e "s/	/    /g" \
 		-e "s/$A/<COMMIT-A>/g" \
@@ -52,5 +52,11 @@ make_user_friendly_and_stable_output () {
 		-e "s/$(echo $A | cut -c1-7)[0-9a-f]*/<OID-A>/g" \
 		-e "s/$(echo $B | cut -c1-7)[0-9a-f]*/<OID-B>/g" \
 		-e "s#To $URL_PREFIX/upstream.git#To <URL/of/upstream.git>#" \
-		-e "/^error: / d"
+		-e "/^error: / d" | \
+	if test $# -eq 0
+	then
+		cat
+	else
+		sed ${1+"$@"}
+	fi
 }

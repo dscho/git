@@ -120,6 +120,17 @@ static int git_fetch_config(const char *k, const char *v, void *cb)
 		return 0;
 	}
 
+	if (!strcmp(k, "transfer.ipversion")) {
+		if (!strcmp(v, "all"))
+			;
+		else if (!strcmp(v, "4"))
+			family = TRANSPORT_FAMILY_IPV4;
+		else if (!strcmp(v, "6"))
+			family = TRANSPORT_FAMILY_IPV6;
+		else
+			die(_("transfer.ipversion can be only 4, 6, or any"));
+		return 0;
+	}
 	return git_default_config(k, v, cb);
 }
 
@@ -393,7 +404,7 @@ static void find_non_local_tags(const struct ref *refs,
 		item = refname_hash_add(&remote_refs, ref->name, &ref->old_oid);
 		string_list_insert(&remote_refs_list, ref->name);
 	}
-	hashmap_free_entries(&existing_refs, struct refname_hash_entry, ent);
+	hashmap_clear_and_free(&existing_refs, struct refname_hash_entry, ent);
 
 	/*
 	 * We may have a final lightweight tag that needs to be
@@ -428,7 +439,7 @@ static void find_non_local_tags(const struct ref *refs,
 		**tail = rm;
 		*tail = &rm->next;
 	}
-	hashmap_free_entries(&remote_refs, struct refname_hash_entry, ent);
+	hashmap_clear_and_free(&remote_refs, struct refname_hash_entry, ent);
 	string_list_clear(&remote_refs_list, 0);
 	oidset_clear(&fetch_oids);
 }
@@ -573,7 +584,7 @@ static struct ref *get_ref_map(struct remote *remote,
 		}
 	}
 	if (existing_refs_populated)
-		hashmap_free_entries(&existing_refs, struct refname_hash_entry, ent);
+		hashmap_clear_and_free(&existing_refs, struct refname_hash_entry, ent);
 
 	return ref_map;
 }
