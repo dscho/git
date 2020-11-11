@@ -132,6 +132,7 @@ prepare_httpd() {
 	install_script incomplete-length-upload-pack-v2-http.sh
 	install_script incomplete-body-upload-pack-v2-http.sh
 	install_script broken-smart-http.sh
+	install_script error-ntime.sh
 	install_script error-smart-http.sh
 	install_script error.sh
 	install_script apply-one-time-perl.sh
@@ -307,4 +308,11 @@ check_access_log() {
 	then
 		test_cmp "$1" access.log.stripped
 	fi
+}
+
+# generate a process unique one-up value
+global_counter_for_nonce=0
+gen_nonce () {
+	global_counter_for_nonce=$((global_counter_for_nonce + 1)) &&
+	echo "$global_counter_for_nonce"
 }
