@@ -20,7 +20,6 @@ USAGE="[--quiet] [--cached]
 OPTIONS_SPEC=
 SUBDIRECTORY_OK=Yes
 . git-sh-setup
-. git-parse-remote
 require_work_tree
 wt_prefix=$(git rev-parse --show-prefix)
 cd_to_toplevel
@@ -412,6 +411,13 @@ is_tip_reachable () (
 	rev=$(git rev-list -n 1 "$2" --not --all 2>/dev/null) &&
 	test -z "$rev"
 )
+
+get_default_remote () {
+	curr_branch=$(git symbolic-ref -q HEAD)
+	curr_branch="${curr_branch#refs/heads/}"
+	origin=$(git config --get "branch.$curr_branch.remote")
+	echo ${origin:-origin}
+}
 
 fetch_in_submodule () (
 	sanitize_submodule_env &&

@@ -6,13 +6,6 @@
 # this would fail in that case and would issue an error message.
 GIT_DIR=$(git rev-parse -q --git-dir) || :;
 
-get_default_remote () {
-	curr_branch=$(git symbolic-ref -q HEAD)
-	curr_branch="${curr_branch#refs/heads/}"
-	origin=$(git config --get "branch.$curr_branch.remote")
-	echo ${origin:-origin}
-}
-
 get_remote_merge_branch () {
 	case "$#" in
 	0|1)
