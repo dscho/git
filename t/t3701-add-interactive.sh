@@ -589,6 +589,59 @@ test_expect_success 'diffs can be colorized' '
 	grep "$(printf "\\033")" output
 '
 
+test_expect_success 'colors can be overridden' '
+	test_config color.interactive.header red &&
+	test_config color.interactive.help green &&
+	test_config color.interactive.prompt yellow &&
+	test_config color.interactive.error blue &&
+	test_config color.diff.frag magenta &&
+	test_config color.diff.context cyan &&
+	test_config color.diff.old bold &&
+	test_config color.diff.new "bold red" &&
+
+	git reset --hard &&
+	test_when_finished "git rm -f color-test" &&
+	test_write_lines context old more-context >color-test &&
+	git add color-test &&
+	test_write_lines context new more-context >color-test &&
+
+	echo trigger an error message >input &&
+	force_color git add -i 2>err.raw <input &&
+	test_decode_color <err.raw >err &&
+	grep "<BLUE>Huh (trigger)?<RESET>" err &&
+
+	test_write_lines patch color-test "" y quit >input &&
+	force_color git add -i >actual.raw <input &&
+	test_decode_color <actual.raw >actual.decoded &&
+	sed "/index [0-9a-f]*\\.\\.[0-9a-f]* 100644/d" <actual.decoded >actual &&
+	cat >expect <<-\EOF &&
+	<RED>           staged     unstaged path<RESET>
+	  1:        +3/-0        +1/-1 color-test
+
+	<RED>*** Commands ***<RESET>
+	  1: <YELLOW>s<RESET>tatus	  2: <YELLOW>u<RESET>pdate	  3: <YELLOW>r<RESET>evert	  4: <YELLOW>a<RESET>dd untracked
+	  5: <YELLOW>p<RESET>atch	  6: <YELLOW>d<RESET>iff	  7: <YELLOW>q<RESET>uit	  8: <YELLOW>h<RESET>elp
+	<YELLOW>What now<RESET>> <RED>           staged     unstaged path<RESET>
+	  1:        +3/-0        +1/-1 <YELLOW>c<RESET>olor-test
+	<YELLOW>Patch update<RESET>>> <RED>           staged     unstaged path<RESET>
+	* 1:        +3/-0        +1/-1 <YELLOW>c<RESET>olor-test
+	<YELLOW>Patch update<RESET>>> <BOLD>diff --git a/color-test b/color-test<RESET>
+	<BOLD>--- a/color-test<RESET>
+	<BOLD>+++ b/color-test<RESET>
+	<MAGENTA>@@ -1,3 +1,3 @@<RESET>
+	<CYAN> context<RESET>
+	<BOLD>-old<RESET>
+	<BOLD;RED>+<RESET><BOLD;RED>new<RESET>
+	<CYAN> more-context<RESET>
+	<YELLOW>(1/1) Stage this hunk [y,n,q,a,d,e,?]? <RESET>
+	<RED>*** Commands ***<RESET>
+	  1: <YELLOW>s<RESET>tatus	  2: <YELLOW>u<RESET>pdate	  3: <YELLOW>r<RESET>evert	  4: <YELLOW>a<RESET>dd untracked
+	  5: <YELLOW>p<RESET>atch	  6: <YELLOW>d<RESET>iff	  7: <YELLOW>q<RESET>uit	  8: <YELLOW>h<RESET>elp
+	<YELLOW>What now<RESET>> Bye.
+	EOF
+	test_cmp expect actual
+'
+
 test_expect_success 'colorized diffs respect diff.wsErrorHighlight' '
 	git reset --hard &&
 
