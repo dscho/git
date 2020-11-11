@@ -980,36 +980,36 @@ test_expect_success ':push:remoteref' '
 		cd push-tests &&
 		test_commit initial &&
 		git remote add from fifth.coffee:blub &&
-		git config branch.master.remote from &&
+		git config branch.main.remote from &&
 		actual="$(git -c push.default=simple for-each-ref \
 			--format="%(push:remotename),%(push:remoteref)" \
-			refs/heads/master)" &&
+			refs/heads/main)" &&
 		test from, = "$actual" &&
-		git config branch.master.merge refs/heads/master &&
+		git config branch.main.merge refs/heads/main &&
 		actual="$(git -c push.default=simple for-each-ref \
 			--format="%(push:remotename),%(push:remoteref)" \
-			refs/heads/master)" &&
-		test from,refs/heads/master = "$actual" &&
-		git config branch.master.merge refs/heads/other &&
+			refs/heads/main)" &&
+		test from,refs/heads/main = "$actual" &&
+		git config branch.main.merge refs/heads/other &&
 		actual="$(git -c push.default=simple for-each-ref \
 			--format="%(push:remotename),%(push:remoteref)" \
-			refs/heads/master)" &&
+			refs/heads/main)" &&
 		test from, = "$actual" &&
 		actual="$(git -c push.default=upstream for-each-ref \
 			--format="%(push:remotename),%(push:remoteref)" \
-			refs/heads/master)" &&
+			refs/heads/main)" &&
 		test from,refs/heads/other = "$actual" &&
 		actual="$(git -c push.default=current for-each-ref \
 			--format="%(push:remotename),%(push:remoteref)" \
-			refs/heads/master)" &&
-		test from,refs/heads/master = "$actual" &&
+			refs/heads/main)" &&
+		test from,refs/heads/main = "$actual" &&
 		actual="$(git -c push.default=matching for-each-ref \
 			--format="%(push:remotename),%(push:remoteref)" \
-			refs/heads/master)" &&
-		test from,refs/heads/master = "$actual" &&
+			refs/heads/main)" &&
+		test from,refs/heads/main = "$actual" &&
 		actual="$(git -c push.default=nothing for-each-ref \
 			--format="%(push:remotename),%(push:remoteref)" \
-			refs/heads/master)" &&
+			refs/heads/main)" &&
 		test from, = "$actual"
 	)
 '

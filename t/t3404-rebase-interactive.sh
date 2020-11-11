@@ -1798,13 +1798,13 @@ test_expect_success 'todo has correct onto hash' '
 '
 
 test_expect_success 'ORIG_HEAD is updated correctly' '
-	test_when_finished "git checkout master && git branch -D test-orig-head" &&
+	test_when_finished "git checkout main && git branch -D test-orig-head" &&
 	git checkout -b test-orig-head A &&
 	git commit --allow-empty -m A1 &&
 	git commit --allow-empty -m A2 &&
 	git commit --allow-empty -m A3 &&
 	git commit --allow-empty -m A4 &&
-	git rebase master &&
+	git rebase main &&
 	test_cmp_rev ORIG_HEAD test-orig-head@{1}
 '
 

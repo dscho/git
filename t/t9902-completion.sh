@@ -2188,7 +2188,7 @@ test_expect_success 'complete files' '
 test_expect_success "simple alias" '
 	test_config alias.co checkout &&
 	test_completion "git co m" <<-\EOF
-	master Z
+	main Z
 	mybranch Z
 	mytag Z
 	EOF
@@ -2198,7 +2198,7 @@ test_expect_success "recursive alias" '
 	test_config alias.co checkout &&
 	test_config alias.cod "co --detached" &&
 	test_completion "git cod m" <<-\EOF
-	master Z
+	main Z
 	mybranch Z
 	mytag Z
 	EOF

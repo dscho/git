@@ -521,8 +521,8 @@ test_expect_success 'untracked changes in added submodule (A. S...) (untracked i
 
 		cat >expect <<-EOF &&
 		# branch.oid $HSUP
-		# branch.head master
-		# branch.upstream origin/master
+		# branch.head main
+		# branch.upstream origin/main
 		# branch.ab +0 -0
 		1 A. N... 000000 100644 100644 $ZERO_OID $HMOD .gitmodules
 		1 A. S... 000000 160000 160000 $ZERO_OID $HSUB sub1
@@ -627,8 +627,8 @@ test_expect_success 'staged and untracked changes in added submodule (AM S.M.) (
 
 		cat >expect <<-EOF &&
 		# branch.oid $HSUP
-		# branch.head master
-		# branch.upstream origin/master
+		# branch.head main
+		# branch.upstream origin/main
 		# branch.ab +0 -0
 		1 A. N... 000000 100644 100644 $ZERO_OID $HMOD .gitmodules
 		1 AM S.M. 000000 160000 160000 $ZERO_OID $HSUB sub1
