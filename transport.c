@@ -286,6 +286,8 @@ static struct ref *handshake(struct transport *transport, int for_push,
 	struct git_transport_data *data = transport->data;
 	struct ref *refs = NULL;
 	struct packet_reader reader;
+	int sid_len;
+	const char *server_trace2_sid;
 
 	connect_setup(transport, for_push);
 
@@ -297,6 +299,8 @@ static struct ref *handshake(struct transport *transport, int for_push,
 	data->version = discover_version(&reader);
 	switch (data->version) {
 	case protocol_v2:
+		if (server_feature_v2("trace2-sid", &server_trace2_sid))
+			trace2_data_string("trace2", NULL, "server-sid", server_trace2_sid);
 		if (must_list_refs)
 			get_remote_refs(data->fd[1], &reader, &refs, for_push,
 					ref_prefixes,
@@ -310,6 +314,12 @@ static struct ref *handshake(struct transport *transport, int for_push,
 				 for_push ? REF_NORMAL : 0,
 				 &data->extra_have,
 				 &data->shallow);
+		server_trace2_sid = server_feature_value("trace2-sid", &sid_len);
+		if (server_trace2_sid) {
+			char *server_sid = xstrndup(server_trace2_sid, sid_len);
+			trace2_data_string("trace2", NULL, "server-sid", server_sid);
+			free(server_sid);
+		}
 		break;
 	case protocol_unknown_version:
 		BUG("unknown protocol version");
