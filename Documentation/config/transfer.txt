@@ -76,3 +76,7 @@ transfer.ipversion::
 	`all` to allow all protocols.
 	See also linkgit:git-fetch[1] options `--ipv4` and `--ipv6`.
 	The default value is `all` to allow all protocols.
+
+transfer.advertiseSID::
+	Boolean. When true, client and server processes will advertise their
+	unique session IDs to their remote counterpart. Defaults to false.
