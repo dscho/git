@@ -1720,6 +1720,10 @@ test_lazy_prereq PREPARE_FOR_MAIN_BRANCH '
 	test "$GIT_TEST_DEFAULT_INITIAL_BRANCH_NAME" = main
 '
 
+test_lazy_prereq MACOS_MAINTENANCE '
+	launchctl list
+'
+
 # Ensure that no test accidentally triggers a Git command
 # that runs 'crontab', affecting a user's cron schedule.
 # Tests that verify the cron integration must set this locally
