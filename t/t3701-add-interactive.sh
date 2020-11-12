@@ -849,6 +849,11 @@ test_expect_success 'setup different kinds of dirty submodules' '
 	cat >expected <<-\EOF &&
 	dirty-both-ways
 	dirty-head
+	EOF
+	git -C for-submodules diff-files --name-only --ignore-submodules=none >actual &&
+	cat >expected <<-\EOF &&
+	dirty-both-ways
+	dirty-head
 	dirty-otherwise
 	EOF
 	test_cmp expected actual &&
