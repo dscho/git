@@ -45,7 +45,7 @@ static inline void buffer_grow(struct ewah_bitmap *self, size_t new_size)
 static inline void buffer_push(struct ewah_bitmap *self, eword_t value)
 {
 	if (self->buffer_size + 1 >= self->alloc_size)
-		buffer_grow(self, self->buffer_size * 3 / 2);
+		buffer_grow(self, (self->buffer_size + 16) * 3 / 2);
 
 	self->buffer[self->buffer_size++] = value;
 }
