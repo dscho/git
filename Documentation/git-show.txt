@@ -45,8 +45,12 @@ include::pretty-options.txt[]
 include::pretty-formats.txt[]
 
 
-COMMON DIFF OPTIONS
--------------------
+DIFF FORMATTING
+---------------
+
+By default, `git show` does not generate any diff output. The options
+below can be used to show the changes made by each commit.
+
 
 :git-log: 1
 include::diff-options.txt[]

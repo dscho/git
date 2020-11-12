@@ -420,6 +420,7 @@ const char *submodule_strategy_to_string(const struct submodule_update_strategy 
 void handle_ignore_submodules_arg(struct diff_options *diffopt,
 				  const char *arg)
 {
+	diffopt->flags.ignore_submodule_set = 1;
 	diffopt->flags.ignore_submodules = 0;
 	diffopt->flags.ignore_untracked_in_submodules = 0;
 	diffopt->flags.ignore_dirty_submodules = 0;
@@ -497,12 +498,6 @@ void prepare_submodule_repo_env(struct strvec *out)
 	prepare_submodule_repo_env_no_git_dir(out);
 	strvec_pushf(out, "%s=%s", GIT_DIR_ENVIRONMENT,
 		     DEFAULT_GIT_DIR_ENVIRONMENT);
-}
-
-static void prepare_submodule_repo_env_in_gitdir(struct strvec *out)
-{
-	prepare_submodule_repo_env_no_git_dir(out);
-	strvec_pushf(out, "%s=.", GIT_DIR_ENVIRONMENT);
 }
 
 /*
@@ -1455,8 +1450,8 @@ static int get_next_submodule(struct child_process *cp,
 		if (task->repo) {
 			struct strbuf submodule_prefix = STRBUF_INIT;
 			child_process_init(cp);
-			cp->dir = task->repo->gitdir;
-			prepare_submodule_repo_env_in_gitdir(&cp->env_array);
+			cp->dir = task->repo->worktree;
+			prepare_submodule_repo_env(&cp->env_array);
 			cp->git_cmd = 1;
 			if (!spf->quiet)
 				strbuf_addf(err, _("Fetching submodule %s%s\n"),
@@ -1505,9 +1500,9 @@ static int get_next_submodule(struct child_process *cp,
 			    spf->prefix, task->sub->path);
 
 		child_process_init(cp);
-		prepare_submodule_repo_env_in_gitdir(&cp->env_array);
+		prepare_submodule_repo_env(&cp->env_array);
 		cp->git_cmd = 1;
-		cp->dir = task->repo->gitdir;
+		cp->dir = task->repo->worktree;
 
 		strvec_init(&cp->args);
 		strvec_pushv(&cp->args, spf->args.v);
@@ -1678,6 +1673,8 @@ unsigned is_submodule_modified(const char *path, int ignore_untracked)
 	strvec_pushl(&cp.args, "status", "--porcelain=2", NULL);
 	if (ignore_untracked)
 		strvec_push(&cp.args, "-uno");
+	else
+		strvec_push(&cp.args, "--ignore-submodules=none");
 
 	prepare_submodule_repo_env(&cp.env_array);
 	cp.git_cmd = 1;

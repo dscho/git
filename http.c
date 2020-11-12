@@ -92,6 +92,9 @@ static const char *http_proxy_ssl_key;
 static const char *http_proxy_ssl_ca_info;
 static struct credential proxy_cert_auth = CREDENTIAL_INIT;
 static int proxy_ssl_cert_password_required;
+static int http_retry_limit = 3;
+static int http_default_delay_sec = 2;
+static int http_max_delay_sec = 60;
 
 static struct {
 	const char *name;
@@ -217,6 +220,56 @@ size_t fwrite_buffer(char *ptr, size_t eltsize, size_t nmemb, void *buffer_)
 size_t fwrite_null(char *ptr, size_t eltsize, size_t nmemb, void *strbuf)
 {
 	return nmemb;
+}
+
+
+/* return 1 for a retryable HTTP code, 0 otherwise */
+static int retryable_code(int code)
+{
+	switch(code) {
+	case 429: /* fallthrough */
+	case 502: /* fallthrough */
+	case 503: /* fallthrough */
+	case 504: return 1;
+	default:  return 0;
+	}
+}
+
+/*
+ * Query the value of an HTTP header.
+ *
+ * If the header is found, then a newly allocate string containing the value
+ * is returned.
+ *
+ * If not found, returns NULL
+ */
+static char* http_header_value(const struct strbuf headers, const char *header)
+{
+	const size_t header_len = strlen(header);
+	const char* beg = headers.buf, *end;
+	const char* ptr = strcasestr(beg, header), *eol;
+
+	while (ptr) {
+		/* headers should have no leading whitespace, and end with ':' */
+		end = ptr + header_len;
+		if ((ptr != beg && ptr[-1] != '\n') || *end != ':') {
+			ptr = strcasestr(end, header);
+			continue;
+		}
+
+		/* skip leading LWS */
+		ptr = end + 1;
+		while (*ptr && isspace(*ptr) && *ptr != '\r')
+			ptr++;
+
+		/* skip trailing LWS */
+		eol = strchrnul(ptr, '\r');
+		while (eol > ptr && isspace(eol[-1]))
+			eol--;
+
+		return xstrndup(ptr, eol-ptr);
+	}
+	return NULL;
 }
 
 static void closedown_active_slot(struct active_request_slot *slot)
@@ -449,6 +502,11 @@ static int http_options(const char *var, const char *value, void *cb)
 			http_follow_config = HTTP_FOLLOW_ALWAYS;
 		else
 			http_follow_config = HTTP_FOLLOW_NONE;
+		return 0;
+	}
+
+	if (!strcmp("http.retrylimit", var)) {
+		http_retry_limit = git_config_int(var, value);
 		return 0;
 	}
 
@@ -1668,7 +1726,7 @@ static int handle_curl_result(struct slot_results *results)
 }
 
 int run_one_slot(struct active_request_slot *slot,
-		 struct slot_results *results)
+		 struct slot_results *results, int *http_code)
 {
 	slot->results = results;
 	if (!start_active_slot(slot)) {
@@ -1678,6 +1736,8 @@ int run_one_slot(struct active_request_slot *slot,
 	}
 
 	run_active_slot(slot);
+	if (http_code)
+		*http_code = results->http_code;
 	return handle_curl_result(results);
 }
 
@@ -1903,25 +1963,63 @@ static void http_opt_request_remainder(CURL *curl, off_t pos)
 #define HTTP_REQUEST_STRBUF	0
 #define HTTP_REQUEST_FILE	1
 
+/*
+ * check for a retry-after header in the given headers string, if found, then
+ * honor it, otherwise do an exponential backoff up to the max on the current
+ * delay
+*/
+static int http_retry_after(const struct strbuf headers, int cur_delay_sec)
+{
+	int delay_sec;
+	char *end;
+	char* value = http_header_value(headers, "retry-after");
+
+	if (value) {
+		delay_sec = strtol(value, &end, 0);
+		free(value);
+		if (*value && *end == '\0' && delay_sec >= 0) {
+			if (delay_sec > http_max_delay_sec) {
+				die(Q_("server requested retry after %d second,"
+					   " which is longer than max allowed\n",
+					   "server requested retry after %d seconds,"
+					   " which is longer than max allowed\n", delay_sec),
+					delay_sec);
+			}
+			return delay_sec;
+		}
+	}
+
+	cur_delay_sec *= 2;
+	return cur_delay_sec >= http_max_delay_sec ? http_max_delay_sec : cur_delay_sec;
+}
+
 static int http_request(const char *url,
 			void *result, int target,
 			const struct http_get_options *options)
 {
 	struct active_request_slot *slot;
 	struct slot_results results;
-	struct curl_slist *headers = http_copy_default_headers();
+	struct curl_slist *headers;
 	struct strbuf buf = STRBUF_INIT;
+	struct strbuf result_headers = STRBUF_INIT;
 	const char *accept_language;
 	int ret;
+	int retry_cnt = 0;
+	int retry_delay_sec = http_default_delay_sec;
+	int http_code;
 
+retry:
 	slot = get_active_slot();
 	curl_easy_setopt(slot->curl, CURLOPT_HTTPGET, 1);
+
+	curl_easy_setopt(slot->curl, CURLOPT_HEADERDATA, &result_headers);
+	curl_easy_setopt(slot->curl, CURLOPT_HEADERFUNCTION, fwrite_buffer);
 
 	if (result == NULL) {
 		curl_easy_setopt(slot->curl, CURLOPT_NOBODY, 1);
 	} else {
 		curl_easy_setopt(slot->curl, CURLOPT_NOBODY, 0);
-		curl_easy_setopt(slot->curl, CURLOPT_FILE, result);
+		curl_easy_setopt(slot->curl, CURLOPT_WRITEDATA, result);
 
 		if (target == HTTP_REQUEST_FILE) {
 			off_t posn = ftello(result);
@@ -1936,6 +2034,7 @@ static int http_request(const char *url,
 
 	accept_language = get_accept_language();
 
+	headers = http_copy_default_headers();
 	if (accept_language)
 		headers = curl_slist_append(headers, accept_language);
 
@@ -1961,7 +2060,26 @@ static int http_request(const char *url,
 	curl_easy_setopt(slot->curl, CURLOPT_ENCODING, "");
 	curl_easy_setopt(slot->curl, CURLOPT_FAILONERROR, 0);
 
-	ret = run_one_slot(slot, &results);
+	http_code = 0;
+	ret = run_one_slot(slot, &results, &http_code);
+
+	/* remove header data fields since not all slots will use them */
+	curl_easy_setopt(slot->curl, CURLOPT_HEADERDATA, NULL);
+	curl_easy_setopt(slot->curl, CURLOPT_HEADERFUNCTION, NULL);
+
+	if (ret != HTTP_OK) {
+		if (retryable_code(http_code) && retry_cnt < http_retry_limit) {
+			retry_cnt++;
+			retry_delay_sec = http_retry_after(result_headers, retry_delay_sec);
+			warning(Q_("got HTTP response %d, retrying after %d second (%d/%d)\n",
+					   "got HTTP response %d, retrying after %d seconds (%d/%d)\n",
+					   retry_delay_sec),
+				http_code, retry_delay_sec, retry_cnt, http_retry_limit);
+			sleep(retry_delay_sec);
+
+			goto retry;
+		}
+	}
 
 	if (options && options->content_type) {
 		struct strbuf raw = STRBUF_INIT;
@@ -2337,7 +2455,7 @@ struct http_pack_request *new_direct_http_pack_request(
 	}
 
 	preq->slot = get_active_slot();
-	curl_easy_setopt(preq->slot->curl, CURLOPT_FILE, preq->packfile);
+	curl_easy_setopt(preq->slot->curl, CURLOPT_WRITEDATA, preq->packfile);
 	curl_easy_setopt(preq->slot->curl, CURLOPT_WRITEFUNCTION, fwrite);
 	curl_easy_setopt(preq->slot->curl, CURLOPT_URL, preq->url);
 	curl_easy_setopt(preq->slot->curl, CURLOPT_HTTPHEADER,
@@ -2508,7 +2626,7 @@ struct http_object_request *new_http_object_request(const char *base_url,
 
 	freq->slot = get_active_slot();
 
-	curl_easy_setopt(freq->slot->curl, CURLOPT_FILE, freq);
+	curl_easy_setopt(freq->slot->curl, CURLOPT_WRITEDATA, freq);
 	curl_easy_setopt(freq->slot->curl, CURLOPT_FAILONERROR, 0);
 	curl_easy_setopt(freq->slot->curl, CURLOPT_WRITEFUNCTION, fwrite_sha1_file);
 	curl_easy_setopt(freq->slot->curl, CURLOPT_ERRORBUFFER, freq->errorstr);

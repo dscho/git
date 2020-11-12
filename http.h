@@ -99,7 +99,7 @@ void finish_all_active_slots(void);
  *
  */
 int run_one_slot(struct active_request_slot *slot,
-		 struct slot_results *results);
+		 struct slot_results *results, int *http_code);
 
 #ifdef USE_CURL_MULTI
 void fill_active_slots(void);
