@@ -120,6 +120,17 @@ static int git_fetch_config(const char *k, const char *v, void *cb)
 		return 0;
 	}
 
+	if (!strcmp(k, "transfer.ipversion")) {
+		if (!strcmp(v, "all"))
+			;
+		else if (!strcmp(v, "4"))
+			family = TRANSPORT_FAMILY_IPV4;
+		else if (!strcmp(v, "6"))
+			family = TRANSPORT_FAMILY_IPV6;
+		else
+			die(_("transfer.ipversion can be only 4, 6, or any"));
+		return 0;
+	}
 	return git_default_config(k, v, cb);
 }
 
