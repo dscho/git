@@ -286,11 +286,13 @@ int reopen_tempfile(struct tempfile *tempfile)
 int rename_tempfile(struct tempfile **tempfile_p, const char *path)
 {
 	struct tempfile *tempfile = *tempfile_p;
+	int fsync_res;
 
 	if (!is_tempfile_active(tempfile))
 		BUG("rename_tempfile called for inactive object");
 
-	if (close_tempfile_gently(tempfile)) {
+	fsync_res = fsync(tempfile->fd);
+	if (close_tempfile_gently(tempfile) || fsync_res < 0) {
 		delete_tempfile(tempfile_p);
 		return -1;
 	}
