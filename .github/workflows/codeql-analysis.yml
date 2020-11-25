@@ -1,0 +1,26 @@
+name: "CodeQL Static Analysis"
+
+on:
+  - push
+  - pull_request
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'cpp', 'python', 'javascript' ]
+    steps:
+    - uses: actions/checkout@v2
+    - run: ci/install-dependencies.sh
+      if: matrix.language == 'cpp'
+    - uses: github/codeql-action/init@v1
+      with:
+        languages: ${{ matrix.language }}
+        config-file: ./.github/codeql/codeql-config.yml
+    - run: make -j$(nproc)
+      if: matrix.language == 'cpp'
+    - uses: github/codeql-action/analyze@v1

@@ -1,0 +1,8 @@
+name: "Git CodeQL config"
+
+queries:
+  - name: Standard set of queries
+    uses: security-and-quality
+
+paths-ignore:
+  - contrib/**
