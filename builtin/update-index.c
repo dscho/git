@@ -406,6 +406,10 @@ static int add_cacheinfo(unsigned int mode, const struct object_id *oid,
 {
 	int len, option;
 	struct cache_entry *ce;
+	char buf[MAX_PATH];
+
+	if (smudge_filename(path, buf))
+		path = buf;
 
 	if (!verify_path(path, mode))
 		return error("Invalid path '%s'", path);

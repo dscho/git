@@ -387,6 +387,14 @@ static inline int git_offset_1st_component(const char *path)
 #define is_valid_path(path) 1
 #endif
 
+#ifndef smudge_filename
+#define smudge_filename NULL
+#endif
+
+#ifndef clean_filename
+#define clean_filename NULL
+#endif
+
 #ifndef find_last_dir_sep
 static inline char *git_find_last_dir_sep(const char *path)
 {

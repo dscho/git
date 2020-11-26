@@ -13,6 +13,18 @@ tree, index, and tree objects.
 
 HT='	'
 
+test_expect_success MINGW 'core.translateIllegalFilenameCharacters' '
+	test_create_repo translate &&
+	(
+		cd translate &&
+		git config core.translateIllegalFilenameCharacters true &&
+		git update-index --add --cacheinfo 100644,$EMPTY_BLOB,\"quote\" &&
+		git ls-files >actual &&
+		printf "\\uf022quote\\uf022\\n" >expect &&
+		test_cmp expect actual
+	)
+'
+
 test_have_prereq MINGW ||
 echo 2>/dev/null > "Name with an${HT}HT"
 if ! test -f "Name with an${HT}HT"

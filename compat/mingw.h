@@ -501,6 +501,12 @@ char *mingw_strbuf_realpath(struct strbuf *resolved, const char *path);
 int is_valid_win32_path(const char *path, int allow_literal_nul);
 #define is_valid_path(path) is_valid_win32_path(path, 0)
 
+const char *win32_smudge_filename(const char *path, char *buffer);
+#define smudge_filename win32_smudge_filename
+
+const char *win32_clean_filename(const char *path, char *buffer);
+#define clean_filename win32_clean_filename
+
 /**
  * Max length of long paths (exceeding MAX_PATH). The actual maximum supported
  * by NTFS is 32,767 (* sizeof(wchar_t)), but we choose an arbitrary smaller

@@ -3856,3 +3856,70 @@ int file_attr_to_st_mode (DWORD attr, DWORD tag, const char *path)
 		fMode |= S_IWRITE;
 	return fMode;
 }
+
+static char illegal_filename_character[0x100] = {
+	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, /* 0x00-0x0f */
+	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, /* 0x10-0x1f */
+	0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, /* 0x20-0x2f */
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 1, 0, 1, 1, /* 0x30-0x3f */
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* 0x40-0x4f */
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* 0x50-0x5f */
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* 0x60-0x6f */
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, /* 0x70-0x7f */
+};
+
+const char *win32_smudge_filename(const char *path, char *buffer)
+{
+	const char *p;
+	char *q = buffer;
+
+	if (!translate_illegal_filename_characters)
+		return NULL;
+
+	for (p = path; *p; p++) {
+		switch (illegal_filename_character[(unsigned char)*p]) {
+		case 2:
+			if (p - path == 1)
+				/* DOS drive prefix was already skipped */
+				break;
+			/* fallthru */
+		case 1:
+			if (q + 5 >= buffer + MAX_PATH)
+				return NULL; /* too long */
+
+			/* Map the illegal character into the \uF000 page */
+			*(q++) = 0xef;
+			*(q++) = 0x80 | ((*p >> 6) & 0x3);
+			*(q++) = 0x80 | (*p & 0x2f);
+			continue;
+		}
+		if (q + 2 >= buffer + MAX_PATH)
+			return NULL; /* too long */
+		*(q++) = *p;
+	}
+	*q = '\0';
+
+	return q - buffer == p - path ? NULL : buffer;
+}
+
+const char *win32_clean_filename(const char *path, char *buffer)
+{
+	const char *p;
+	char *q = buffer;
+
+	if (!translate_illegal_filename_characters)
+		return NULL;
+
+	for (p = path; *p; p++) {
+		if (q + 2 - buffer >= MAX_PATH)
+			return NULL; /* too long */
+		if ((unsigned char)p[0] == 0xef && ((unsigned char)p[1] & ~0x03) == 0x80 && ((unsigned char)p[2] & ~0x2f) == 0x80) {
+			*(q++) = (p[1] & 0x03) << 6 | (p[2] & 0x2f);
+			p += 2;
+		} else
+			*(q++) = *p;
+	}
+	*q = '\0';
+
+	return q - buffer == p - path ? NULL : buffer;
+}
