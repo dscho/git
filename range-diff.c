@@ -36,6 +36,171 @@ static size_t find_end_of_line(char *buffer, unsigned long size)
 	return eol + 1 - buffer;
 }
 
+static int read_mbox(const char *path, struct string_list *list)
+{
+	struct strbuf buf = STRBUF_INIT, contents = STRBUF_INIT;
+	struct patch_util *util = NULL;
+	int in_header = 1, in_diff = 0;
+	char *line, *current_filename = NULL;
+	int offset, len;
+	size_t size;
+	const char *author = NULL, *subject = NULL;
+
+	if (!strcmp(path, "-")) {
+		if (strbuf_read(&contents, STDIN_FILENO, 0) < 0)
+			return error_errno(_("could not read stdin"));
+	} else if (strbuf_read_file(&contents, path, 0) < 0)
+		return error_errno(_("could not read '%s'"), path);
+
+	line = contents.buf;
+	size = contents.len;
+	for (offset = 0; size > 0; offset += len, size -= len, line += len) {
+		const char *p;
+
+		len = find_end_of_line(line, size);
+		line[len - 1] = '\0';
+
+		if (starts_with(line, "diff --git")) {
+			struct patch patch = { 0 };
+			struct strbuf root = STRBUF_INIT;
+			int linenr = 0;
+			int orig_len;
+
+			in_diff = 1;
+			strbuf_addch(&buf, '\n');
+			if (!util) {
+				util = xcalloc(sizeof(*util), 1);
+				oidcpy(&util->oid, &null_oid);
+				util->matching = -1;
+				author = subject = NULL;
+			}
+			if (!util->diff_offset)
+				util->diff_offset = buf.len;
+			line[len - 1] = '\n';
+			orig_len = len;
+			len = parse_git_diff_header(&root, &linenr, 0, line,
+						    len, size, &patch);
+			if (len < 0) {
+				error(_("could not parse git header '%.*s'"),
+				      orig_len, line);
+				free(util);
+				free(current_filename);
+				string_list_clear(list, 1);
+				strbuf_release(&buf);
+				strbuf_release(&contents);
+				return -1;
+			}
+
+			if (patch.old_name)
+				skip_prefix(patch.old_name, "a/",
+					    (const char **)&patch.old_name);
+			if (patch.new_name)
+				skip_prefix(patch.new_name, "b/",
+					    (const char **)&patch.new_name);
+
+			strbuf_addstr(&buf, " ## ");
+			if (patch.is_new > 0)
+				strbuf_addf(&buf, "%s (new)", patch.new_name);
+			else if (patch.is_delete > 0)
+				strbuf_addf(&buf, "%s (deleted)", patch.old_name);
+			else if (patch.is_rename)
+				strbuf_addf(&buf, "%s => %s", patch.old_name, patch.new_name);
+			else
+				strbuf_addstr(&buf, patch.new_name);
+
+			free(current_filename);
+			if (patch.is_delete > 0)
+				current_filename = xstrdup(patch.old_name);
+			else
+				current_filename = xstrdup(patch.new_name);
+
+			if (patch.new_mode && patch.old_mode &&
+			    patch.old_mode != patch.new_mode)
+				strbuf_addf(&buf, " (mode change %06o => %06o)",
+					    patch.old_mode, patch.new_mode);
+
+			strbuf_addstr(&buf, " ##\n");
+			util->diffsize++;
+			continue;
+		} else if (in_diff) {
+			switch (line[0]) {
+			case '\0':
+				continue; /* ignore empty lines after diff */
+			case '+':
+			case '-':
+			case ' ':
+			case '\\':
+				strbuf_addstr(&buf, line);
+				strbuf_addch(&buf, '\n');
+				util->diffsize++;
+				continue;
+			case '@':
+				if (skip_prefix(line, "@@ ", &p)) {
+					p = strstr(p, "@@");
+					strbuf_addstr(&buf, "@@");
+					if (current_filename && p[2])
+						strbuf_addf(&buf, " %s:",
+							    current_filename);
+					if (p)
+						strbuf_addstr(&buf, p + 2);
+
+					strbuf_addch(&buf, '\n');
+					util->diffsize++;
+					continue;
+				}
+				break;
+			}
+
+			if (util) {
+				string_list_append(list, buf.buf)->util = util;
+				strbuf_reset(&buf);
+			}
+			util = xcalloc(sizeof(*util), 1);
+			oidcpy(&util->oid, &null_oid);
+			util->matching = -1;
+			author = subject = NULL;
+			in_header = 1;
+			in_diff = 0;
+		}
+
+		if (in_header) {
+			if (!line[0]) {
+				in_header = 0;
+				strbuf_addstr(&buf, " ## Metadata ##\n");
+				if (author)
+					strbuf_addf(&buf, "Author: %s\n", author);
+				strbuf_addstr(&buf, "\n ## Commit message ##\n");
+				if (subject)
+					strbuf_addf(&buf, "%s\n", subject);
+			} else if (skip_prefix(line, "From: ", &p)) {
+				author = p;
+			} else if (skip_prefix(line, "Subject: ", &p)) {
+				const char *q;
+
+				subject = p;
+
+				if (starts_with(p, "[PATCH") &&
+				    (q = strchr(p, ']'))) {
+					while (isspace(*q))
+						q++;
+					subject = q;
+				}
+			}
+		} else {
+			strbuf_addch(&buf, ' ');
+			strbuf_addstr(&buf, line);
+		}
+	}
+	strbuf_release(&contents);
+
+	if (util)
+		string_list_append(list, buf.buf)->util = util;
+	strbuf_release(&buf);
+	free(current_filename);
+
+	return 0;
+}
+
 /*
  * Reads the patches into a string list, with the `util` field being populated
  * as struct object_id (will need to be free()d).
@@ -50,6 +215,10 @@ static int read_patches(const char *range, struct string_list *list,
 	char *line, *current_filename = NULL;
 	int offset, len;
 	size_t size;
+	const char *path;
+
+	if (skip_prefix(range, "mbox:", &path))
+		return read_mbox(path, list);
 
 	strvec_pushl(&cp.args, "log", "--no-color", "-p", "--no-merges",
 		     "--reverse", "--date-order", "--decorate=no",
@@ -533,6 +702,9 @@ int show_range_diff(const char *range1, const char *range2,
 
 	struct string_list branch1 = STRING_LIST_INIT_DUP;
 	struct string_list branch2 = STRING_LIST_INIT_DUP;
+
+	if (!strcmp(range1, "mbox:-") && !strcmp(range2, "mbox:-"))
+		res = error(_("only one mbox can be read from stdin"));
 
 	if (read_patches(range1, &branch1, other_arg))
 		res = error(_("could not parse log for '%s'"), range1);

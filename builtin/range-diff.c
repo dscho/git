@@ -16,7 +16,7 @@ static int is_range(const char *range)
 	size_t i;
 	char c;
 
-	if (strstr(range, ".."))
+	if (starts_with(range, "mbox:") || strstr(range, ".."))
 		return 1;
 
 	i = strlen(range);
