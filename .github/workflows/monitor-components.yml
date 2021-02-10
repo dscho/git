@@ -63,6 +63,9 @@ jobs:
           - label: perl
             feed: https://github.com/Perl/perl5/tags.atom
             titleFilter: (5\.[0-9]+[13579])|(RC)
+          - label: pcre2
+            feed: "https://en.wikipedia.org/w/index.php?title=Perl_Compatible_Regular_Expressions&feed=atom&action=history"
+            contentFilter: "PCRE2 [1-9][0-9]*\\.&lt;ins"
       fail-fast: false
     steps:
       - uses: guilhem/rss-issues-action@cadba1e05ad93613180979261b7e05cee1a9b282
