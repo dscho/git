@@ -1,6 +1,7 @@
 name: git-artifacts
 
 on:
+  push:
   # This workflow can be triggered manually in the Actions tab, see
   # https://github.blog/changelog/2020-07-06-github-actions-manual-triggers-with-workflow_dispatch/
   workflow_dispatch:
@@ -17,7 +18,7 @@ env:
   HOME: "${{github.workspace}}\\home"
   MSYSTEM: MINGW64
   USERPROFILE: "${{github.workspace}}\\home"
-  BUILD_ONLY: "${{github.event.inputs.build_only}}"
+  BUILD_ONLY: "installer portable"
   REPOSITORY: "${{github.event.inputs.repository}}"
   REF: "${{github.event.inputs.ref}}"
 
@@ -220,6 +221,8 @@ jobs:
       - name: Build mingw-w64-${{matrix.arch.name}}-git
         env:
           GPGKEY: "${{secrets.GPGKEY}}"
+          MINGW_packages_branch: safer-arm64-support-for-git
+          MINGW_packages_url: https://github.com/dscho/MINGW-packages
         shell: powershell
         run: |
           & git-sdk-64-build-installers\usr\bin\sh.exe -lc @"
@@ -227,6 +230,9 @@ jobs:
             # Let `cv2pdb` find the DLLs
             PATH=\"`$PATH:/C/Program Files (x86)/Microsoft Visual Studio 14.0/VC/bin${{matrix.arch.bin}}\"
             type -p mspdb140.dll || exit 1
+
+            git clone --depth 1 --single-branch -b `$MINGW_packages_branch `$MINGW_packages_url /usr/src/MINGW-packages || exit 1
+
             sh -x /usr/src/build-extra/please.sh build-mingw-w64-git --only-${{matrix.arch.bitness}}-bit --build-src-pkg -o artifacts HEAD &&
             cp bundle-artifacts/ver artifacts/ &&
             if test -n \"`$GPGKEY\"
@@ -242,7 +248,7 @@ jobs:
             (cd /usr/src/MINGW-packages/mingw-w64-git &&
             cp PKGBUILD.`$version PKGBUILD &&
             git commit -s -m \"mingw-w64-git: new version (`$version)\" PKGBUILD &&
-            git bundle create \"`$b\"/MINGW-packages.bundle origin/main..main)
+            git bundle create \"`$b\"/MINGW-packages.bundle origin/`$MINGW_packages_branch..`$MINGW_packages_branch)
           "@
       - name: Clean up temporary files
         if: always()
