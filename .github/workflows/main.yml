@@ -27,7 +27,7 @@ jobs:
       uses: actions/cache@v2
       with:
         path: compat/vcbuild/vcpkg
-        key: vcpkg-${{ steps.vcpkg-build-id.outputs.id }}
+        key: vcpkg-test3-${{ steps.vcpkg-build-id.outputs.id }}
     - name: download vcpkg artifacts
       if: steps.cache-vcpkg.outputs.cache-hit != 'true'
       shell: bash
