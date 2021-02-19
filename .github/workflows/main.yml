@@ -1,28 +1,49 @@
-name: CI/PR
+name: tar-vs-gtar
 
-on: [push, pull_request]
+on: [push, workflow_dispatch]
 
 env:
   DEVELOPER: 1
 
 jobs:
   test-cache:
-    runs-on: windows-latest
+    runs-on: macos-latest
     steps:
-    - uses: git-for-windows/setup-git-for-windows-sdk@main
-    - name: Cache a/b/c
-      id: cache-abc
-      uses: actions/cache@v2.1.4
-      with:
-        path: a/b/c
-        key: abc-2113
-    - name: generate a/b/c
-      if: steps.cache-abc.outputs.cache-hit != 'true'
+    - name: diagnose tzstd problems with ~/a/b/c
       shell: bash
       run: |
-        mkdir -p a/b/c
-        echo Hello >a/b/c/world.txt
-    - name: /usr/bin/tar.exe is incompatible with actions/cache; move it out of the way
-      if: false
-      shell: bash
-      run: mv /usr/bin/tar.exe /usr/bin/gtar.exe
+        set -x
+        mkdir -p ~/a/b/c/github.com/go-test/deep@v1.0.7/test/v2/
+        echo Hello >~/a/b/c/github.com/go-test/deep@v1.0.7/test/v2/errors.go
+        find ~/a/ -exec chmod a-w {} \;
+        ls -laR ~/a
+        echo ===
+        which tar
+        echo ===
+        tar --version
+        echo ===
+        which gtar
+        echo ===
+        gtar --version
+        echo ===
+        (cd ~/ && pwd -P)
+        echo ===
+        (cd ../../.. && pwd -P)
+        echo ===
+        echo '../../../a/b/c' >manifest.txt
+        /usr/bin/tar --format=ustar --fflags --use-compress-program "zstd -T0" -cf cache.tzst -P -C ${{github.workspace}} --files-from manifest.txt
+        file cache.tzst
+        echo ===
+        /usr/local/bin/gtar --posix --use-compress-program "zstd -T0" -cf cache.gtar.tzst -P -C ${{github.workspace}} --files-from manifest.txt
+        file cache.gtar.tzst
+        echo ===
+        /usr/bin/tar --use-compress-program "zstd -d" -tvf cache.tzst
+        echo ===
+        /usr/local/bin/gtar --use-compress-program "zstd -d" -tvf cache.tzst -P
+        echo ===
+        find ~/a/ -exec chmod a+w {} \;
+        rm -rf ~/a
+        /usr/local/bin/gtar -p --use-compress-program "zstd -d" -xf $PWD/cache.tzst -P -C ${{github.workspace}}
+        echo ===
+        ls -laR ~/a
+        echo ===
