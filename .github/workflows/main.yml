@@ -6,66 +6,23 @@ env:
   DEVELOPER: 1
 
 jobs:
-  vs-build:
-    env:
-      NO_PERL: 1
-      GIT_CONFIG_PARAMETERS: "'user.name=CI' 'user.email=ci@git'"
+  test-cache:
     runs-on: windows-latest
     steps:
-    - uses: actions/checkout@v2
     - uses: git-for-windows/setup-git-for-windows-sdk@main
-    - name: Determine the latest vcpkg build ID
-      id: vcpkg-build-id
-      shell: bash
-      run: |
-        urlbase=https://dev.azure.com/git/git/_apis/build/builds
-        id=$(curl "$urlbase?definitions=9&statusFilter=completed&resultFilter=succeeded&\$top=1" |
-          jq -r '.value[0].id')
-        echo "::set-output name=id::$id"
-    - name: Cache vcpkg
-      id: cache-vcpkg
-      uses: actions/cache@v2
+    - name: Cache a/b/c
+      id: cache-abc
+      uses: actions/cache@v2.1.4
       with:
-        path: compat/vcbuild/vcpkg
-        key: vcpkg-test3-${{ steps.vcpkg-build-id.outputs.id }}
-    - name: download vcpkg artifacts
-      if: steps.cache-vcpkg.outputs.cache-hit != 'true'
+        path: a/b/c
+        key: abc-2113
+    - name: generate a/b/c
+      if: steps.cache-abc.outputs.cache-hit != 'true'
       shell: bash
       run: |
-        urlbase=https://dev.azure.com/git/git/_apis/build/builds
-        id=${{ steps.vcpkg-build-id.outputs.id }}
-        download_url=$(curl "$urlbase/$id/artifacts" |
-          jq -r '.value[] | select(.name == "compat").resource.downloadUrl')
-        curl -o compat.zip "$download_url"
-        unzip compat.zip
-        rm compat.zip
-    - name: add msbuild to PATH
-      uses: microsoft/setup-msbuild@v1
-    - name: copy dlls to root
-      shell: cmd
-      run: compat\vcbuild\vcpkg_copy_dlls.bat release
-    - name: generate Visual Studio solution
-      shell: bash
-      run: |
-        cmake `pwd`/contrib/buildsystems/ -DCMAKE_PREFIX_PATH=`pwd`/compat/vcbuild/vcpkg/installed/x64-windows \
-        -DNO_GETTEXT=YesPlease -DPERL_TESTS=OFF -DPYTHON_TESTS=OFF -DCURL_NO_CURL_CMAKE=ON
-    - name: MSBuild
-      run: msbuild git.sln -property:Configuration=Release -property:Platform=x64 -maxCpuCount:4 -property:PlatformToolset=v142
-    - name: bundle artifact tar
-      shell: bash
-      env:
-        MSVC: 1
-        VCPKG_ROOT: ${{github.workspace}}\compat\vcbuild\vcpkg
-      run: |
-        mkdir -p artifacts &&
-        eval "$(make -n artifacts-tar INCLUDE_DLLS_IN_ARTIFACTS=YesPlease ARTIFACTS_DIRECTORY=artifacts 2>&1 | grep ^tar)"
-    - name: zip up tracked files
-      run: git archive -o artifacts/tracked.tar.gz HEAD
-    - name: upload tracked files and build artifacts
-      uses: actions/upload-artifact@v2
-      with:
-        name: vs-artifacts
-        path: artifacts
+        mkdir -p a/b/c
+        echo Hello >a/b/c/world.txt
     - name: /usr/bin/tar.exe is incompatible with actions/cache; move it out of the way
+      if: false
       shell: bash
       run: mv /usr/bin/tar.exe /usr/bin/gtar.exe
