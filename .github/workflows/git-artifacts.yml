@@ -1,6 +1,7 @@
 name: git-artifacts
 
 on:
+  push:
   # This workflow can be triggered manually in the Actions tab, see
   # https://github.blog/changelog/2020-07-06-github-actions-manual-triggers-with-workflow_dispatch/
   workflow_dispatch:
@@ -21,8 +22,8 @@ env:
   MSYSTEM: MINGW64
   USERPROFILE: "${{github.workspace}}\\home"
   BUILD_ONLY: "${{github.event.inputs.build_only}}"
-  REPOSITORY: "${{github.event.inputs.repository}}"
-  REF: "${{github.event.inputs.ref}}"
+  REPOSITORY: "jeffhostetler/git"
+  REF: "refs/heads/fsmonitor4"
 
 jobs:
   bundle-artifacts:
