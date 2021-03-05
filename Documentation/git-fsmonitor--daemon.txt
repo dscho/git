@@ -71,7 +71,7 @@ working directory.  Commands, such as `git status`, should automatically
 start it (if necessary) when `feature.fsmonitor` is set to `true`.
 
 To watch more than one working directory, start one instance of the
-daemon in each.  Or simply set `core.fsmonitor` in each desired
+daemon in each.  Or simply set `feature.fsmonitor` in each desired
 working directory.
 
 Tokens are opaque strings.  They are used by the fsmonitor daemon to
