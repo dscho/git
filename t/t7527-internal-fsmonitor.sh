@@ -505,7 +505,7 @@ test_lazy_prereq UNTRACKED_CACHE '
 '
 
 test_expect_success 'Matrix: setup for untracked-cache,fsmonitor matrix' '
-	test_might_fail git config --unset core.fsmonitor &&
+	test_might_fail git config --unset feature.fsmonitor &&
 	git update-index --no-fsmonitor &&
 	test_might_fail git fsmonitor--daemon --stop
 '
@@ -558,7 +558,7 @@ do
 		if test $fsm_val = false
 		then
 			test_expect_success "Matrix[uc:$uc_val][fsm:$fsm_val] disable fsmonitor" '
-				test_might_fail git config --unset core.fsmonitor &&
+				test_might_fail git config --unset feature.fsmonitor &&
 				git update-index --no-fsmonitor &&
 				test_might_fail git fsmonitor--daemon --stop 2>/dev/null
 			'
