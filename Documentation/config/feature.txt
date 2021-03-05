@@ -15,6 +15,12 @@ feature.experimental::
 * `fetch.negotiationAlgorithm=skipping` may improve fetch negotiation times by
 skipping more commits at a time, reducing the number of round trips.
 
+feature.fsmonitor::
+	Enable the internal filesystem event watcher. This requires a supported
+	platform (such as Windows) and can speed up Git commands that need to
+	refresh the Git index in a worktree with many files, such as `git
+	status`. See linkgit:git-fsmonitor--daemon[1] for details.
+
 feature.manyFiles::
 	Enable config options that optimize for repos with many files in the
 	working directory. With many files, commands such as `git status` and

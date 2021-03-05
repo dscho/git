@@ -69,8 +69,8 @@ core.fsmonitor::
 +
 See the "fsmonitor-watchman" section of linkgit:githooks[5].
 +
-The special value `:internal:` is used to select the
-linkgit:git-fsmonitor--daemon[1].
+Note: this option is ignored if the internal FSMonitor is enabled via
+the `feature.fsmonitor` option (see linkgit:git-fsmonitor--daemon[1]).
 
 core.fsmonitorHookVersion::
 	Sets the version of hook that is to be used when calling fsmonitor.

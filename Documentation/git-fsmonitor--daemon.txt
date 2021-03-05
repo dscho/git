@@ -68,7 +68,7 @@ REMARKS
 -------
 The fsmonitor daemon is a long running process that will watch a single
 working directory.  Commands, such as `git status`, should automatically
-start it (if necessary) when `core.fsmonitor` is set to `:internal:`.
+start it (if necessary) when `feature.fsmonitor` is set to `true`.
 
 To watch more than one working directory, start one instance of the
 daemon in each.  Or simply set `core.fsmonitor` in each desired
