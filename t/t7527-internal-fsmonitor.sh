@@ -171,7 +171,7 @@ test_expect_success 'setup' '
 	test_tick &&
 	git -c core.fsmonitor= commit -m initial &&
 
-	git config core.fsmonitor :internal:
+	git config feature.fsmonitor true
 '
 
 test_expect_success 'update-index implicitly starts daemon' '
