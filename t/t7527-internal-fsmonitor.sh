@@ -564,7 +564,7 @@ do
 			'
 		else
 			test_expect_success "Matrix[uc:$uc_val][fsm:$fsm_val] enable fsmonitor" '
-				git config core.fsmonitor :internal: &&
+				git config feature.fsmonitor true &&
 				git fsmonitor--daemon --start &&
 				git update-index --fsmonitor
 			'
