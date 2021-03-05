@@ -136,7 +136,11 @@ test_expect_success "one time repo setup" '
 
 setup_for_fsmonitor() {
 	# set INTEGRATION_SCRIPT depending on the environment
-	if test -n "$INTEGRATION_PATH"
+	if test -n "$USE_FSMONITOR_DAEMON"
+	then
+		git config feature.fsmonitor true &&
+		INTEGRATION_SCRIPT=false
+	elif test -n "$INTEGRATION_PATH"
 	then
 		INTEGRATION_SCRIPT="$INTEGRATION_PATH"
 	else
@@ -295,7 +299,7 @@ test_lazy_prereq HAVE_FSMONITOR_DAEMON '
 
 if test_have_prereq HAVE_FSMONITOR_DAEMON
 then
-	INTEGRATION_PATH=":internal:"
+	USE_FSMONITOR_DAEMON=t
 
 	trace_start fsmonitor--daemon--server
 	git fsmonitor--daemon --start
