@@ -167,9 +167,9 @@ test_expect_success 'setup' '
 	trace*
 	EOF
 
-	git -c core.fsmonitor= add . &&
+	git -c feature.fsmonitor= add . &&
 	test_tick &&
-	git -c core.fsmonitor= commit -m initial &&
+	git -c feature.fsmonitor= commit -m initial &&
 
 	git config feature.fsmonitor true
 '
@@ -237,7 +237,7 @@ directory_to_file() {
 verify_status() {
 	git status >actual &&
 	GIT_INDEX_FILE=.git/fresh-index git read-tree master &&
-	GIT_INDEX_FILE=.git/fresh-index git -c core.fsmonitor= status >expect &&
+	GIT_INDEX_FILE=.git/fresh-index git -c feature.fsmonitor= status >expect &&
 	test_cmp expect actual &&
 	echo HELLO AFTER &&
 	cat .git/trace &&
