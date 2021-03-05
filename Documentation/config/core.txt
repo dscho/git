@@ -62,7 +62,7 @@ core.protectNTFS::
 	Defaults to `true` on Windows, and `false` elsewhere.
 
 core.fsmonitor::
-	If set to true, enable the built-in file system monitor
+	If set to true, enable the (EXPERIMENTAL) built-in file system monitor
 	daemon for this working directory (linkgit:git-fsmonitor--daemon[1]).
 +
 Like hook-based file system monitors, the built-in file system monitor
