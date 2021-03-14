@@ -103,6 +103,7 @@ jobs:
       fail-fast: false
       matrix:
         nr: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        use-busybox: [false, true]
     steps:
     - name: download tracked files and build artifacts
       uses: actions/download-artifact@v2
@@ -113,6 +114,17 @@ jobs:
       shell: bash
       run: tar xf artifacts.tar.gz && tar xf tracked.tar.gz
     - uses: git-for-windows/setup-git-for-windows-sdk@v1
+    - name: Download busybox.exe
+      if: matrix.use-busybox == true
+      shell: bash
+      run: |
+        curl -Lo /tmp/busybox.zip \
+          -H "Accept: application/vnd.github.v3+json" \
+          -H "Authorization: token ${{secrets.GITHUB_TOKEN}}" \
+          https://api.github.com/repos/dscho/busybox-w32/actions/artifacts/51350770/zip &&
+        cd /c/git-sdk-64-minimal/mingw64/bin &&
+        unzip /tmp/busybox.zip &&
+        echo 'GIT_TEST_USE_BUSYBOX=1' >>$GITHUB_ENV
     - name: test
       shell: bash
       run: ci/run-test-slice.sh ${{matrix.nr}} 10
