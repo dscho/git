@@ -1623,6 +1623,7 @@ test_lazy_prereq PIPE '
 '
 
 test_lazy_prereq SYMLINKS '
+	test_have_prereq !BUSYBOX &&
 	# test whether the filesystem supports symbolic links
 	ln -s x y && test -h y
 '
