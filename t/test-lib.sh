@@ -66,6 +66,15 @@ fi
 . "$GIT_BUILD_DIR"/GIT-BUILD-OPTIONS
 export PERL_PATH SHELL_PATH
 
+if test -n "$GIT_TEST_USE_BUSYBOX"
+then
+	TEST_SHELL_PATH="$(which busybox) sh"
+	SHELL_PATH="$TEST_SHELL_PATH"
+	SHELL="$TEST_SHELL_PATH"
+	export TEST_SHELL_PATH SHELL_PATH SHELL
+	no_bin_wrappers=t
+fi
+
 # Disallow the use of abbreviated options in the test suite by default
 if test -z "${GIT_TEST_DISALLOW_ABBREVIATED_OPTIONS}"
 then

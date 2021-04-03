@@ -264,16 +264,34 @@ int sane_execvp(const char *file, char * const argv[])
 	return -1;
 }
 
+static int use_busybox_ash(void)
+{
+	static int result = -1;
+
+	if (result < 0) {
+		result = git_env_bool("GIT_TEST_USE_BUSYBOX", -1);
+		if (result < 0)
+			if (git_config_get_maybe_bool("core.usebusybox",
+						      &result))
+				result = -1;
+	}
+
+	return result > 0;
+}
+
 static const char **prepare_shell_cmd(struct strvec *out, const char **argv)
 {
 	if (!argv[0])
 		BUG("shell command is empty");
 
 	if (strcspn(argv[0], "|&;<>()$`\\\"' \t\n*?[#~=%") != strlen(argv[0])) {
+		if (use_busybox_ash())
+			strvec_pushl(out, "busybox", "sh", NULL);
+		else
 #ifndef GIT_WINDOWS_NATIVE
-		strvec_push(out, SHELL_PATH);
+			strvec_push(out, SHELL_PATH);
 #else
-		strvec_push(out, "sh");
+			strvec_push(out, "sh");
 #endif
 		strvec_push(out, "-c");
 

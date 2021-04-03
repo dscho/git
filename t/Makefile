@@ -50,11 +50,19 @@ failed:
 	test -z "$$failed" || $(MAKE) $$failed
 
 prove: pre-clean check-chainlint $(TEST_LINT)
+ifeq ($(GIT_TEST_USE_BUSYBOX),)
 	@echo "*** prove ***"; $(PROVE) --exec '$(TEST_SHELL_PATH_SQ)' $(GIT_PROVE_OPTS) $(T) :: $(GIT_TEST_OPTS)
+else
+	@echo "*** prove ***"; GIT_TEST_USE_BUSYBOX=1 $(PROVE) --exec 'busybox sh' $(GIT_PROVE_OPTS) $(T) :: $(GIT_TEST_OPTS)
+endif
 	$(MAKE) clean-except-prove-cache
 
 $(T):
+ifeq ($(GIT_TEST_USE_BUSYBOX),)
 	@echo "*** $@ ***"; '$(TEST_SHELL_PATH_SQ)' $@ $(GIT_TEST_OPTS)
+else
+	@echo "*** $@ ***"; GIT_TEST_USE_BUSYBOX=1 busybox sh $@ $(GIT_TEST_OPTS)
+endif
 
 pre-clean:
 	$(RM) -r '$(TEST_RESULTS_DIRECTORY_SQ)'
