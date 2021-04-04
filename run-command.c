@@ -24,6 +24,7 @@ void child_process_clear(struct child_process *child)
 
 struct child_to_clean {
 	pid_t pid;
+	void (*clean_on_exit_handler)(struct child_process *process);
 	struct child_process *process;
 	struct child_to_clean *next;
 };
@@ -40,12 +41,12 @@ static void cleanup_children(int sig, int in_signal)
 
 		if (p->process && !in_signal) {
 			struct child_process *process = p->process;
-			if (process->clean_on_exit_handler) {
+			if (p->clean_on_exit_handler) {
 				trace_printf(
 					"trace: run_command: running exit handler for pid %"
 					PRIuMAX, (uintmax_t)p->pid
 				);
-				process->clean_on_exit_handler(process);
+				p->clean_on_exit_handler(process);
 			}
 		}
 
@@ -88,6 +89,7 @@ static void mark_child_for_cleanup(pid_t pid, struct child_process *process)
 {
 	struct child_to_clean *p = xmalloc(sizeof(*p));
 	p->pid = pid;
+	p->clean_on_exit_handler = process->clean_on_exit_handler;
 	p->process = process;
 	p->next = children_to_clean;
 	children_to_clean = p;
