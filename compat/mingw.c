@@ -1479,7 +1479,7 @@ static const char *quote_arg_msys2(const char *arg)
 	return strbuf_detach(&buf, 0);
 }
 
-static const char *parse_interpreter(const char *cmd)
+static const char *parse_interpreter(const char *cmd, struct strvec *args)
 {
 	static char buf[MAX_PATH];
 	char *p, *opt;
@@ -1511,6 +1511,13 @@ static const char *parse_interpreter(const char *cmd)
 	/* strip options */
 	if ((opt = strchr(p+1, ' ')))
 		*opt = '\0';
+
+	if (args) {
+		strvec_push(args, p + 1);
+		if (opt)
+			strvec_split(args, opt + 1);
+	}
+
 	return p+1;
 }
 
@@ -2100,26 +2107,29 @@ pid_t mingw_spawnvpe(const char *cmd, const char **argv, char **deltaenv,
 		pid = -1;
 	}
 	else {
-		const char *interpr = parse_interpreter(prog);
+		struct strvec args = STRVEC_INIT;
+		const char *interpr = parse_interpreter(prog, &args);
 
 		if (interpr) {
-			const char *argv0 = argv[0];
 			char *iprog = path_lookup(interpr, 1);
-			argv[0] = prog;
 			if (!iprog) {
 				errno = ENOENT;
 				pid = -1;
 			}
 			else {
-				pid = mingw_spawnve_fd(iprog, argv, deltaenv, dir, interpr,
+				if (args.nr == 1)
+					strvec_clear(&args);
+				strvec_push(&args, prog);
+				strvec_pushv(&args, argv + 1);
+				pid = mingw_spawnve_fd(iprog, args.v, deltaenv, dir, interpr,
 						       fhin, fhout, fherr);
 				free(iprog);
 			}
-			argv[0] = argv0;
 		}
 		else
 			pid = mingw_spawnve_fd(prog, argv, deltaenv, dir, NULL,
 					       fhin, fhout, fherr);
+		strvec_clear(&args);
 		free(prog);
 	}
 	return pid;
@@ -2127,7 +2137,8 @@ pid_t mingw_spawnvpe(const char *cmd, const char **argv, char **deltaenv,
 
 static int try_shell_exec(const char *cmd, char *const *argv)
 {
-	const char *interpr = parse_interpreter(cmd);
+	struct strvec args = STRVEC_INIT;
+	const char *interpr = parse_interpreter(cmd, &args);
 	char *prog;
 	int pid = 0;
 
@@ -2136,17 +2147,12 @@ static int try_shell_exec(const char *cmd, char *const *argv)
 	prog = path_lookup(interpr, 1);
 	if (prog) {
 		int exec_id;
-		int argc = 0;
-#ifndef _MSC_VER
-		const
-#endif
-		char **argv2;
-		while (argv[argc]) argc++;
-		ALLOC_ARRAY(argv2, argc + 1);
-		argv2[0] = (char *)cmd;	/* full path to the script file */
-		COPY_ARRAY(&argv2[1], &argv[1], argc);
-		exec_id = trace2_exec(prog, argv2);
-		pid = mingw_spawnv(prog, argv2, interpr);
+
+		strvec_pushv(&args, (const char **)argv);
+		free((char *)args.v[0]);
+		args.v[0] = xstrdup(cmd); /* full path to the script file */
+		exec_id = trace2_exec(prog, args.v);
+		pid = mingw_spawnv(prog, args.v, interpr);
 		if (pid >= 0) {
 			int status;
 			if (waitpid(pid, &status, 0) < 0)
@@ -2157,7 +2163,7 @@ static int try_shell_exec(const char *cmd, char *const *argv)
 		trace2_exec_result(exec_id, -1);
 		pid = 1;	/* indicate that we tried but failed */
 		free(prog);
-		free(argv2);
+		strvec_clear(&args);
 	}
 	return pid;
 }
