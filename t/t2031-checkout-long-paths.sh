@@ -12,6 +12,12 @@ then
 	test_done
 fi
 
+if test_have_prereq BUSYBOX
+then
+	skip_all='skipping long paths test with BusyBox'
+	test_done
+fi
+
 test_expect_success setup '
 	p=longpathxx && # -> 10
 	p=$p$p$p$p$p && # -> 50

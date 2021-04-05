@@ -725,7 +725,7 @@ test_expect_success 'git clean works if a glob is passed with -d' '
 	test_path_is_missing d2/ut
 '
 
-test_expect_success MINGW 'handle clean & core.longpaths = false nicely' '
+test_expect_success MINGW,!BUSYBOX 'handle clean & core.longpaths = false nicely' '
 	test_config core.longpaths false &&
 	a50=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa &&
 	mkdir -p $a50$a50/$a50$a50/$a50$a50 &&
