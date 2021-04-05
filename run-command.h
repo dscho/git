@@ -179,6 +179,8 @@ void child_process_clear(struct child_process *);
 
 int is_executable(const char *name);
 
+int use_busybox_ash(void);
+
 /**
  * Start a sub-process. Takes a pointer to a `struct child_process`
  * that specifies the details and returns pipe FDs (if requested).

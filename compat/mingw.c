@@ -1507,8 +1507,12 @@ static const char *parse_interpreter(const char *cmd, struct strvec *args)
 	*p = '\0';
 	if (!(p = strrchr(buf+2, '/')) && !(p = strrchr(buf+2, '\\')))
 		return NULL;
-	/* strip options */
-	if ((opt = strchr(p+1, ' ')))
+
+	if (!strcmp("sh", p + 1) && use_busybox_ash()) {
+		p = "/busybox";
+		opt = " sh";
+	} else if ((opt = strchr(p+1, ' ')))
+		/* strip options */
 		*opt = '\0';
 
 	if (args) {

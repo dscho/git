@@ -264,7 +264,7 @@ int sane_execvp(const char *file, char * const argv[])
 	return -1;
 }
 
-static int use_busybox_ash(void)
+int use_busybox_ash(void)
 {
 	static int result = -1;
 
