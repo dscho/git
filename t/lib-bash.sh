@@ -6,7 +6,7 @@ if test -n "$BASH" && test -z "$POSIXLY_CORRECT"
 then
 	# we are in full-on bash mode
 	true
-elif type bash >/dev/null 2>&1
+elif test_have_prereq !BUSYBOX && type bash >/dev/null 2>&1
 then
 	# execute in full-on bash mode
 	unset POSIXLY_CORRECT

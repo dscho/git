@@ -1468,6 +1468,26 @@ GIT_TEMPLATE_DIR="$GIT_TEST_TEMPLATE_DIR"
 GIT_CONFIG_NOSYSTEM=1
 GIT_ATTR_NOSYSTEM=1
 GIT_CEILING_DIRECTORIES="$TRASH_DIRECTORY/.."
+case "$($SHELL --help 2>&1)" in
+*BusyBox*)
+	# Unlike the MSYS2 Bash, BusyBox' ash does not translate
+	# MSYS2-style paths to Windows form when spawning the native
+	# git.exe, so it would be handed unusable "/d/..." paths. Convert
+	# the variables git.exe consumes as paths to a Win32-digestible
+	# form.
+	GIT_EXEC_PATH="$(cygpath -m "$GIT_EXEC_PATH")"
+	GIT_TEMPLATE_DIR="$(cygpath -m "$GIT_TEMPLATE_DIR")"
+	GIT_CEILING_DIRECTORIES="$(cygpath -m "$GIT_CEILING_DIRECTORIES")"
+
+	# Git for Windows' minimal BusyBox flavor (MinGit-BusyBox) can ship
+	# without Perl, yet the per-script chain-linter requires it. As the
+	# linter only checks shell-script structure -- which does not depend
+	# on the shell running the tests and is still verified on the
+	# Perl-equipped MSYS2/Linux runs -- suppress it under BusyBox so the
+	# suite can also run in a Perl-less environment.
+	GIT_TEST_EXT_CHAIN_LINT=0
+	;;
+esac
 export PATH GIT_EXEC_PATH GIT_TEMPLATE_DIR GIT_CONFIG_NOSYSTEM GIT_ATTR_NOSYSTEM GIT_CEILING_DIRECTORIES
 
 # Add libc MALLOC and MALLOC_PERTURB test only if we are not executing
@@ -1750,6 +1770,15 @@ Darwin)
 	test_set_prereq GREP_STRIPS_CR
 	test_set_prereq WINDOWS
 	GIT_TEST_CMP="GIT_DIR=/dev/null git diff --no-index --ignore-cr-at-eol --"
+	case "$($SHELL --help 2>&1)" in
+	*BusyBox*)
+		# Unlike the MSYS2 Bash, BusyBox does not translate /dev/null
+		# to the Windows null device when spawning the native git.exe,
+		# and the minimal CI SDK provides no /dev/null for it to open;
+		# name nul directly so test_cmp (and --ignore-cr-at-eol) works.
+		GIT_TEST_CMP="GIT_DIR=nul git diff --no-index --ignore-cr-at-eol --"
+		;;
+	esac
 	if ! type iconv >/dev/null 2>&1
 	then
 		iconv () {
