@@ -765,6 +765,7 @@ test_expect_success 'bisect: demonstrate identification of damage boundary' "
 	git bisect reset &&
 	git checkout broken &&
 	git bisect start broken main --no-checkout &&
+	if test_have_prereq BUSYBOX; then SHELL_PATH=/bin/sh; fi &&
 	test_must_fail git bisect run \"\$SHELL_PATH\" -c '
 		GOOD=\$(git for-each-ref \"--format=%(objectname)\" refs/bisect/good-*) &&
 		git rev-list --objects BISECT_HEAD --not \$GOOD >tmp.\$\$ &&
