@@ -8,6 +8,7 @@ scalar - an opinionated repository management tool
 SYNOPSIS
 --------
 [verse]
+scalar list
 scalar register [<enlistment>]
 scalar unregister [<enlistment>]
 
@@ -26,10 +27,19 @@ This encourages the separation between tracked files (inside `src/`) and
 untracked files, such as build artifacts (outside `src/`).
 
 The command implements various subcommands, and different options depending
-on the subcommand.
+on the subcommand. With the exception of `list`, all subcommands expect to be
+run in an enlistment.
 
 COMMANDS
 --------
+
+List
+~~~~
+
+list::
+    To see which repositories are currently registered by the service, run
+    `scalar list`. This subcommand does not need to be run inside a Git
+    worktree.
 
 Register
 ~~~~~~~~
