@@ -7,6 +7,7 @@
 #include "parse-options.h"
 #include "config.h"
 #include "run-command.h"
+#include "refs.h"
 
 /*
  * Remove the deepest subdirectory in the provided path string. Path must not
@@ -399,7 +400,16 @@ static int cmd_clone(int argc, const char **argv)
 
 	dir = xstrfmt("%s/src", enlistment);
 
-	if ((res = run_git("init", "--", dir, NULL)))
+	strbuf_reset(&buf);
+	if (branch)
+		strbuf_addf(&buf, "init.defaultBranch=%s", branch);
+	else {
+		char *b = repo_default_branch_name(the_repository, 1);
+		strbuf_addf(&buf, "init.defaultBranch=%s", b);
+		free(b);
+	}
+
+	if ((res = run_git("-c", buf.buf, "init", "--", dir, NULL)))
 		goto cleanup;
 
 	if (chdir(dir) < 0) {
