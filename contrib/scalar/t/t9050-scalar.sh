@@ -53,4 +53,55 @@ test_expect_success UNZIP 'scalar diagnose' '
 	)
 '
 
+test_set_port GIT_TEST_GVFS_PROTOCOL_PORT
+HOST_PORT=127.0.0.1:$GIT_TEST_GVFS_PROTOCOL_PORT
+PID_FILE="$(pwd)"/pid-file.pid
+SERVER_LOG="$(pwd)"/OUT.server.log
+
+test_atexit '
+	test -f "$PID_FILE" || return 0
+
+	# The server will shutdown automatically when we delete the pid-file.
+	rm -f "$PID_FILE"
+	# Give it a few seconds to shutdown (mainly to completely release the
+	# port before the next test start another instance and it attempts to
+	# bind to it).
+	for k in $(test_seq 5)
+	do
+		grep -q "Starting graceful shutdown" "$SERVER_LOG" &&
+		return 0 ||
+		sleep 1
+	done
+
+	echo "stop_gvfs_protocol_server: timeout waiting for server shutdown"
+	return 1
+'
+
+test_expect_success 'start GVFS-enabled server' '
+	git config uploadPack.allowFilter false &&
+	git config uploadPack.allowAnySHA1InWant false &&
+	(
+		GIT_HTTP_EXPORT_ALL=1 \
+		test-gvfs-protocol --verbose \
+			--listen=127.0.0.1 \
+			--port=$GIT_TEST_GVFS_PROTOCOL_PORT \
+			--reuseaddr \
+			--pid-file="$PID_FILE" \
+			2>"$SERVER_LOG" &
+	)
+'
+
+test_expect_success '`scalar clone` with GVFS-enabled server' '
+	scalar clone --single-branch http://$HOST_PORT/ using-gvfs &&
+	(
+		cd using-gvfs &&
+		test_path_is_missing 1/2 &&
+		test_must_fail git rev-list --missing=print $second &&
+		git rev-list $second &&
+		git cat-file blob $second >actual &&
+		echo "second" >expect &&
+		test_cmp expect actual
+	)
+'
+
 test_done
