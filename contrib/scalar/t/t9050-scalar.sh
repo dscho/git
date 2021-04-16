@@ -94,7 +94,7 @@ test_expect_success 'start GVFS-enabled server' '
 test_expect_success '`scalar clone` with GVFS-enabled server' '
 	scalar clone --single-branch http://$HOST_PORT/ using-gvfs &&
 	(
-		cd using-gvfs &&
+		cd using-gvfs/src &&
 		test_path_is_missing 1/2 &&
 		test_must_fail git rev-list --missing=print $second &&
 		git rev-list $second &&
