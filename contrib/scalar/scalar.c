@@ -262,6 +262,10 @@ static int cmd_clone(int argc, const char **argv)
 		die(_("'%s' exists and is not empty"), dir);
 	}
 
+	if (!run_git(NULL, "gvfs-helper", "--remote", url, "config", NULL)) {
+		die("TODO: GVFS-enabled");
+	}
+
 	strbuf_reset(&buf);
 	if (branch)
 		strbuf_addf(&buf, "init.defaultBranch=%s", branch);
