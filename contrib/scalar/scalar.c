@@ -11,6 +11,7 @@
 #include "dir.h"
 #include "packfile.h"
 #include "help.h"
+#include "quote.h"
 
 /*
  * Remove the deepest subdirectory in the provided path string. Path must not
@@ -259,6 +260,106 @@ static int unregister_dir(void)
 	return res;
 }
 
+static int stage(int fast_import_fd, struct strbuf *buf, const char *path)
+{
+	struct strbuf info = STRBUF_INIT, quoted = STRBUF_INIT;
+	int res = 0;
+
+	strbuf_addf(&info, "M 100644 inline %s\ndata %"PRIuMAX"\n",
+		    quote_path(path, NULL, &quoted, 0), (uintmax_t)buf->len);
+
+	if (write_in_full(fast_import_fd, info.buf, info.len) < 0)
+		res = error_errno(_("could not write to `fast-import`"));
+
+	if (write_in_full(fast_import_fd, buf->buf, buf->len) < 0)
+		res = error_errno(_("could not write to `fast-import`"));
+
+	if (write_in_full(fast_import_fd, "\n", 1) < 0)
+		res = error_errno(_("could not write to `fast-import`"));
+
+	strbuf_release(&quoted);
+	strbuf_release(&info);
+	return res;
+}
+
+static int stage_file(int fast_import_fd, const char *path)
+{
+	/* Cannot stage `.git/...`, therefore we stage `_git/...` */
+	char *replace_path = starts_with(path, ".git/") ?
+		xstrfmt("_%s", path + 1) : NULL;
+	struct strbuf info = STRBUF_INIT, quoted = STRBUF_INIT;
+	int fd, res = 0;
+	struct stat st;
+
+	if (lstat(path, &st) < 0 || (fd = open(path, O_RDONLY)) < 0)
+		return error_errno(_("'%s' does not exist"), path);
+
+	strbuf_addf(&info, "M 100644 inline %s\ndata %"PRIuMAX"\n",
+		    quote_path(replace_path ? replace_path : path,
+			       NULL, &quoted, 0), (uintmax_t)st.st_size);
+
+	if (write_in_full(fast_import_fd, info.buf, info.len) < 0)
+		res = error_errno(_("could not write to `fast-import`"));
+
+	if (copy_fd(fd, fast_import_fd) < 0)
+		res = error_errno(_("could not write to `fast-import`"));
+	close(fd);
+
+	if (write_in_full(fast_import_fd, "\n", 1) < 0)
+		res = error_errno(_("could not write to `fast-import`"));
+
+	free(replace_path);
+	strbuf_release(&quoted);
+	strbuf_release(&info);
+	return res;
+}
+
+static int stage_directory(int fast_import_fd, const char *path, int recurse)
+{
+	int at_root = !*path;
+	DIR *dir = opendir(at_root ? "." : path);
+	struct dirent *e;
+	struct strbuf buf = STRBUF_INIT;
+	size_t len;
+	int res = 0;
+
+	if (!dir)
+		return error(_("could not open directory '%s'"), path);
+
+	if (!at_root)
+		strbuf_addf(&buf, "%s/", path);
+	len = buf.len;
+
+	while (!res && (e = readdir(dir))) {
+		if (!strcmp(".", e->d_name) || !strcmp("..", e->d_name))
+			continue;
+
+		strbuf_setlen(&buf, len);
+		strbuf_addstr(&buf, e->d_name);
+
+		if ((e->d_type == DT_REG &&
+		     stage_file(fast_import_fd, buf.buf)) ||
+		    (e->d_type == DT_DIR && recurse &&
+		     stage_directory(fast_import_fd, buf.buf, recurse)))
+			res = -1;
+	}
+
+	closedir(dir);
+	strbuf_release(&buf);
+	return res;
+}
+
+static int ref_to_zip(const char *git_dir, const char *ref)
+{
+	struct child_process cp = CHILD_PROCESS_INIT;
+
+	cp.git_cmd = 1;
+	strvec_pushl(&cp.args, "--git-dir", git_dir, "archive", "-o", NULL);
+	strvec_pushf(&cp.args, "%s.zip", git_dir);
+	strvec_pushl(&cp.args, ref, "--", NULL);
+	return run_command(&cp);
+}
+
 /* printf-style interface, expects `<key>=<value>` argument */
 static int set_config(const char *fmt, ...)
 {
@@ -496,6 +597,104 @@ cleanup:
 	free(enlistment);
 	free(dir);
 	strbuf_release(&buf);
+	return res;
+}
+
+static int cmd_diagnose(int argc, const char **argv)
+{
+	struct option options[] = {
+		OPT_END(),
+	};
+	const char * const usage[] = {
+		N_("scalar diagnose [<enlistment>]"),
+		NULL
+	};
+	struct strbuf tmp_dir = STRBUF_INIT;
+	struct child_process fast_import = CHILD_PROCESS_INIT;
+	time_t now = time(NULL);
+	struct tm tm;
+	struct strbuf path = STRBUF_INIT, buf = STRBUF_INIT;
+	int res = 0;
+
+	argc = parse_options(argc, argv, NULL, options,
+			     usage, 0);
+
+	setup_enlistment_directory(argc, argv, usage, options, &buf);
+
+	strbuf_addstr(&buf, "/.scalarDiagnostics/scalar_");
+	strbuf_addftime(&buf, "%Y%m%d_%H%M%S", localtime_r(&now, &tm), 0, 0);
+	if (run_git("init", "-q", "-b", "dummy", "--bare", buf.buf, NULL)) {
+		res = error(_("could not initialize temporary repository: %s"),
+			    buf.buf);
+		goto diagnose_cleanup;
+	}
+	strbuf_realpath(&tmp_dir, buf.buf, 1);
+
+	fast_import.git_cmd = 1;
+	fast_import.in = -1;
+	strvec_pushl(&fast_import.args,
+		     "-C", tmp_dir.buf,
+		     "fast-import", "--date-format=now", NULL);
+	if ((res = start_command(&fast_import))) {
+		error(_("failed to start `fast-import`"));
+		goto diagnose_cleanup;
+	}
+
+	strbuf_reset(&buf);
+	strbuf_addstr(&buf,
+		      "commit refs/heads/diagnose\n"
+		      "committer scalar <scalar@diagnose> now\n"
+		      "data <<EOF\n"
+		      "Diagnose\n"
+		      "EOF\n");
+	if ((res = write_in_full(fast_import.in, buf.buf, buf.len)) < 0) {
+		error_errno(_("failed to write to `fast-import`"));
+		goto diagnose_cleanup;
+	}
+
+	strbuf_reset(&buf);
+	strbuf_addf(&buf, "Collecting diagnostic info into temp folder %s\n\n",
+		    tmp_dir.buf);
+
+	get_version_info(&buf, 1);
+
+	strbuf_addf(&buf, "Enlistment root: %s\n", the_repository->worktree);
+	fwrite(buf.buf, buf.len, 1, stdout);
+
+	if ((res = stage(fast_import.in, &buf, "diagnostics.log")))
+		goto diagnose_cleanup;
+
+	if ((res = stage_directory(fast_import.in, ".git", 0)) ||
+	    (res = stage_directory(fast_import.in, ".git/hooks", 0)) ||
+	    (res = stage_directory(fast_import.in, ".git/info", 0)) ||
+	    (res = stage_directory(fast_import.in, ".git/logs", 1)) ||
+	    (res = stage_directory(fast_import.in, ".git/objects/info", 0)))
+		goto diagnose_cleanup;
+
+	if (close(fast_import.in))
+		warning(_("failed to write to `fast-import`"));
+
+	if ((res = finish_command(&fast_import))) {
+		error(_("failed to run `fast-import`"));
+		goto diagnose_cleanup;
+	}
+
+	res = ref_to_zip(tmp_dir.buf, "refs/heads/diagnose");
+
+	if (!res)
+		res = remove_dir_recursively(&tmp_dir, 0);
+
+	if (!res)
+		printf("\n"
+		       "Diagnostics complete.\n"
+		       "All of the gathered info is captured in '%s.zip'\n",
+		       tmp_dir.buf);
+
+diagnose_cleanup:
+	strbuf_release(&tmp_dir);
+	strbuf_release(&path);
+	strbuf_release(&buf);
+
 	return res;
 }
 
@@ -800,6 +999,7 @@ static struct {
 	{ "reconfigure", cmd_reconfigure },
 	{ "delete", cmd_delete },
 	{ "version", cmd_version },
+	{ "diagnose", cmd_diagnose },
 	{ NULL, NULL},
 };
 
