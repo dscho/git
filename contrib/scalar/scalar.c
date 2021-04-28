@@ -260,10 +260,24 @@ static int unregister_dir(void)
 	return res;
 }
 
+static void spinner(void)
+{
+	static const char whee[] = "|\010/\010-\010\\\010", *next = whee;
+
+	if (!next)
+		return;
+	if (write(2, next, 2) < 0)
+		next = NULL;
+	else
+		next = next[2] ? next + 2 : whee;
+}
+
 static int stage(int fast_import_fd, struct strbuf *buf, const char *path)
 {
 	struct strbuf info = STRBUF_INIT, quoted = STRBUF_INIT;
 	int res = 0;
+
+	spinner();
 
 	strbuf_addf(&info, "M 100644 inline %s\ndata %"PRIuMAX"\n",
 		    quote_path(path, NULL, &quoted, 0), (uintmax_t)buf->len);
@@ -290,6 +304,8 @@ static int stage_file(int fast_import_fd, const char *path)
 	struct strbuf info = STRBUF_INIT, quoted = STRBUF_INIT;
 	int fd, res = 0;
 	struct stat st;
+
+	spinner();
 
 	if (lstat(path, &st) < 0 || (fd = open(path, O_RDONLY)) < 0)
 		return error_errno(_("'%s' does not exist"), path);
