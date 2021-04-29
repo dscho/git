@@ -1,0 +1,40 @@
+name: "release-winget"
+on:
+  release:
+    types: [released]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+    - id: update-winget
+      name: Update winget repository
+      uses: mjcheetham/update-winget@v1.2.2
+      with:
+        id: Microsoft.Git
+        token: ${{ secrets.WINGET_TOKEN }}
+        releaseAsset: Git-([0-9.vfs]*)\-64-bit.exe
+        manifestText: |
+          PackageIdentifier: {{id}}
+          PackageVersion: {{version}}
+          PackageName: Microsoft Git
+          Publisher: Microsoft Corporation
+          Moniker: microsoft-git
+          PackageUrl: https://aka.ms/ms-git
+          Tags: [ microsoft-git ]
+          License: Copyright (C) Microsoft Corporation
+          ShortDescription: |
+            Git distribution to support monorepo scenarios.
+            Note: This is not Git for Windows. Unless you are working in a monorepo and require
+            specific Git modifications, please run `winget install git` to start using Git for Windows.
+          Installers:
+          - Architecture: x64
+            InstallerUrl: {{url}}
+            InstallerType: inno
+            InstallerSha256: {{sha256}}
+            InstallerSwitches:
+              Custom: /COMPONENTS="AUTOUPDATE"
+          PackageLocale: en-US
+          ManifestType: singleton
+          ManifestVersion: 1.0.0
+        alwaysUsePullRequest: true
