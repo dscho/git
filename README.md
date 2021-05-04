@@ -1,82 +1,94 @@
-Git for Windows
+Microsoft Git
 ===============
 
-[![Build status](https://github.com/git-for-windows/git/workflows/CI/PR/badge.svg)](https://github.com/git-for-windows/git/actions?query=branch%3Amaster+event%3Apush)
-[![Join the chat at https://gitter.im/git-for-windows/git](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/git-for-windows/git?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+[![CI/PR](https://github.com/microsoft/git/actions/workflows/main.yml/badge.svg)](https://github.com/microsoft/git/actions/workflows/main.yml)
 
-This is [Git for Windows](http://git-for-windows.github.io/), the Windows port
-of [Git](http://git-scm.com/).
+This is Microsoft Git, a special Git distribution to support monorepo scenarios. If you are _not_ working in a monorepo, you are likely searching for [Git for Windows](http://git-for-windows.github.io/) instead of this codebase.
 
-The Git for Windows project is run using a [governance
-model](http://git-for-windows.github.io/governance-model.html). If you
-encounter problems, you can report them as [GitHub
-issues](https://github.com/git-for-windows/git/issues), discuss them on Git
-for Windows' [Google Group](http://groups.google.com/group/git-for-windows),
-and [contribute bug
-fixes](https://github.com/git-for-windows/git/wiki/How-to-participate).
+If you encounter problems with Microsoft Git, please report them as [GitHub issues](https://github.com/microsoft/git/issues).
 
-Git - fast, scalable, distributed revision control system
+Why is Microsoft Git needed?
 =========================================================
 
-Git is a fast, scalable, distributed revision control system with an
-unusually rich command set that provides both high-level operations
-and full access to internals.
+Git is awesome - it's a fast, scalable, distributed version control system with an unusually rich command set that provides both high-level operations and full access to internals. What more could you ask for?
 
-Git is an Open Source project covered by the GNU General Public
-License version 2 (some parts of it are under different licenses,
-compatible with the GPLv2). It was originally written by Linus
-Torvalds with help of a group of hackers around the net.
+Well, because Git is a distributed version control system, each Git repository has a copy of all files in the entire history. As large repositories, aka _monorepos_ grow, Git can struggle to manage all that data. As Git commands like `status` and `fetch` get slower, developers stop waiting and start switching context. And context switches harm developer productivity.
 
-Please read the file [INSTALL][] for installation instructions.
+Microsoft Git is focused on addressing these performance woes and making the monorepo developer experience first-class. It does so in part by working with the [GVFS protocol](https://docs.microsoft.com/en-us/azure/devops/learn/git/gvfs-architecture#gvfs-protocol) to prefetch packs of commits and trees and delay downloading of associated blobs. This is required for monorepos using [VFS for Git](https://github.com/microsoft/VFSForGit/blob/master/Readme.md). Additionally, some Git hosting providers support the GVFS protocol instead of the Git-native [partial clone feature](https://github.blog/2020-12-21-get-up-to-speed-with-partial-clone-and-shallow-clone/).
 
-Many Git online resources are accessible from <https://git-scm.com/>
-including full documentation and Git related tools.
+Downloading and Installing
+=========================================================
 
-See [Documentation/gittutorial.txt][] to get started, then see
-[Documentation/giteveryday.txt][] for a useful minimum set of commands, and
-`Documentation/git-<commandname>.txt` for documentation of each command.
-If git has been correctly installed, then the tutorial can also be
-read with `man gittutorial` or `git help tutorial`, and the
-documentation of each command with `man git-<commandname>` or `git help
-<commandname>`.
+If you're working in a monorepo and want to take advantage of Microsoft Git's performance boosts, you can
+download the latest version installer for your OS from the [Releases page](https://github.com/microsoft/git/releases). Alternatively,
+you can opt to install via the command line, using the below instructions for supported OSes:
 
-CVS users may also want to read [Documentation/gitcvs-migration.txt][]
-(`man gitcvs-migration` or `git help cvs-migration` if git is
-installed).
+## Windows
+__Note:__ Winget is still in public preview, meaning you currently [need to take special installation steps](https://docs.microsoft.com/en-us/windows/package-manager/winget/#install-winget) (i.e. manually installing the `.appxbundle`, installing the preview version of [App Installer](https://www.microsoft.com/p/app-installer/9nblggh4nns1?ocid=9nblggh4nns1_ORSEARCH_Bing&rtc=1&activetab=pivot:overviewtab), or participating in the [Windows Insider flight ring](https://insider.windows.com/https://insider.windows.com/)).
 
-The user discussion and development of core Git take place on the Git
-mailing list -- everyone is welcome to post bug reports, feature
-requests, comments and patches to git@vger.kernel.org (read
-[Documentation/SubmittingPatches][] for instructions on patch submission).
-To subscribe to the list, send an email with just "subscribe git" in
-the body to majordomo@vger.kernel.org. The mailing list archives are
-available at <https://lore.kernel.org/git/>,
-<http://marc.info/?l=git> and other archival sites.
-The core git mailing list is plain text (no HTML!).
+To install with Winget, run
 
-Issues which are security relevant should be disclosed privately to
-the Git Security mailing list <git-security@googlegroups.com>.
+```shell
+winget install microsoft/git
+```
 
-The maintainer frequently sends the "What's cooking" reports that
-list the current status of various development topics to the mailing
-list.  The discussion following them give a good reference for
-project status, development direction and remaining tasks.
+To upgrade Microsoft Git, use the following Git command, which will download and install the latest release.
 
-The name "git" was given by Linus Torvalds when he wrote the very
-first version. He described the tool as "the stupid content tracker"
-and the name as (depending on your mood):
+```shell
+git update-microsoft-git
+```
 
- - random three-letter combination that is pronounceable, and not
-   actually used by any common UNIX command.  The fact that it is a
-   mispronunciation of "get" may or may not be relevant.
- - stupid. contemptible and despicable. simple. Take your pick from the
-   dictionary of slang.
- - "global information tracker": you're in a good mood, and it actually
-   works for you. Angels sing, and a light suddenly fills the room.
- - "goddamn idiotic truckload of sh*t": when it breaks
+You may also be alerted with a notification to upgrade, which presents a single-click process for running `git update-microsoft-git`.
 
-[INSTALL]: INSTALL
-[Documentation/gittutorial.txt]: Documentation/gittutorial.txt
-[Documentation/giteveryday.txt]: Documentation/giteveryday.txt
-[Documentation/gitcvs-migration.txt]: Documentation/gitcvs-migration.txt
-[Documentation/SubmittingPatches]: Documentation/SubmittingPatches
+## macOS
+
+To install Microsoft Git on macOS, first [be sure that Homebrew is installed](https://brew.sh/) then install the `microsoft-git` cask with these steps:
+
+```shell
+brew tap microsoft/git
+brew install --cask microsoft-git
+```
+
+To upgrade microsoft/git, you can run the necessary brew commands:
+
+```shell
+brew update
+brew upgrade --cask microsoft-git
+```
+
+Or you can run the `git update-microsoft-git` command, which will run those brew commands for you.
+
+## Linux
+
+For Ubuntu/Debian distributions, `apt-get` support is coming soon. For now, though, please use the most recent [`.deb` package](https://github.com/microsoft/git/releases).
+
+```shell
+wget -o microsoft-git.deb https://github.com/microsoft/git/releases/download/v2.31.1.vfs.0.1/git-vfs_2.31.1.vfs.0.1.deb
+sudo dpkg -i microsoft-git.deb
+```
+
+For other distributions, you will need to compile and install microsoft/git from source:
+
+```shell
+git clone https://github.com/microsoft/git microsoft-git
+cd microsoft-git
+make -j12 prefix=/usr/local
+sudo make -j12 prefix=/usr/local install
+```
+
+For more assistance building Git from source, see [the INSTALL file in the core Git project](https://github.com/git/git/blob/master/INSTALL).
+
+Contributing
+=========================================================
+
+This project welcomes contributions and suggestions.  Most contributions require you to agree to a
+Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us
+the rights to use your contribution. For details, visit <https://cla.microsoft.com.>
+
+When you submit a pull request, a CLA-bot will automatically determine whether you need to provide
+a CLA and decorate the PR appropriately (e.g., label, comment). Simply follow the instructions
+provided by the bot. You will only need to do this once across all repos using our CLA.
+
+This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
+For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
+contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
