@@ -1006,39 +1006,60 @@ static int cmd_cache_server(int argc, const char **argv)
 	};
 	const char * const cache_server_usage[] = {
 		N_("scalar cache_server "
-		   "[--get | --set <url> | --list [<remote>]]"),
+		   "[--get | --set <url> | --list [<remote>]] [<worktree>]"),
 		NULL
 	};
+	int res = 0;
 
 	argc = parse_options(argc, argv, NULL, cache_server_options,
 			     cache_server_usage, 0);
 
 
 	if (mode == LIST) {
-		if (argc > 1)
+		if (argc > 2)
 			usage_with_options(cache_server_usage,
 					   cache_server_options);
-		return !!supports_gvfs_protocol(NULL, argc > 0 ?
-						argv[0] : "origin", NULL);
+		res = !!supports_gvfs_protocol(argc > 1 ? argv[1] : NULL,
+					       argc > 0 ? argv[0] : "origin",
+					       NULL);
 	} else if (mode == SET) {
-		if (argc != 1)
+		char *file = NULL;
+
+		if (argc != 1 && argc != 2)
 			usage_with_options(cache_server_usage,
 					   cache_server_options);
-		return !!set_config(NULL, "gvfs.cache-server=%s", argv[0]);
+		if (argc > 1)
+			file = xstrfmt("%s/.git/config", argv[1]);
+		res = !!set_config(file, "gvfs.cache-server=%s", argv[0]);
+		free(file);
 	} else {
 		char *url = NULL;
 
-		if (argc != 0)
+		if (argc != 0 && argc != 1)
 			usage_with_options(cache_server_usage,
 					   cache_server_options);
+		if (argc == 0)
+			git_config_get_string("gvfs.cache-server", &url);
+		else {
+			struct strbuf buf = STRBUF_INIT;
+			struct child_process cp = CHILD_PROCESS_INIT;
 
-		printf("Using cache server: %s\n",
-		       git_config_get_string("gvfs.cache-server", &url) ?
-		       "(undefined)" : url);
+			cp.git_cmd = 1;
+			cp.dir = argv[0];
+			strvec_pushl(&cp.args,
+				     "config", "gvfs.cache-server", NULL);
+			res = !!pipe_command(&cp, NULL, 0, &buf, 0, NULL, 0);
+			strbuf_trim_trailing_newline(&buf);
+			if (!res)
+				url = strbuf_detach(&buf, NULL);
+		}
+		if (!res)
+			printf("Using cache server: %s\n",
+			       url ? url : "(undefined)");
 		free(url);
 	}
 
-	return 0;
+	return res;
 }
 
 static int cmd_test(int argc, const char **argv)
@@ -1073,6 +1094,12 @@ int cmd_main(int argc, const char **argv)
 {
 	struct strbuf scalar_usage = STRBUF_INIT;
 	int i;
+
+	if (is_unattended()) {
+		setenv("GIT_ASKPASS", "", 1);
+		setenv("GIT_TERMINAL_PROMPT", "false", 1);
+		git_config_push_parameter("credential.interactive=never");
+	}
 
 	while (argc > 1 && *argv[1] == '-') {
 		if (!strcmp(argv[1], "-C")) {
