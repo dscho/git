@@ -65,6 +65,17 @@ test_expect_success 'scalar clone' '
 	)
 '
 
+test_expect_success 'scalar reconfigure' '
+	git init one/src &&
+	scalar register one &&
+	git -C one/src config core.preloadIndex false &&
+	scalar reconfigure one &&
+	test true = "$(git -C one/src config core.preloadIndex)" &&
+	git -C one/src config core.preloadIndex false &&
+	scalar reconfigure -a &&
+	test true = "$(git -C one/src config core.preloadIndex)"
+'
+
 test_expect_success '`scalar register` & `unregister` with existing repo' '
 	git init existing &&
 	scalar register existing &&
