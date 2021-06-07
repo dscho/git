@@ -438,9 +438,11 @@ void fsmonitor_fs_listen__loop(struct fsmonitor_daemon_state *state)
 
 	state->error_code = 0;
 
+trace2_data_string("fsmonitor", NULL, "start-watch-worktree-1", data->watch_worktree->path.buf);
 	if (start_rdcw_watch(data, data->watch_worktree) == -1)
 		goto force_error_stop;
 
+if (data->watch_gitdir) trace2_data_string("fsmonitor", NULL, "start-watch-gitdir-1", data->watch_gitdir->path.buf);
 	if (data->watch_gitdir &&
 	    start_rdcw_watch(data, data->watch_gitdir) == -1)
 		goto force_error_stop;
@@ -455,6 +457,7 @@ void fsmonitor_fs_listen__loop(struct fsmonitor_daemon_state *state)
 				goto force_error_stop;
 			if (process_worktree_events(state) == LISTENER_SHUTDOWN)
 				goto force_shutdown;
+trace2_data_string("fsmonitor", NULL, "start-watch-worktree-2", data->watch_worktree->path.buf);
 			if (start_rdcw_watch(data, data->watch_worktree) == -1)
 				goto force_error_stop;
 			continue;
@@ -465,6 +468,7 @@ void fsmonitor_fs_listen__loop(struct fsmonitor_daemon_state *state)
 				goto force_error_stop;
 			if (process_gitdir_events(state) == LISTENER_SHUTDOWN)
 				goto force_shutdown;
+trace2_data_string("fsmonitor", NULL, "start-watch-gitdir-2", data->watch_gitdir->path.buf);
 			if (start_rdcw_watch(data, data->watch_gitdir) == -1)
 				goto force_error_stop;
 			continue;
