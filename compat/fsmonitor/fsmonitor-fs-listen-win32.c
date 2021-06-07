@@ -302,6 +302,8 @@ static int process_worktree_events(struct fsmonitor_daemon_state *state)
 			goto skip_this_path;
 
 		t = fsmonitor_classify_path_workdir_relative(path.buf);
+trace2_data_string("fsmonitor", NULL, "fsm-classify-string", path.buf);
+trace2_data_intmax("fsmonitor", NULL, "fsm-classify-type", (intmax_t)t);
 
 		switch (t) {
 		case IS_INSIDE_DOT_GIT_WITH_COOKIE_PREFIX:
