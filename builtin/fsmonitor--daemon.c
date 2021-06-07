@@ -954,9 +954,19 @@ static int handle_client(void *data,
 enum fsmonitor_path_type fsmonitor_classify_path_workdir_relative(
 	const char *rel)
 {
-	if (fspathncmp(rel, ".git", 4))
+	if (!fspathncmp(rel, ".git", 4))
+		rel += 4;
+#ifdef WIN32
+	/*
+	 * When the `.git/` directory is deleted using its NTFS short name,
+	 * `ReadDirectoryChangesW()` unfortunately reports that short name,
+	 * which is typically `GIT~1`.
+	 */
+	else if (!fspathncmp(rel, "GIT~1", 5))
+		rel += 5;
+#endif
+	else
 		return IS_WORKDIR_PATH;
-	rel += 4;
 
 	if (!*rel)
 		return IS_DOT_GIT;
