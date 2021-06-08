@@ -661,10 +661,8 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 		 * There is no reply to the client.
 		 */
 		return SIMPLE_IPC_QUIT;
-	}
 
-
-	if (!strcmp(command, "flush")) {
+	} else if (!strcmp(command, "flush")) {
 		/*
 		 * Flush all of our cached data and generate a new token
 		 * just like if we lost sync with the filesystem.
@@ -674,9 +672,8 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 		fsmonitor_force_resync(state);
 		result = 0;
 		goto send_trivial_response;
-	}
 
-	if (!skip_prefix(command, "builtin:", &p)) {
+	} else if (!skip_prefix(command, "builtin:", &p)) {
 		/* assume V1 timestamp or garbage */
 
 		char *p_end;
@@ -687,19 +684,24 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 				  "fsmonitor: invalid command line '%s'" :
 				  "fsmonitor: unsupported V1 protocol '%s'"),
 				 command);
-		result = -1;
+		result = 0;
 		goto send_trivial_response;
-	}
 
-	/* try V2 token */
-
-	if (fsmonitor_parse_client_token(command, &requested_token_id,
-					 &requested_oldest_seq_nr)) {
-		trace_printf_key(&trace_fsmonitor,
-				 "fsmonitor: invalid V2 protocol token '%s'",
-				 command);
-		result = -1;
-		goto send_trivial_response;
+	} else {
+		/* We have "builtin:*" */
+		if (fsmonitor_parse_client_token(command, &requested_token_id,
+						 &requested_oldest_seq_nr)) {
+			trace_printf_key(&trace_fsmonitor,
+					 "fsmonitor: invalid V2 protocol token '%s'",
+					 command);
+			result = 0;
+			goto send_trivial_response;
+		} else {
+			/*
+			 * We have a V2 valid token:
+			 *     "builtin:<token_id>:<seq_nr>"
+			 */
+		}
 	}
 
 	pthread_mutex_lock(&state->main_lock);
