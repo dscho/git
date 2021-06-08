@@ -705,15 +705,9 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 
 	pthread_mutex_lock(&state->main_lock);
 
-	if (!state->current_token_data) {
-		/*
-		 * We don't have a current token.  This may mean that
-		 * the listener thread has not yet started.
-		 */
-		pthread_mutex_unlock(&state->main_lock);
-		result = 0;
-		goto send_trivial_response;
-	}
+	if (!state->current_token_data)
+		BUG("fsmonitor state does not have a current token");
+
 	if (strcmp(requested_token_id.buf,
 		   state->current_token_data->token_id.buf)) {
 		/*
