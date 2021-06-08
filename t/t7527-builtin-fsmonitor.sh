@@ -63,7 +63,7 @@ test_expect_success 'implicit daemon start' '
 	# implicitly started.)
 
 	GIT_TRACE2_EVENT="$PWD/.git/trace" \
-		git -C test_implicit fsmonitor--daemon --query 0 >actual &&
+		test-tool -C test_implicit fsmonitor-client query --token 0 >actual &&
 	nul_to_q <actual >actual.filtered &&
 	grep "builtin:" actual.filtered &&
 
@@ -275,7 +275,7 @@ test_expect_success 'edit some files' '
 
 	edit_files &&
 
-	git fsmonitor--daemon --query 0 >/dev/null 2>&1 &&
+	test-tool fsmonitor-client query --token 0 >/dev/null 2>&1 &&
 
 	grep "^event: dir1/modified$"  .git/trace &&
 	grep "^event: dir2/modified$"  .git/trace &&
@@ -295,7 +295,7 @@ test_expect_success 'create some files' '
 
 	create_files &&
 
-	git fsmonitor--daemon --query 0 >/dev/null 2>&1 &&
+	test-tool fsmonitor-client query --token 0 >/dev/null 2>&1 &&
 
 	grep "^event: dir1/new$" .git/trace &&
 	grep "^event: dir2/new$" .git/trace &&
@@ -314,7 +314,7 @@ test_expect_success 'delete some files' '
 
 	delete_files &&
 
-	git fsmonitor--daemon --query 0 >/dev/null 2>&1 &&
+	test-tool fsmonitor-client query --token 0 >/dev/null 2>&1 &&
 
 	grep "^event: dir1/delete$" .git/trace &&
 	grep "^event: dir2/delete$" .git/trace &&
@@ -333,7 +333,7 @@ test_expect_success 'rename some files' '
 
 	rename_files &&
 
-	git fsmonitor--daemon --query 0 >/dev/null 2>&1 &&
+	test-tool fsmonitor-client query --token 0 >/dev/null 2>&1 &&
 
 	grep "^event: dir1/rename$"  .git/trace &&
 	grep "^event: dir2/rename$"  .git/trace &&
@@ -355,7 +355,7 @@ test_expect_success 'rename directory' '
 
 	mv dirtorename dirrenamed &&
 
-	git fsmonitor--daemon --query 0 >/dev/null 2>&1 &&
+	test-tool fsmonitor-client query --token 0 >/dev/null 2>&1 &&
 
 	grep "^event: dirtorename/*$" .git/trace &&
 	grep "^event: dirrenamed/*$"  .git/trace
@@ -373,7 +373,7 @@ test_expect_success 'file changes to directory' '
 
 	file_to_directory &&
 
-	git fsmonitor--daemon --query 0 >/dev/null 2>&1 &&
+	test-tool fsmonitor-client query --token 0 >/dev/null 2>&1 &&
 
 	grep "^event: delete$"     .git/trace &&
 	grep "^event: delete/new$" .git/trace
@@ -391,7 +391,7 @@ test_expect_success 'directory changes to a file' '
 
 	directory_to_file &&
 
-	git fsmonitor--daemon --query 0 >/dev/null 2>&1 &&
+	test-tool fsmonitor-client query --token 0 >/dev/null 2>&1 &&
 
 	grep "^event: dir1$" .git/trace
 '
@@ -423,13 +423,13 @@ test_expect_success 'flush cached data' '
 	# then a few (probably platform-specific number of) events in _1.
 	# These should both have the same <token_id>.
 
-	git -C test_flush fsmonitor--daemon --query "builtin:test_00000001:0" >actual_0 &&
+	test-tool -C test_flush fsmonitor-client query --token "builtin:test_00000001:0" >actual_0 &&
 	nul_to_q <actual_0 >actual_q0 &&
 
 	touch test_flush/file_1 &&
 	touch test_flush/file_2 &&
 
-	git -C test_flush fsmonitor--daemon --query "builtin:test_00000001:0" >actual_1 &&
+	test-tool -C test_flush fsmonitor-client query --token "builtin:test_00000001:0" >actual_1 &&
 	nul_to_q <actual_1 >actual_q1 &&
 
 	grep "file_1" actual_q1 &&
@@ -438,18 +438,18 @@ test_expect_success 'flush cached data' '
 	# flush the file data.  Then create some events and ensure that the file
 	# again appears in the cache.  It should have the new <token_id>.
 
-	git -C test_flush fsmonitor--daemon --flush >flush_0 &&
+	test-tool -C test_flush fsmonitor-client flush >flush_0 &&
 	nul_to_q <flush_0 >flush_q0 &&
 	grep "^builtin:test_00000002:0Q/Q$" flush_q0 &&
 
-	git -C test_flush fsmonitor--daemon --query "builtin:test_00000002:0" >actual_2 &&
+	test-tool -C test_flush fsmonitor-client query --token "builtin:test_00000002:0" >actual_2 &&
 	nul_to_q <actual_2 >actual_q2 &&
 
 	grep "^builtin:test_00000002:0Q$" actual_q2 &&
 
 	touch test_flush/file_3 &&
 
-	git -C test_flush fsmonitor--daemon --query "builtin:test_00000002:0" >actual_3 &&
+	test-tool -C test_flush fsmonitor-client query --token "builtin:test_00000002:0" >actual_3 &&
 	nul_to_q <actual_3 >actual_q3 &&
 
 	grep "file_3" actual_q3
