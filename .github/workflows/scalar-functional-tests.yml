@@ -147,7 +147,7 @@ jobs:
         git version --build-options
         cd ../out
         PATH="$PWD/Scalar/$BUILD_FRAGMENT:$PWD/Scalar.Service/$BUILD_FRAGMENT:$PATH"
-        Scalar.FunctionalTests/$BUILD_FRAGMENT/Scalar.FunctionalTests$BUILD_FILE_EXT --test-git-on-path --timeout=300000 --full-suite
+        Scalar.FunctionalTests/$BUILD_FRAGMENT/Scalar.FunctionalTests$BUILD_FILE_EXT --test-scalar-on-path --test-git-on-path --timeout=300000 --full-suite
 
     - name: Force-stop FSMonitor daemons (Windows)
       if: runner.os == 'Windows' && matrix.features == 'experimental' && (success() || failure())
