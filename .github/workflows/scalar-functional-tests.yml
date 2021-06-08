@@ -3,7 +3,7 @@ name: Scalar Functional Tests
 env:
   SCALAR_REPOSITORY: dscho/scalar
   SCALAR_REF: vfs-2.32.0
-  DEBUG_WITH_TMATE: true
+  DEBUG_WITH_TMATE: false
 
 on:
   push:
