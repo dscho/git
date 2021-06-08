@@ -6,19 +6,13 @@
 #include "trace2.h"
 
 #ifdef HAVE_FSMONITOR_DAEMON_BACKEND
-#define FSMONITOR_DAEMON_IS_SUPPORTED 1
-#else
-#define FSMONITOR_DAEMON_IS_SUPPORTED 0
-#endif
 
 int fsmonitor_ipc__is_supported(void)
 {
-	return FSMONITOR_DAEMON_IS_SUPPORTED;
+	return 1;
 }
 
-#ifdef HAVE_FSMONITOR_DAEMON_BACKEND
-
-GIT_PATH_FUNC(fsmonitor_ipc__get_path, "fsmonitor")
+GIT_PATH_FUNC(fsmonitor_ipc__get_path, "fsmonitor--daemon.ipc")
 
 enum ipc_active_state fsmonitor_ipc__get_state(void)
 {
@@ -143,6 +137,40 @@ int fsmonitor_ipc__send_command(const char *command,
 	}
 
 	return 0;
+}
+
+#else
+
+/*
+ * A trivial implementation of the fsmonitor_ipc__ API for unsupported
+ * platforms.
+ */
+
+int fsmonitor_ipc__is_supported(void)
+{
+	return 0;
+}
+
+const char *fsmonitor_ipc__get_path(void)
+{
+	return NULL;
+}
+
+enum ipc_active_state fsmonitor_ipc__get_state(void)
+{
+	return IPC_STATE__OTHER_ERROR;
+}
+
+int fsmonitor_ipc__send_query(const char *since_token,
+			      struct strbuf *answer)
+{
+	return -1;
+}
+
+int fsmonitor_ipc__send_command(const char *command,
+				struct strbuf *answer)
+{
+	return -1;
 }
 
 #endif
