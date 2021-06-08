@@ -721,19 +721,6 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 				   "response/token", "different");
 		goto send_trivial_response;
 	}
-	if (!state->current_token_data->batch_tail) {
-		/*
-		 * The listener has not received any filesystem
-		 * events yet since we created the current token.
-		 * We can respond with an empty list, since the
-		 * client has already seen the current token and
-		 * we have nothing new to report.  (This is
-		 * instead of sending a trivial response.)
-		 */
-		pthread_mutex_unlock(&state->main_lock);
-		result = 0;
-		goto send_empty_response;
-	}
 	if (requested_oldest_seq_nr <
 	    state->current_token_data->batch_tail->batch_seq_nr) {
 		/*
@@ -929,23 +916,6 @@ send_trivial_response:
 	strbuf_release(&requested_token_id);
 
 	return result;
-
-send_empty_response:
-	pthread_mutex_lock(&state->main_lock);
-	with_lock__format_response_token(&response_token,
-					&state->current_token_data->token_id,
-					NULL);
-	pthread_mutex_unlock(&state->main_lock);
-
-	reply(reply_data, response_token.buf, response_token.len + 1);
-	trace2_data_string("fsmonitor", the_repository, "response/token",
-			   response_token.buf);
-	trace2_data_intmax("fsmonitor", the_repository, "response/empty", 1);
-
-	strbuf_release(&response_token);
-	strbuf_release(&requested_token_id);
-
-	return 0;
 }
 
 static ipc_server_application_cb handle_client;
