@@ -571,16 +571,16 @@ static int fsmonitor_parse_client_token(const char *buf_token,
 	*seq_nr = 0;
 
 	if (!skip_prefix(buf_token, "builtin:", &p))
-		return 1;
+		return -1;
 
 	while (*p && *p != ':')
 		strbuf_addch(requested_token_id, *p++);
 	if (!*p++)
-		return 1;
+		return -1;
 
 	*seq_nr = (uint64_t)strtoumax(p, &p_end, 10);
 	if (*p_end)
-		return 1;
+		return -1;
 
 	return 0;
 }
