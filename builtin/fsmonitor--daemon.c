@@ -836,7 +836,7 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 	 */
 	shown = kh_init_str();
 	for (batch = batch_head;
-	     batch && batch->batch_seq_nr >= requested_oldest_seq_nr;
+	     batch && batch->batch_seq_nr > requested_oldest_seq_nr;
 	     batch = batch->next) {
 		size_t k;
 
