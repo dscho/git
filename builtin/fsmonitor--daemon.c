@@ -670,11 +670,9 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 		 *
 		 * Then send a trivial response using the new token.
 		 */
-		fsmonitor_force_resync(state);
 		do_flush = 1;
 		do_trivial = 1;
 		do_cookie = 1;
-		goto send_trivial_response;
 
 	} else if (!skip_prefix(command, "builtin:", &p)) {
 		/* assume V1 timestamp or garbage */
@@ -689,7 +687,6 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 				 command);
 		do_trivial = 1;
 		do_cookie = 1;
-		goto send_trivial_response;
 
 	} else {
 		/* We have "builtin:*" */
@@ -700,7 +697,6 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 					 command);
 			do_trivial = 1;
 			do_cookie = 1;
-			goto send_trivial_response;
 
 		} else {
 			/*
@@ -737,7 +733,6 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 			error(_("fsmonitor: cookie_result '%d' != SEEN"),
 			      cookie_result);
 			do_trivial = 1;
-			goto send_trivial_response;
 		}
 	}
 
@@ -779,11 +774,10 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 			 * instance -OR- the daemon had to resync with
 			 * the filesystem (and lost events), so reject.
 			 */
-			pthread_mutex_unlock(&state->main_lock);
 			trace2_data_string("fsmonitor", the_repository,
 					   "response/token", "different");
 			do_trivial = 1;
-			goto send_trivial_response;
+
 		} else if (requested_oldest_seq_nr <
 			   token_data->batch_tail->batch_seq_nr) {
 			/*
@@ -793,12 +787,9 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 			 * client a complete snapshot relative to their
 			 * request.
 			 */
-			pthread_mutex_unlock(&state->main_lock);
-
 			trace_printf_key(&trace_fsmonitor,
 					 "client requested truncated data");
 			do_trivial = 1;
-			goto send_trivial_response;
 		}
 	}
 
@@ -922,24 +913,6 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 	strbuf_release(&response_token);
 	strbuf_release(&requested_token_id);
 	strbuf_release(&payload);
-
-	return 0;
-
-send_trivial_response:
-	pthread_mutex_lock(&state->main_lock);
-	with_lock__format_response_token(&response_token,
-					&state->current_token_data->token_id,
-					state->current_token_data->batch_head);
-	pthread_mutex_unlock(&state->main_lock);
-
-	reply(reply_data, response_token.buf, response_token.len + 1);
-	trace2_data_string("fsmonitor", the_repository, "response/token",
-			   response_token.buf);
-	reply(reply_data, "/", 2);
-	trace2_data_intmax("fsmonitor", the_repository, "response/trivial", 1);
-
-	strbuf_release(&response_token);
-	strbuf_release(&requested_token_id);
 
 	return 0;
 }
