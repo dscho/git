@@ -938,7 +938,9 @@ static int handle_client(void *data, const char *command,
 	return result;
 }
 
-#define FSMONITOR_COOKIE_PREFIX ".fsmonitor-daemon-"
+#define FSMONITOR_DIR           "fsmonitor--daemon"
+#define FSMONITOR_COOKIE_DIR    "cookies"
+#define FSMONITOR_COOKIE_PREFIX (FSMONITOR_DIR "/" FSMONITOR_COOKIE_DIR "/")
 
 enum fsmonitor_path_type fsmonitor_classify_path_workdir_relative(
 	const char *rel)
@@ -1211,8 +1213,16 @@ static int fsmonitor_run_daemon(void)
 	 */
 	strbuf_init(&state.path_cookie_prefix, 0);
 	strbuf_addbuf(&state.path_cookie_prefix, &state.path_gitdir_watch);
+
 	strbuf_addch(&state.path_cookie_prefix, '/');
-	strbuf_addstr(&state.path_cookie_prefix, FSMONITOR_COOKIE_PREFIX);
+	strbuf_addstr(&state.path_cookie_prefix, FSMONITOR_DIR);
+	mkdir(state.path_cookie_prefix.buf, 0777);
+
+	strbuf_addch(&state.path_cookie_prefix, '/');
+	strbuf_addstr(&state.path_cookie_prefix, FSMONITOR_COOKIE_DIR);
+	mkdir(state.path_cookie_prefix.buf, 0777);
+
+	strbuf_addch(&state.path_cookie_prefix, '/');
 
 	/*
 	 * Confirm that we can create platform-specific resources for the
@@ -1235,6 +1245,10 @@ done:
 	strbuf_release(&state.path_worktree_watch);
 	strbuf_release(&state.path_gitdir_watch);
 	strbuf_release(&state.path_cookie_prefix);
+
+	/*
+	 * NEEDSWORK: Consider "rm -rf <gitdir>/<fsmonitor-dir>"
+	 */
 
 	return err;
 }
