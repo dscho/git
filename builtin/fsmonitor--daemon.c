@@ -116,7 +116,7 @@ static int cookies_cmp(const void *data, const struct hashmap_entry *he1,
 	return strcmp(a->name, keydata ? keydata : b->name);
 }
 
-static enum fsmonitor_cookie_item_result fsmonitor_wait_for_cookie(
+static enum fsmonitor_cookie_item_result with_lock__wait_for_cookie(
 	struct fsmonitor_daemon_state *state)
 {
 	int fd;
@@ -125,8 +125,6 @@ static enum fsmonitor_cookie_item_result fsmonitor_wait_for_cookie(
 	struct strbuf cookie_filename = STRBUF_INIT;
 	enum fsmonitor_cookie_item_result result;
 	int my_cookie_seq;
-
-	pthread_mutex_lock(&state->main_lock);
 
 	CALLOC_ARRAY(cookie, 1);
 
@@ -174,8 +172,6 @@ static enum fsmonitor_cookie_item_result fsmonitor_wait_for_cookie(
 	hashmap_remove(&state->cookies, &cookie->entry, NULL);
 
 	result = cookie->result;
-
-	pthread_mutex_unlock(&state->main_lock);
 
 	free((char*)cookie->name);
 	free(cookie);
@@ -756,23 +752,19 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 		goto send_trivial_response;
 	}
 
-	pthread_mutex_unlock(&state->main_lock);
-
 	/*
 	 * We mark the current head of the batch list as "pinned" so
 	 * that the listener thread will treat this item as read-only
 	 * (and prevent any more paths from being added to it) from
 	 * now on.
 	 */
-	cookie_result = fsmonitor_wait_for_cookie(state);
+	cookie_result = with_lock__wait_for_cookie(state);
 	if (cookie_result != FCIR_SEEN) {
 		error(_("fsmonitor: cookie_result '%d' != SEEN"),
 		      cookie_result);
 		result = 0;
 		goto send_trivial_response;
 	}
-
-	pthread_mutex_lock(&state->main_lock);
 
 	if (strcmp(requested_token_id.buf,
 		   state->current_token_data->token_id.buf)) {
