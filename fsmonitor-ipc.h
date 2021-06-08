@@ -7,10 +7,6 @@
  */
 int fsmonitor_ipc__is_supported(void);
 
-#ifdef HAVE_FSMONITOR_DAEMON_BACKEND
-#include "run-command.h"
-#include "simple-ipc.h"
-
 /*
  * Returns the pathname to the IPC named pipe or Unix domain socket
  * where a `git-fsmonitor--daemon` process will listen.  This is a
@@ -49,5 +45,4 @@ int fsmonitor_ipc__send_query(const char *since_token,
 int fsmonitor_ipc__send_command(const char *command,
 				struct strbuf *answer);
 
-#endif /* HAVE_FSMONITOR_DAEMON_BACKEND */
 #endif /* FSMONITOR_IPC_H */
