@@ -636,6 +636,7 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 	intmax_t count = 0, duplicates = 0;
 	kh_str_t *shown;
 	int hash_ret;
+	int do_trivial = 0;
 	int do_cookie = 0;
 	enum fsmonitor_cookie_item_result cookie_result;
 
@@ -669,6 +670,7 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 		 * Then send a trivial response using the new token.
 		 */
 		fsmonitor_force_resync(state);
+		do_trivial = 1;
 		do_cookie = 1;
 		goto send_trivial_response;
 
@@ -683,6 +685,7 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 				  "fsmonitor: invalid command line '%s'" :
 				  "fsmonitor: unsupported V1 protocol '%s'"),
 				 command);
+		do_trivial = 1;
 		do_cookie = 1;
 		goto send_trivial_response;
 
@@ -693,6 +696,7 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 			trace_printf_key(&trace_fsmonitor,
 					 "fsmonitor: invalid V2 protocol token '%s'",
 					 command);
+			do_trivial = 1;
 			do_cookie = 1;
 			goto send_trivial_response;
 
@@ -734,34 +738,6 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 		}
 	}
 
-	if (strcmp(requested_token_id.buf,
-		   state->current_token_data->token_id.buf)) {
-		/*
-		 * The client last spoke to a different daemon
-		 * instance -OR- the daemon had to resync with
-		 * the filesystem (and lost events), so reject.
-		 */
-		pthread_mutex_unlock(&state->main_lock);
-		trace2_data_string("fsmonitor", the_repository,
-				   "response/token", "different");
-		goto send_trivial_response;
-	}
-	if (requested_oldest_seq_nr <
-	    state->current_token_data->batch_tail->batch_seq_nr) {
-		/*
-		 * The client wants older events than we have for
-		 * this token_id.  This means that the end of our
-		 * batch list was truncated and we cannot give the
-		 * client a complete snapshot relative to their
-		 * request.
-		 */
-		pthread_mutex_unlock(&state->main_lock);
-
-		trace_printf_key(&trace_fsmonitor,
-				 "client requested truncated data");
-		goto send_trivial_response;
-	}
-
 	/*
 	 * We mark the current head of the batch list as "pinned" so
 	 * that the listener thread will treat this item as read-only
@@ -780,15 +756,45 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 	 * to it.
 	 */
 	with_lock__format_response_token(&response_token,
-					&token_data->token_id,
-					batch_head);
+					 &token_data->token_id, batch_head);
 
 	reply(reply_data, response_token.buf, response_token.len + 1);
 	total_response_len += response_token.len + 1;
 
 	trace2_data_string("fsmonitor", the_repository, "response/token",
 			   response_token.buf);
-	trace_printf_key(&trace_fsmonitor, "response token: %s", response_token.buf);
+	trace_printf_key(&trace_fsmonitor, "response token: %s",
+			 response_token.buf);
+
+	if (!do_trivial) {
+		if (strcmp(requested_token_id.buf, token_data->token_id.buf)) {
+			/*
+			 * The client last spoke to a different daemon
+			 * instance -OR- the daemon had to resync with
+			 * the filesystem (and lost events), so reject.
+			 */
+			pthread_mutex_unlock(&state->main_lock);
+			trace2_data_string("fsmonitor", the_repository,
+					"response/token", "different");
+			do_trivial = 1;
+			goto send_trivial_response;
+		} else if (requested_oldest_seq_nr <
+			   token_data->batch_tail->batch_seq_nr) {
+			/*
+			 * The client wants older events than we have for
+			 * this token_id.  This means that the end of our
+			 * batch list was truncated and we cannot give the
+			 * client a complete snapshot relative to their
+			 * request.
+			 */
+			pthread_mutex_unlock(&state->main_lock);
+
+			trace_printf_key(&trace_fsmonitor,
+					"client requested truncated data");
+			do_trivial = 1;
+			goto send_trivial_response;
+		}
+	}
 
 	if (strcmp(requested_token_id.buf,
 		   state->current_token_data->token_id.buf)) {
