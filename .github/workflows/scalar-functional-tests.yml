@@ -3,7 +3,7 @@ name: Scalar Functional Tests
 env:
   SCALAR_REPOSITORY: dscho/scalar
   SCALAR_REF: vfs-2.32.0
-  DEBUG_WITH_TMATE: false
+  DEBUG_WITH_TMATE: true
 
 on:
   push:
@@ -17,7 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-16.04, ubuntu-18.04, ubuntu-20.04, windows-2019, macos-10.15]
+        os: [ubuntu-20.04]
         features: [false, experimental]
         exclude:
           # The built-in FSMonitor is not (yet) supported on Linux
