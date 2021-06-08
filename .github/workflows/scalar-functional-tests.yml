@@ -155,8 +155,8 @@ jobs:
       run: |
         set -x
         wmic process get CommandLine,ExecutablePath,HandleCount,Name,ParentProcessID,ProcessID
-        openfiles || :
-        wmic process where "CommandLine Like '%fsmonitor--daemon run'" delete
+        wmic process where "CommandLine Like '%fsmonitor--daemon %run'" delete
+        wmic process where "ExecutablePath Like '%git.exe'" delete
 
     - id: trace2_zip_unix
       if: runner.os != 'Windows' && ( success() || failure() ) && ( steps.functional_test.conclusion == 'success' || steps.functional_test.conclusion == 'failure' )
