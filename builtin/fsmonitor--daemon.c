@@ -636,7 +636,6 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 	intmax_t count = 0, duplicates = 0;
 	kh_str_t *shown;
 	int hash_ret;
-	int result;
 	int do_cookie = 0;
 	enum fsmonitor_cookie_item_result cookie_result;
 
@@ -670,7 +669,6 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 		 * Then send a trivial response using the new token.
 		 */
 		fsmonitor_force_resync(state);
-		result = 0;
 		do_cookie = 1;
 		goto send_trivial_response;
 
@@ -732,7 +730,6 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 		if (cookie_result != FCIR_SEEN) {
 			error(_("fsmonitor: cookie_result '%d' != SEEN"),
 			      cookie_result);
-			result = 0;
 			goto send_trivial_response;
 		}
 	}
@@ -745,7 +742,6 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 		 * the filesystem (and lost events), so reject.
 		 */
 		pthread_mutex_unlock(&state->main_lock);
-		result = 0;
 		trace2_data_string("fsmonitor", the_repository,
 				   "response/token", "different");
 		goto send_trivial_response;
@@ -763,7 +759,6 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 
 		trace_printf_key(&trace_fsmonitor,
 				 "client requested truncated data");
-		result = 0;
 		goto send_trivial_response;
 	}
 
@@ -806,7 +801,6 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 
 		trace_printf_key(&trace_fsmonitor,
 				 "lost filesystem sync");
-		result = 0;
 		goto send_trivial_response;
 	}
 
@@ -936,7 +930,7 @@ send_trivial_response:
 	strbuf_release(&response_token);
 	strbuf_release(&requested_token_id);
 
-	return result;
+	return 0;
 }
 
 static ipc_server_application_cb handle_client;
