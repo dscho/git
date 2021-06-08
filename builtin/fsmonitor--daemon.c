@@ -637,6 +637,7 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 	kh_str_t *shown;
 	int hash_ret;
 	int result;
+	int do_cookie = 0;
 	enum fsmonitor_cookie_item_result cookie_result;
 
 	/*
@@ -670,6 +671,7 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 		 */
 		fsmonitor_force_resync(state);
 		result = 0;
+		do_cookie = 1;
 		goto send_trivial_response;
 
 	} else if (!skip_prefix(command, "builtin:", &p)) {
@@ -683,7 +685,7 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 				  "fsmonitor: invalid command line '%s'" :
 				  "fsmonitor: unsupported V1 protocol '%s'"),
 				 command);
-		result = 0;
+		do_cookie = 1;
 		goto send_trivial_response;
 
 	} else {
@@ -693,13 +695,15 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 			trace_printf_key(&trace_fsmonitor,
 					 "fsmonitor: invalid V2 protocol token '%s'",
 					 command);
-			result = 0;
+			do_cookie = 1;
 			goto send_trivial_response;
+
 		} else {
 			/*
 			 * We have a V2 valid token:
 			 *     "builtin:<token_id>:<seq_nr>"
 			 */
+			do_cookie = 1;
 		}
 	}
 
@@ -707,6 +711,31 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 
 	if (!state->current_token_data)
 		BUG("fsmonitor state does not have a current token");
+
+	/*
+	 * Write a cookie file inside the directory being watched in
+	 * an effort to flush out existing filesystem events that we
+	 * actually care about.  Suspend this client thread until we
+	 * see the filesystem events for this cookie file.
+	 *
+	 * Creating the cookie lets us guarantee that our FS listener
+	 * thread has drained the kernel queue and we are caught up
+	 * with the kernel.
+	 *
+	 * If we cannot create the cookie (or otherwise guarantee that
+	 * we are caught up), we send a trivial response.  We have to
+	 * assume that there might be some very, very recent activity
+	 * on the FS still in flight.
+	 */
+	if (do_cookie) {
+		cookie_result = with_lock__wait_for_cookie(state);
+		if (cookie_result != FCIR_SEEN) {
+			error(_("fsmonitor: cookie_result '%d' != SEEN"),
+			      cookie_result);
+			result = 0;
+			goto send_trivial_response;
+		}
+	}
 
 	if (strcmp(requested_token_id.buf,
 		   state->current_token_data->token_id.buf)) {
@@ -765,14 +794,6 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 	trace2_data_string("fsmonitor", the_repository, "response/token",
 			   response_token.buf);
 	trace_printf_key(&trace_fsmonitor, "response token: %s", response_token.buf);
-
-	cookie_result = with_lock__wait_for_cookie(state);
-	if (cookie_result != FCIR_SEEN) {
-		error(_("fsmonitor: cookie_result '%d' != SEEN"),
-		      cookie_result);
-		result = 0;
-		goto send_trivial_response;
-	}
 
 	if (strcmp(requested_token_id.buf,
 		   state->current_token_data->token_id.buf)) {
