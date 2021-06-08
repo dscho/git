@@ -167,12 +167,10 @@ static ipc_server_application_cb test_app_cb;
  * by this application.
  */
 static int test_app_cb(void *application_data,
-		       const char *command,
+		       const char *command, size_t command_len,
 		       ipc_server_reply_cb *reply_cb,
 		       struct ipc_server_reply_data *reply_data)
 {
-	size_t command_len = strlen(command);
-
 	/*
 	 * Verify that we received the application-data that we passed
 	 * when we started the ipc-server.  (We have several layers of
@@ -499,7 +497,7 @@ static int client__send_ipc(void)
 	options.wait_if_not_found = 0;
 
 	if (!ipc_client_send_command(cl_args.path, &options,
-				     command,
+				     command, strlen(command),
 				     &buf)) {
 		if (buf.len) {
 			printf("%s\n", buf.buf);
@@ -569,7 +567,7 @@ static int do_sendbytes(int bytecount, char byte, const char *path,
 	strbuf_addchars(&buf_send, byte, bytecount);
 
 	if (!ipc_client_send_command(path, options,
-				     buf_send.buf,
+				     buf_send.buf, buf_send.len,
 				     &buf_resp)) {
 		strbuf_rtrim(&buf_resp);
 		printf("sent:%c%08d %s\n", byte, bytecount, buf_resp.buf);
