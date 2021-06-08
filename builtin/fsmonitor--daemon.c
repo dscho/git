@@ -637,6 +637,7 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 	kh_str_t *shown;
 	int hash_ret;
 	int do_trivial = 0;
+	int do_flush = 0;
 	int do_cookie = 0;
 	enum fsmonitor_cookie_item_result cookie_result;
 
@@ -670,6 +671,7 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 		 * Then send a trivial response using the new token.
 		 */
 		fsmonitor_force_resync(state);
+		do_flush = 1;
 		do_trivial = 1;
 		do_cookie = 1;
 		goto send_trivial_response;
@@ -739,6 +741,9 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 		}
 	}
 
+	if (do_flush)
+		with_lock__do_force_resync(state);
+
 	/*
 	 * We mark the current head of the batch list as "pinned" so
 	 * that the listener thread will treat this item as read-only
@@ -795,6 +800,19 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 			do_trivial = 1;
 			goto send_trivial_response;
 		}
+	}
+
+	if (do_trivial) {
+		pthread_mutex_unlock(&state->main_lock);
+
+		reply(reply_data, "/", 2);
+
+		trace2_data_intmax("fsmonitor", the_repository,
+				   "response/trivial", 1);
+
+		strbuf_release(&response_token);
+		strbuf_release(&requested_token_id);
+		return 0;
 	}
 
 	/*
