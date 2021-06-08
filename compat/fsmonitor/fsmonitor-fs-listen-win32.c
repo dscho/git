@@ -122,7 +122,7 @@ static struct one_watch *create_watch(struct fsmonitor_daemon_state *state,
 		return NULL;
 	}
 
-	watch = xcalloc(1, sizeof(*watch));
+	CALLOC_ARRAY(watch, 1);
 
 	watch->buf_len = sizeof(watch->buffer); /* assume full MAX_RDCW_BUF */
 
@@ -341,7 +341,6 @@ static int process_worktree_events(struct fsmonitor_daemon_state *state)
 		default:
 			BUG("unexpected path classification '%d' for '%s'",
 			    t, path.buf);
-			goto skip_this_path;
 		}
 
 skip_this_path:
@@ -416,7 +415,6 @@ static int process_gitdir_events(struct fsmonitor_daemon_state *state)
 		default:
 			BUG("unexpected path classification '%d' for '%s'",
 			    t, path.buf);
-			goto skip_this_path;
 		}
 
 skip_this_path:
@@ -498,7 +496,7 @@ int fsmonitor_fs_listen__ctor(struct fsmonitor_daemon_state *state)
 {
 	struct fsmonitor_daemon_backend_data *data;
 
-	data = xcalloc(1, sizeof(*data));
+	CALLOC_ARRAY(data, 1);
 
 	data->hEventShutdown = CreateEvent(NULL, TRUE, FALSE, NULL);
 
