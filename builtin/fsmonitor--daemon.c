@@ -120,38 +120,31 @@ static enum fsmonitor_cookie_item_result fsmonitor_wait_for_cookie(
 	struct fsmonitor_daemon_state *state)
 {
 	int fd;
-	struct fsmonitor_cookie_item cookie;
+	struct fsmonitor_cookie_item *cookie;
 	struct strbuf cookie_pathname = STRBUF_INIT;
 	struct strbuf cookie_filename = STRBUF_INIT;
-	const char *slash;
+	enum fsmonitor_cookie_item_result result;
 	int my_cookie_seq;
 
 	pthread_mutex_lock(&state->main_lock);
 
+	CALLOC_ARRAY(cookie, 1);
+
 	my_cookie_seq = state->cookie_seq++;
 
+	strbuf_addf(&cookie_filename, "%i-%i", getpid(), my_cookie_seq);
+
 	strbuf_addbuf(&cookie_pathname, &state->path_cookie_prefix);
-	strbuf_addf(&cookie_pathname, "%i-%i", getpid(), my_cookie_seq);
+	strbuf_addbuf(&cookie_pathname, &cookie_filename);
 
-	slash = find_last_dir_sep(cookie_pathname.buf);
-	if (slash)
-		strbuf_addstr(&cookie_filename, slash + 1);
-	else
-		strbuf_addbuf(&cookie_filename, &cookie_pathname);
-	cookie.name = strbuf_detach(&cookie_filename, NULL);
-	cookie.result = FCIR_INIT;
-	// TODO should we have case-insenstive hash (and in cookie_cmp()) ??
-	hashmap_entry_init(&cookie.entry, strhash(cookie.name));
+	cookie->name = strbuf_detach(&cookie_filename, NULL);
+	cookie->result = FCIR_INIT;
+	hashmap_entry_init(&cookie->entry, strhash(cookie->name));
 
-	/*
-	 * Warning: we are putting the address of a stack variable into a
-	 * global hashmap.  This feels dodgy.  We must ensure that we remove
-	 * it before this thread and stack frame returns.
-	 */
-	hashmap_add(&state->cookies, &cookie.entry);
+	hashmap_add(&state->cookies, &cookie->entry);
 
 	trace_printf_key(&trace_fsmonitor, "cookie-wait: '%s' '%s'",
-			 cookie.name, cookie_pathname.buf);
+			 cookie->name, cookie_pathname.buf);
 
 	/*
 	 * Create the cookie file on disk and then wait for a notification
@@ -160,26 +153,35 @@ static enum fsmonitor_cookie_item_result fsmonitor_wait_for_cookie(
 	fd = open(cookie_pathname.buf, O_WRONLY | O_CREAT | O_EXCL, 0600);
 	if (fd >= 0) {
 		close(fd);
-		unlink_or_warn(cookie_pathname.buf);
+		unlink(cookie_pathname.buf);
 
-		while (cookie.result == FCIR_INIT)
+		/*
+		 * NEEDSWORK: This is an infinite wait (well, unless another
+		 * thread sends us an abort).  I'd like to change this to
+		 * use `pthread_cond_timedwait()` and return an error/timeout
+		 * and let the caller do the trivial response thing.
+		 */
+		while (cookie->result == FCIR_INIT)
 			pthread_cond_wait(&state->cookies_cond,
 					  &state->main_lock);
-
-		hashmap_remove(&state->cookies, &cookie.entry, NULL);
 	} else {
 		error_errno(_("could not create fsmonitor cookie '%s'"),
-			    cookie.name);
+			    cookie->name);
 
-		cookie.result = FCIR_ERROR;
-		hashmap_remove(&state->cookies, &cookie.entry, NULL);
+		cookie->result = FCIR_ERROR;
 	}
+
+	hashmap_remove(&state->cookies, &cookie->entry, NULL);
+
+	result = cookie->result;
 
 	pthread_mutex_unlock(&state->main_lock);
 
-	free((char*)cookie.name);
+	free((char*)cookie->name);
+	free(cookie);
 	strbuf_release(&cookie_pathname);
-	return cookie.result;
+
+	return result;
 }
 
 /*
