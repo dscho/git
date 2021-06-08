@@ -576,11 +576,12 @@ void fsmonitor_force_resync(struct fsmonitor_daemon_state *state)
 /*
  * Format an opaque token string to send to the client.
  */
-static void fsmonitor_format_response_token(
+static void with_lock__format_response_token(
 	struct strbuf *response_token,
 	const struct strbuf *response_token_id,
 	const struct fsmonitor_batch *batch)
 {
+	/* assert current thread holding state->main_lock */
 	uint64_t seq_nr = (batch) ? batch->batch_seq_nr + 1 : 0;
 
 	strbuf_reset(response_token);
@@ -816,7 +817,7 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 	 * hash table.  Currently, we're still comparing the string
 	 * values.
 	 */
-	fsmonitor_format_response_token(&response_token,
+	with_lock__format_response_token(&response_token,
 					&token_data->token_id,
 					batch_head);
 
@@ -911,7 +912,7 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 
 send_trivial_response:
 	pthread_mutex_lock(&state->main_lock);
-	fsmonitor_format_response_token(&response_token,
+	with_lock__format_response_token(&response_token,
 					&state->current_token_data->token_id,
 					state->current_token_data->batch_head);
 	pthread_mutex_unlock(&state->main_lock);
@@ -929,7 +930,7 @@ send_trivial_response:
 
 send_empty_response:
 	pthread_mutex_lock(&state->main_lock);
-	fsmonitor_format_response_token(&response_token,
+	with_lock__format_response_token(&response_token,
 					&state->current_token_data->token_id,
 					NULL);
 	pthread_mutex_unlock(&state->main_lock);
