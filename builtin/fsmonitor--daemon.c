@@ -549,7 +549,7 @@ static void fsmonitor_free_token_data(struct fsmonitor_token_data *token)
  * Either way, the old token data series is no longer associated with
  * our state data.
  */
-void fsmonitor_force_resync(struct fsmonitor_daemon_state *state)
+static void with_lock__do_force_resync(struct fsmonitor_daemon_state *state)
 {
 	/* assert current thread holding state->main_lock */
 
@@ -558,22 +558,20 @@ void fsmonitor_force_resync(struct fsmonitor_daemon_state *state)
 
 	new_one = fsmonitor_new_token_data();
 
-	pthread_mutex_lock(&state->main_lock);
-
-	trace_printf_key(&trace_fsmonitor,
-			 "force resync [old '%s'][new '%s']",
-			 state->current_token_data->token_id.buf,
-			 new_one->token_id.buf);
-
-	fsmonitor_cookie_abort_all(state);
-
 	if (state->current_token_data->client_ref_count == 0)
 		free_me = state->current_token_data;
 	state->current_token_data = new_one;
 
-	pthread_mutex_unlock(&state->main_lock);
-
 	fsmonitor_free_token_data(free_me);
+
+	fsmonitor_cookie_abort_all(state);
+}
+
+void fsmonitor_force_resync(struct fsmonitor_daemon_state *state)
+{
+	pthread_mutex_lock(&state->main_lock);
+	with_lock__do_force_resync(state);
+	pthread_mutex_unlock(&state->main_lock);
 }
 
 /*
