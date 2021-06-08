@@ -734,6 +734,7 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 		if (cookie_result != FCIR_SEEN) {
 			error(_("fsmonitor: cookie_result '%d' != SEEN"),
 			      cookie_result);
+			do_trivial = 1;
 			goto send_trivial_response;
 		}
 	}
@@ -775,7 +776,7 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 			 */
 			pthread_mutex_unlock(&state->main_lock);
 			trace2_data_string("fsmonitor", the_repository,
-					"response/token", "different");
+					   "response/token", "different");
 			do_trivial = 1;
 			goto send_trivial_response;
 		} else if (requested_oldest_seq_nr <
@@ -790,24 +791,10 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 			pthread_mutex_unlock(&state->main_lock);
 
 			trace_printf_key(&trace_fsmonitor,
-					"client requested truncated data");
+					 "client requested truncated data");
 			do_trivial = 1;
 			goto send_trivial_response;
 		}
-	}
-
-	if (strcmp(requested_token_id.buf,
-		   state->current_token_data->token_id.buf)) {
-		/*
-		 * Ack! The listener thread lost sync with the filesystem
-		 * and created a new token while we were waiting for the
-		 * cookie file to be created!  Just give up.
-		 */
-		pthread_mutex_unlock(&state->main_lock);
-
-		trace_printf_key(&trace_fsmonitor,
-				 "lost filesystem sync");
-		goto send_trivial_response;
 	}
 
 	/*
