@@ -119,6 +119,8 @@ static int cookies_cmp(const void *data, const struct hashmap_entry *he1,
 static enum fsmonitor_cookie_item_result with_lock__wait_for_cookie(
 	struct fsmonitor_daemon_state *state)
 {
+	/* assert current thread holding state->main_lock */
+
 	int fd;
 	struct fsmonitor_cookie_item *cookie;
 	struct strbuf cookie_pathname = STRBUF_INIT;
@@ -183,10 +185,10 @@ static enum fsmonitor_cookie_item_result with_lock__wait_for_cookie(
 /*
  * Mark these cookies as _SEEN and wake up the corresponding client threads.
  */
-static void fsmonitor_cookie_mark_seen(struct fsmonitor_daemon_state *state,
-				       const struct string_list *cookie_names)
+static void with_lock__mark_cookies_seen(struct fsmonitor_daemon_state *state,
+					 const struct string_list *cookie_names)
 {
-	/* assert state->main_lock */
+	/* assert current thread holding state->main_lock */
 
 	int k;
 	int nr_seen = 0;
@@ -214,9 +216,9 @@ static void fsmonitor_cookie_mark_seen(struct fsmonitor_daemon_state *state,
 /*
  * Set _ABORT on all pending cookies and wake up all client threads.
  */
-static void fsmonitor_cookie_abort_all(struct fsmonitor_daemon_state *state)
+static void with_lock__abort_all_cookies(struct fsmonitor_daemon_state *state)
 {
-	/* assert state->main_lock */
+	/* assert current thread holding state->main_lock */
 
 	struct hashmap_iter iter;
 	struct fsmonitor_cookie_item *cookie;
@@ -465,10 +467,11 @@ static void fsmonitor_batch__combine(struct fsmonitor_batch *batch_dest,
  */
 #define MY_TIME_DELAY_SECONDS (5 * 60) /* seconds */
 
-static void fsmonitor_batch__truncate(struct fsmonitor_daemon_state *state,
-				      const struct fsmonitor_batch *batch_marker)
+static void with_lock__truncate_old_batches(
+	struct fsmonitor_daemon_state *state,
+	const struct fsmonitor_batch *batch_marker)
 {
-	/* assert state->main_lock */
+	/* assert current thread holding state->main_lock */
 
 	const struct fsmonitor_batch *batch;
 	struct fsmonitor_batch *rest;
@@ -560,7 +563,7 @@ static void with_lock__do_force_resync(struct fsmonitor_daemon_state *state)
 
 	fsmonitor_free_token_data(free_me);
 
-	fsmonitor_cookie_abort_all(state);
+	with_lock__abort_all_cookies(state);
 }
 
 void fsmonitor_force_resync(struct fsmonitor_daemon_state *state)
@@ -890,7 +893,7 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 			 * obsolete.  See if we can truncate the list
 			 * and save some memory.
 			 */
-			fsmonitor_batch__truncate(state, batch);
+			with_lock__truncate_old_batches(state, batch);
 		}
 	}
 
@@ -1128,7 +1131,7 @@ void fsmonitor_publish(struct fsmonitor_daemon_state *state,
 	}
 
 	if (cookie_names->nr)
-		fsmonitor_cookie_mark_seen(state, cookie_names);
+		with_lock__mark_cookies_seen(state, cookie_names);
 
 	pthread_mutex_unlock(&state->main_lock);
 }
