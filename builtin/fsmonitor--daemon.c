@@ -919,12 +919,21 @@ send_empty_response:
 
 static ipc_server_application_cb handle_client;
 
-static int handle_client(void *data, const char *command,
+static int handle_client(void *data,
+			 const char *command, size_t command_len,
 			 ipc_server_reply_cb *reply,
 			 struct ipc_server_reply_data *reply_data)
 {
 	struct fsmonitor_daemon_state *state = data;
 	int result;
+
+	/*
+	 * The Simple IPC API now supports {char*, len} arguments, but
+	 * FSMonitor always uses proper null-terminated strings, so
+	 * we can ignore the command_len argument.  (Trust, but verify.)
+	 */
+	if (command_len != strlen(command))
+		BUG("FSMonitor assumes text messages");
 
 	trace_printf_key(&trace_fsmonitor, "requested token: %s", command);
 
