@@ -477,7 +477,6 @@ static void fsmonitor_batch__truncate(struct fsmonitor_daemon_state *state,
 	const struct fsmonitor_batch *batch;
 	struct fsmonitor_batch *rest;
 	struct fsmonitor_batch *p;
-	time_t t;
 
 	if (!batch_marker)
 		return;
@@ -487,6 +486,8 @@ static void fsmonitor_batch__truncate(struct fsmonitor_daemon_state *state,
 			 (uint64_t)batch_marker->pinned_time);
 
 	for (batch = batch_marker; batch; batch = batch->next) {
+		time_t t;
+
 		if (!batch->pinned_time) /* an overflow batch */
 			continue;
 
@@ -1087,10 +1088,7 @@ void fsmonitor_publish(struct fsmonitor_daemon_state *state,
 
 		head = state->current_token_data->batch_head;
 		if (!head) {
-			batch->batch_seq_nr = 0;
-			batch->next = NULL;
-			state->current_token_data->batch_head = batch;
-			state->current_token_data->batch_tail = batch;
+			BUG("token does not have batch");
 		} else if (head->pinned_time) {
 			/*
 			 * We cannot alter the current batch list
