@@ -4,16 +4,6 @@ test_description='built-in file system watcher'
 
 . ./test-lib.sh
 
-# Ask the fsmonitor daemon to insert a little delay before responding to
-# client commands like `git status` and `git fsmonitor--daemon --query` to
-# allow recent filesystem events to be received by the daemon.  This helps
-# the CI/PR builds be more stable.
-#
-# An arbitrary millisecond value.
-#
-GIT_TEST_FSMONITOR_CLIENT_DELAY=1000
-export GIT_TEST_FSMONITOR_CLIENT_DELAY
-
 git version --build-options | grep "feature:" | grep "fsmonitor--daemon" || {
 	skip_all="The built-in FSMonitor is not supported on this platform"
 	test_done

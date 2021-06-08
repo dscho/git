@@ -54,8 +54,6 @@ struct fsmonitor_daemon_state {
 	struct fsmonitor_daemon_backend_data *backend_data;
 
 	struct ipc_server_data *ipc_server_data;
-
-	int test_client_delay_ms;
 };
 
 /*
