@@ -366,7 +366,7 @@ struct fsmonitor_batch *fsmonitor_batch__new(void)
 	return batch;
 }
 
-struct fsmonitor_batch *fsmonitor_batch__free(struct fsmonitor_batch *batch)
+struct fsmonitor_batch *fsmonitor_batch__pop(struct fsmonitor_batch *batch)
 {
 	struct fsmonitor_batch *next;
 
@@ -471,9 +471,9 @@ truncate_past_here:
 	rest = ((struct fsmonitor_batch *)batch)->next;
 	((struct fsmonitor_batch *)batch)->next = NULL;
 
-	for (p = rest; p; p = fsmonitor_batch__free(p)) {
+	for (p = rest; p; p = fsmonitor_batch__pop(p)) {
 		trace_printf_key(&trace_fsmonitor,
-				 "TRNC kill (%"PRIu64",%"PRIu64")",
+				 "Truncate: kill (%"PRIu64",%"PRIu64")",
 				 p->batch_seq_nr, (uint64_t)p->pinned_time);
 	}
 }
@@ -489,7 +489,7 @@ static void fsmonitor_free_token_data(struct fsmonitor_token_data *token)
 
 	strbuf_release(&token->token_id);
 
-	for (p = token->batch_head; p; p = fsmonitor_batch__free(p))
+	for (p = token->batch_head; p; p = fsmonitor_batch__pop(p))
 		;
 
 	free(token);
@@ -1094,7 +1094,7 @@ void fsmonitor_publish(struct fsmonitor_daemon_state *state,
 			 * batch onto the end of the current head batch.
 			 */
 			fsmonitor_batch__combine(head, batch);
-			fsmonitor_batch__free(batch);
+			fsmonitor_batch__pop(batch);
 		}
 	}
 

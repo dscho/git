@@ -356,7 +356,7 @@ skip_this_path:
 	return LISTENER_HAVE_DATA_WORKTREE;
 
 force_shutdown:
-	fsmonitor_batch__free(batch);
+	fsmonitor_batch__pop(batch);
 	string_list_clear(&cookie_list, 0);
 	strbuf_release(&path);
 	return LISTENER_SHUTDOWN;

@@ -22,7 +22,7 @@ struct fsmonitor_batch *fsmonitor_batch__new(void);
 /*
  * Free this batch and return the value of the batch->next field.
  */
-struct fsmonitor_batch *fsmonitor_batch__free(struct fsmonitor_batch *batch);
+struct fsmonitor_batch *fsmonitor_batch__pop(struct fsmonitor_batch *batch);
 
 /*
  * Add this path to this batch of modified files.
