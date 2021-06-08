@@ -312,13 +312,21 @@ struct fsmonitor_token_data {
 	uint64_t client_ref_count;
 };
 
+struct fsmonitor_batch {
+	struct fsmonitor_batch *next;
+	uint64_t batch_seq_nr;
+	const char **interned_paths;
+	size_t nr, alloc;
+	time_t pinned_time;
+};
+
 static struct fsmonitor_token_data *fsmonitor_new_token_data(void)
 {
 	static int test_env_value = -1;
 	static uint64_t flush_count = 0;
 	struct fsmonitor_token_data *token;
 
-	token = (struct fsmonitor_token_data *)xcalloc(1, sizeof(*token));
+	CALLOC_ARRAY(token, 1);
 
 	strbuf_init(&token->token_id, 0);
 	token->batch_head = NULL;
@@ -351,17 +359,11 @@ static struct fsmonitor_token_data *fsmonitor_new_token_data(void)
 	return token;
 }
 
-struct fsmonitor_batch {
-	struct fsmonitor_batch *next;
-	uint64_t batch_seq_nr;
-	const char **interned_paths;
-	size_t nr, alloc;
-	time_t pinned_time;
-};
-
 struct fsmonitor_batch *fsmonitor_batch__new(void)
 {
-	struct fsmonitor_batch *batch = xcalloc(1, sizeof(*batch));
+	struct fsmonitor_batch *batch;
+
+	CALLOC_ARRAY(batch, 1);
 
 	return batch;
 }
@@ -433,7 +435,7 @@ static void fsmonitor_batch__combine(struct fsmonitor_batch *batch_dest,
  * artificial (based on when we pinned the batch item) and not on any
  * filesystem activity.
  */
-#define MY_TIME_DELAY (5 * 60) /* seconds */
+#define MY_TIME_DELAY_SECONDS (5 * 60) /* seconds */
 
 static void fsmonitor_batch__truncate(struct fsmonitor_daemon_state *state,
 				      const struct fsmonitor_batch *batch_marker)
@@ -448,7 +450,7 @@ static void fsmonitor_batch__truncate(struct fsmonitor_daemon_state *state,
 	if (!batch_marker)
 		return;
 
-	trace_printf_key(&trace_fsmonitor, "TRNC mark (%"PRIu64",%"PRIu64")",
+	trace_printf_key(&trace_fsmonitor, "Truncate: mark (%"PRIu64",%"PRIu64")",
 			 batch_marker->batch_seq_nr,
 			 (uint64_t)batch_marker->pinned_time);
 
@@ -456,7 +458,7 @@ static void fsmonitor_batch__truncate(struct fsmonitor_daemon_state *state,
 		if (!batch->pinned_time) /* an overflow batch */
 			continue;
 
-		t = batch->pinned_time + MY_TIME_DELAY;
+		t = batch->pinned_time + MY_TIME_DELAY_SECONDS;
 		if (t > batch_marker->pinned_time) /* too close to marker */
 			continue;
 
@@ -1262,11 +1264,6 @@ done:
 	return err;
 }
 
-static int is_ipc_daemon_listening(void)
-{
-	return fsmonitor_ipc__get_state() == IPC_STATE__LISTENING;
-}
-
 static int try_to_run_foreground_daemon(void)
 {
 	/*
@@ -1277,7 +1274,7 @@ static int try_to_run_foreground_daemon(void)
 	 * However, this method gives us a nicer error message for a
 	 * common error case.
 	 */
-	if (is_ipc_daemon_listening())
+	if (fsmonitor_ipc__get_state() == IPC_STATE__LISTENING)
 		die("fsmonitor--daemon is already running.");
 
 	return !!fsmonitor_run_daemon();
@@ -1384,11 +1381,7 @@ static int wait_for_background_startup(pid_t pid_child)
 			time(&now);
 			if (now > time_limit)
 				return error(_("fsmonitor--daemon not online yet"));
-
-			continue;
-		}
-
-		else if (pid_seen == pid_child) {
+		} else if (pid_seen == pid_child) {
 			/*
 			 * The new child daemon process shutdown while
 			 * it was starting up, so it is not listening
@@ -1414,9 +1407,7 @@ static int wait_for_background_startup(pid_t pid_child)
 			 * early shutdown as an error.
 			 */
 			return error(_("fsmonitor--daemon failed to start"));
-		}
-
-		else
+		} else
 			return error(_("waitpid is confused"));
 	}
 }
@@ -1434,7 +1425,7 @@ static int try_to_start_background_daemon(void)
 	 * of creating the background process (and not whether it
 	 * immediately exited).
 	 */
-	if (is_ipc_daemon_listening())
+	if (fsmonitor_ipc__get_state() == IPC_STATE__LISTENING)
 		die("fsmonitor--daemon is already running.");
 
 	/*
