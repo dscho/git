@@ -125,7 +125,7 @@ jobs:
 
     - id: functional_test
       name: Functional test
-      timeout-minutes: 30
+      timeout-minutes: 60
       working-directory: scalar
       shell: bash
       run: |
@@ -139,10 +139,10 @@ jobs:
         git version --build-options
         cd ../out
         PATH="$PWD/Scalar/$BUILD_FRAGMENT:$PWD/Scalar.Service/$BUILD_FRAGMENT:$PATH"
-        Scalar.FunctionalTests/$BUILD_FRAGMENT/Scalar.FunctionalTests$BUILD_FILE_EXT --test-scalar-on-path --full-suite
+        Scalar.FunctionalTests/$BUILD_FRAGMENT/Scalar.FunctionalTests$BUILD_FILE_EXT --test-git-on-path --timeout=300000 --full-suite
 
     - name: Force-stop FSMonitor daemons (Windows)
-      if: runner.os == 'Windows' && matrix.features == 'experimental'
+      if: runner.os == 'Windows' && matrix.features == 'experimental' && (success() || failure())
       shell: bash
       run: |
         set -x
