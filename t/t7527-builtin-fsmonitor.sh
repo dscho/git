@@ -21,7 +21,7 @@ git version --build-options | grep "feature:" | grep "fsmonitor--daemon" || {
 
 kill_repo () {
 	r=$1
-	git -C $r fsmonitor--daemon --stop >/dev/null 2>/dev/null
+	git -C $r fsmonitor--daemon stop >/dev/null 2>/dev/null
 	rm -rf $1
 	return 0
 }
@@ -32,8 +32,8 @@ start_daemon () {
 		*) r="";
 	esac
 
-	git $r fsmonitor--daemon --start || return $?
-	git $r fsmonitor--daemon --is-running || return $?
+	git $r fsmonitor--daemon start || return $?
+	git $r fsmonitor--daemon status || return $?
 
 	return 0
 }
@@ -44,15 +44,15 @@ test_expect_success 'explicit daemon start and stop' '
 	git init test_explicit &&
 	start_daemon test_explicit &&
 
-	git -C test_explicit fsmonitor--daemon --stop &&
-	test_must_fail git -C test_explicit fsmonitor--daemon --is-running
+	git -C test_explicit fsmonitor--daemon stop &&
+	test_must_fail git -C test_explicit fsmonitor--daemon status
 '
 
 test_expect_success 'implicit daemon start' '
 	test_when_finished "kill_repo test_implicit" &&
 
 	git init test_implicit &&
-	test_must_fail git -C test_implicit fsmonitor--daemon --is-running &&
+	test_must_fail git -C test_implicit fsmonitor--daemon status &&
 
 	# query will implicitly start the daemon.
 	#
@@ -75,9 +75,9 @@ test_expect_success 'implicit daemon start' '
 
 	grep :\"query/response-length\" .git/trace &&
 
-	git -C test_implicit fsmonitor--daemon --is-running &&
-	git -C test_implicit fsmonitor--daemon --stop &&
-	test_must_fail git -C test_implicit fsmonitor--daemon --is-running
+	git -C test_implicit fsmonitor--daemon status &&
+	git -C test_implicit fsmonitor--daemon stop &&
+	test_must_fail git -C test_implicit fsmonitor--daemon status
 '
 
 test_expect_success 'implicit daemon stop (delete .git)' '
@@ -100,7 +100,7 @@ test_expect_success 'implicit daemon stop (delete .git)' '
 	sleep 1 &&
 	mkdir test_implicit_1/.git &&
 
-	test_must_fail git -C test_implicit_1 fsmonitor--daemon --is-running
+	test_must_fail git -C test_implicit_1 fsmonitor--daemon status
 '
 
 test_expect_success 'implicit daemon stop (rename .git)' '
@@ -123,7 +123,7 @@ test_expect_success 'implicit daemon stop (rename .git)' '
 	sleep 1 &&
 	mkdir test_implicit_2/.git &&
 
-	test_must_fail git -C test_implicit_2 fsmonitor--daemon --is-running
+	test_must_fail git -C test_implicit_2 fsmonitor--daemon status
 '
 
 test_expect_success 'cannot start multiple daemons' '
@@ -133,11 +133,11 @@ test_expect_success 'cannot start multiple daemons' '
 
 	start_daemon test_multiple &&
 
-	test_must_fail git -C test_multiple fsmonitor--daemon --start 2>actual &&
+	test_must_fail git -C test_multiple fsmonitor--daemon start 2>actual &&
 	grep "fsmonitor--daemon is already running" actual &&
 
-	git -C test_multiple fsmonitor--daemon --stop &&
-	test_must_fail git -C test_multiple fsmonitor--daemon --is-running
+	git -C test_multiple fsmonitor--daemon stop &&
+	test_must_fail git -C test_multiple fsmonitor--daemon status
 '
 
 test_expect_success 'setup' '
@@ -175,25 +175,25 @@ test_expect_success 'setup' '
 '
 
 test_expect_success 'update-index implicitly starts daemon' '
-	test_must_fail git fsmonitor--daemon --is-running &&
+	test_must_fail git fsmonitor--daemon status &&
 
 	GIT_TRACE2_EVENT="$PWD/.git/trace_implicit_1" \
 		git update-index --fsmonitor &&
 
-	git fsmonitor--daemon --is-running &&
-	test_might_fail git fsmonitor--daemon --stop &&
+	git fsmonitor--daemon status &&
+	test_might_fail git fsmonitor--daemon stop &&
 
 	grep \"event\":\"start\".*\"fsmonitor--daemon\" .git/trace_implicit_1
 '
 
 test_expect_success 'status implicitly starts daemon' '
-	test_must_fail git fsmonitor--daemon --is-running &&
+	test_must_fail git fsmonitor--daemon status &&
 
 	GIT_TRACE2_EVENT="$PWD/.git/trace_implicit_2" \
 		git status >actual &&
 
-	git fsmonitor--daemon --is-running &&
-	test_might_fail git fsmonitor--daemon --stop &&
+	git fsmonitor--daemon status &&
+	test_might_fail git fsmonitor--daemon stop &&
 
 	grep \"event\":\"start\".*\"fsmonitor--daemon\" .git/trace_implicit_2
 '
@@ -259,7 +259,7 @@ verify_status() {
 clean_up_repo_and_stop_daemon () {
 	git reset --hard HEAD
 	git clean -fd
-	git fsmonitor--daemon --stop
+	git fsmonitor--daemon stop
 	rm -f .git/trace
 }
 
@@ -480,8 +480,8 @@ test_expect_success 'worktree with .git file' '
 		start_daemon wt-secondary
 	) &&
 
-	git -C wt-secondary fsmonitor--daemon --stop &&
-	test_must_fail git -C wt-secondary fsmonitor--daemon --is-running
+	git -C wt-secondary fsmonitor--daemon stop &&
+	test_must_fail git -C wt-secondary fsmonitor--daemon status
 '
 
 # TODO Repeat one of the "edit" tests on wt-secondary and confirm that
@@ -507,7 +507,7 @@ test_lazy_prereq UNTRACKED_CACHE '
 test_expect_success 'Matrix: setup for untracked-cache,fsmonitor matrix' '
 	test_might_fail git config --unset core.useBuiltinFSMonitor &&
 	git update-index --no-fsmonitor &&
-	test_might_fail git fsmonitor--daemon --stop
+	test_might_fail git fsmonitor--daemon stop
 '
 
 matrix_clean_up_repo () {
@@ -560,12 +560,12 @@ do
 			test_expect_success "Matrix[uc:$uc_val][fsm:$fsm_val] disable fsmonitor" '
 				test_might_fail git config --unset core.useBuiltinFSMonitor &&
 				git update-index --no-fsmonitor &&
-				test_might_fail git fsmonitor--daemon --stop 2>/dev/null
+				test_might_fail git fsmonitor--daemon stop 2>/dev/null
 			'
 		else
 			test_expect_success "Matrix[uc:$uc_val][fsm:$fsm_val] enable fsmonitor" '
 				git config core.useBuiltinFSMonitor true &&
-				git fsmonitor--daemon --start &&
+				git fsmonitor--daemon start &&
 				git update-index --fsmonitor
 			'
 		fi

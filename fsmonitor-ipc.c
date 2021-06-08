@@ -27,7 +27,7 @@ enum ipc_active_state fsmonitor_ipc__get_state(void)
 
 static int spawn_daemon(void)
 {
-	const char *args[] = { "fsmonitor--daemon", "--start", NULL };
+	const char *args[] = { "fsmonitor--daemon", "start", NULL };
 
 	return run_command_v_opt_tr2(args, RUN_COMMAND_NO_STDIN | RUN_GIT_CMD,
 				    "fsmonitor");

@@ -311,13 +311,13 @@ then
 	USE_FSMONITOR_DAEMON=t
 
 	trace_start fsmonitor--daemon--server
-	git fsmonitor--daemon --start
+	git fsmonitor--daemon start
 
 	trace_start fsmonitor--daemon--client
 	test_expect_success "setup for fsmonitor--daemon" 'setup_for_fsmonitor'
 	test_fsmonitor_suite
 
-	git fsmonitor--daemon --stop
+	git fsmonitor--daemon stop
 	trace_stop
 fi
 
