@@ -11,11 +11,6 @@
 #define FSMONITOR_DAEMON_IS_SUPPORTED 0
 #endif
 
-/*
- * A trivial function so that this source file always defines at least
- * one symbol even when the feature is not supported.  This quiets an
- * annoying compiler error.
- */
 int fsmonitor_ipc__is_supported(void)
 {
 	return FSMONITOR_DAEMON_IS_SUPPORTED;

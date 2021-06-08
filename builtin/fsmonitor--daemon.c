@@ -333,6 +333,9 @@ static int lookup_client_test_delay(void)
  *
  *     "builtin" ":" <token_id> ":" <sequence_nr>
  *
+ * The "builtin" prefix is used as a namespace to avoid conflicts
+ * with other providers (such as Watchman).
+ *
  * The <token_id> is an arbitrary OPAQUE string, such as a GUID,
  * UUID, or {timestamp,pid}.  It is used to group all filesystem
  * events that happened while the daemon was monitoring (and in-sync
@@ -343,9 +346,20 @@ static int lookup_client_test_delay(void)
  *     (There are too many race conditions to rely on file system
  *     event timestamps.)
  *
- * The <sequence_nr> is a simple integer incremented for each event
- * received.  When a new <token_id> is created, the <sequence_nr> is
- * reset to zero.
+ * The <sequence_nr> is a simple integer incremented whenever the
+ * daemon needs to make its state public.  For example, if 1000 file
+ * system events come in, but no clients have requested the data,
+ * the daemon can continue to accumulate file changes in the same
+ * bin and does not need to advance the sequence number.  However,
+ * as soon as a client does arrive, the daemon needs to start a new
+ * bin and increment the sequence number.
+ *
+ *     The sequence number serves as the boundary between 2 sets
+ *     of bins -- the older ones that the client has already seen
+ *     and the newer ones that it hasn't.
+ *
+ * When a new <token_id> is created, the <sequence_nr> is reset to
+ * zero.
  *
  *
  * About Token Ids
@@ -361,12 +375,6 @@ static int lookup_client_test_delay(void)
  *
  * [3] in response to a client "flush" command (for dropped event
  *     testing).
- *
- * [4] MAYBE We might want to change the token_id after very complex
- *     filesystem operations are performed, such as a directory move
- *     sequence that affects many files within.  It might be simpler
- *     to just give up and fake a re-sync (and let the client do a
- *     full scan) than try to enumerate the effects of such a change.
  *
  * When a new token_id is created, the daemon is free to discard all
  * cached filesystem events associated with any previous token_ids.
@@ -470,8 +478,6 @@ void fsmonitor_batch__add_path(struct fsmonitor_batch *batch,
 static void fsmonitor_batch__combine(struct fsmonitor_batch *batch_dest,
 				     const struct fsmonitor_batch *batch_src)
 {
-	/* assert state->main_lock */
-
 	size_t k;
 
 	ALLOC_GROW(batch_dest->interned_paths,
@@ -581,13 +587,17 @@ static void fsmonitor_free_token_data(struct fsmonitor_token_data *token)
  * [2] Some of those lost events may have been for cookie files.  We
  *     should assume the worst and abort them rather letting them starve.
  *
- * If there are no readers of the the current token data series, we
- * can free it now.  Otherwise, let the last reader free it.  Either
- * way, the old token data series is no longer associated with our
- * state data.
+ * If there are no concurrent threads readering the current token data
+ * series, we can free it now.  Otherwise, let the last reader free
+ * it.
+ *
+ * Either way, the old token data series is no longer associated with
+ * our state data.
  */
 void fsmonitor_force_resync(struct fsmonitor_daemon_state *state)
 {
+	/* assert current thread holding state->main_lock */
+
 	struct fsmonitor_token_data *free_me = NULL;
 	struct fsmonitor_token_data *new_one = NULL;
 
@@ -628,6 +638,7 @@ static void fsmonitor_format_response_token(
 
 /*
  * Parse an opaque token from the client.
+ * Returns -1 on error.
  */
 static int fsmonitor_parse_client_token(const char *buf_token,
 					struct strbuf *requested_token_id,
@@ -806,10 +817,10 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 	pthread_mutex_unlock(&state->main_lock);
 
 	/*
-	 * Write a cookie file inside the directory being watched in an
-	 * effort to flush out existing filesystem events that we actually
-	 * care about.  Suspend this client thread until we see the filesystem
-	 * events for this cookie file.
+	 * We mark the current head of the batch list as "pinned" so
+	 * that the listener thread will treat this item as read-only
+	 * (and prevent any more paths from being added to it) from
+	 * now on.
 	 */
 	cookie_result = fsmonitor_wait_for_cookie(state);
 	if (cookie_result != FCIR_SEEN) {
@@ -847,11 +858,6 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 	 *
 	 * AND it allows the listener thread to do a token-reset
 	 * (and install a new `current_token_data`).
-	 *
-	 * We mark the current head of the batch list as "pinned" so
-	 * that the listener thread will treat this item as read-only
-	 * (and prevent any more paths from being added to it) from
-	 * now on.
 	 */
 	token_data = state->current_token_data;
 	token_data->client_ref_count++;
@@ -862,9 +868,16 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 	pthread_mutex_unlock(&state->main_lock);
 
 	/*
-	 * FSMonitor Protocol V2 requires that we send a response header
-	 * with a "new current token" and then all of the paths that changed
-	 * since the "requested token".
+	 * The client request is relative to the token that they sent,
+	 * so walk the batch list backwards from the current head back
+	 * to the batch (sequence number) they named.
+	 *
+	 * We use khash to de-dup the list of pathnames.
+	 *
+	 * NEEDSWORK: each batch contains a list of interned strings,
+	 * so we only need to do pointer comparisons here to build the
+	 * hash table.  Currently, we're still comparing the string
+	 * values.
 	 */
 	fsmonitor_format_response_token(&response_token,
 					&token_data->token_id,
@@ -921,6 +934,7 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 	kh_release_str(shown);
 
 	pthread_mutex_lock(&state->main_lock);
+
 	if (token_data->client_ref_count > 0)
 		token_data->client_ref_count--;
 
@@ -1269,8 +1283,10 @@ static int fsmonitor_run_daemon(void)
 	state.nr_paths_watching = 1;
 
 	/*
-	 * If ".git" is not a directory, then <gitdir> is not inside the
-	 * cone of <worktree-root>, so set up a second watch for it.
+	 * We create/delete cookie files inside the .git directory to
+	 * help us keep sync with the file system.  If ".git" is not a
+	 * directory, then <gitdir> is not inside the cone of
+	 * <worktree-root>, so set up a second watch for it.
 	 */
 	strbuf_init(&state.path_gitdir_watch, 0);
 	strbuf_addbuf(&state.path_gitdir_watch, &state.path_worktree_watch);
@@ -1283,7 +1299,7 @@ static int fsmonitor_run_daemon(void)
 
 	/*
 	 * We will write filesystem syncing cookie files into
-	 * <gitdir>/<cookie-prefix><pid>-<seq>.
+	 * <gitdir>/<fsmonitor-dir>/<cookie-dir>/<pid>-<seq>.
 	 */
 	strbuf_init(&state.path_cookie_prefix, 0);
 	strbuf_addbuf(&state.path_cookie_prefix, &state.path_gitdir_watch);
@@ -1418,7 +1434,6 @@ static int wait_for_background_startup(pid_t pid_child)
 
 		if (pid_seen == -1)
 			return error_errno(_("waitpid failed"));
-
 		else if (pid_seen == 0) {
 			/*
 			 * The child is still running (this should be

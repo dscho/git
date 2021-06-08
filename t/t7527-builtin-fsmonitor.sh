@@ -401,8 +401,8 @@ test_expect_success 'directory changes to a file' '
 # polling fast enough), we need to discard the cached data (relative to the
 # current token) and start collecting events under a new token.
 #
-# the 'git fsmonitor--daemon --flush' command can be used to send a "flush"
-# message to a running daemon and ask it to do a flush/resync.
+# the 'test-tool fsmonitor-client flush' command can be used to send a
+# "flush" message to a running daemon and ask it to do a flush/resync.
 
 test_expect_success 'flush cached data' '
 	test_when_finished "kill_repo test_flush" &&
