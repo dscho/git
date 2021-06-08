@@ -149,9 +149,8 @@ void write_fsmonitor_extension(struct strbuf *sb, struct index_state *istate)
 /*
  * Call the query-fsmonitor hook passing the last update token of the saved results.
  */
-static int query_fsmonitor(int version, struct index_state *istate, struct strbuf *query_result)
+static int query_fsmonitor(int version, const char *last_update, struct strbuf *query_result)
 {
-	const char *last_update = istate->fsmonitor_last_update;
 	struct child_process cp = CHILD_PROCESS_INIT;
 	int result;
 
@@ -346,7 +345,7 @@ void refresh_fsmonitor(struct index_state *istate)
 	if (istate->fsmonitor_last_update) {
 		if (hook_version == -1 || hook_version == HOOK_INTERFACE_VERSION2) {
 			query_success = !query_fsmonitor(HOOK_INTERFACE_VERSION2,
-				istate, &query_result);
+				istate->fsmonitor_last_update, &query_result);
 
 			if (query_success) {
 				if (hook_version < 0)
@@ -376,7 +375,7 @@ void refresh_fsmonitor(struct index_state *istate)
 
 		if (hook_version == HOOK_INTERFACE_VERSION1) {
 			query_success = !query_fsmonitor(HOOK_INTERFACE_VERSION1,
-				istate, &query_result);
+				istate->fsmonitor_last_update, &query_result);
 		}
 
 		trace_performance_since(last_update, "fsmonitor process '%s'", core_fsmonitor);
