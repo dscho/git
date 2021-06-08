@@ -757,6 +757,28 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 	 * (and prevent any more paths from being added to it) from
 	 * now on.
 	 */
+	token_data = state->current_token_data;
+	batch_head = token_data->batch_head;
+	((struct fsmonitor_batch *)batch_head)->pinned_time = time(NULL);
+
+	/*
+	 * FSMonitor Protocol V2 requires that we send a response header
+	 * with a "new current token" and then all of the paths that changed
+	 * since the "requested token".  We send the seq_nr of the just-pinned
+	 * head batch so that future requests from a client will be relative
+	 * to it.
+	 */
+	with_lock__format_response_token(&response_token,
+					&token_data->token_id,
+					batch_head);
+
+	reply(reply_data, response_token.buf, response_token.len + 1);
+	total_response_len += response_token.len + 1;
+
+	trace2_data_string("fsmonitor", the_repository, "response/token",
+			   response_token.buf);
+	trace_printf_key(&trace_fsmonitor, "response token: %s", response_token.buf);
+
 	cookie_result = with_lock__wait_for_cookie(state);
 	if (cookie_result != FCIR_SEEN) {
 		error(_("fsmonitor: cookie_result '%d' != SEEN"),
@@ -792,11 +814,7 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 	 * AND it allows the listener thread to do a token-reset
 	 * (and install a new `current_token_data`).
 	 */
-	token_data = state->current_token_data;
 	token_data->client_ref_count++;
-
-	batch_head = token_data->batch_head;
-	((struct fsmonitor_batch *)batch_head)->pinned_time = time(NULL);
 
 	pthread_mutex_unlock(&state->main_lock);
 
@@ -812,17 +830,6 @@ static int do_handle_client(struct fsmonitor_daemon_state *state,
 	 * hash table.  Currently, we're still comparing the string
 	 * values.
 	 */
-	with_lock__format_response_token(&response_token,
-					&token_data->token_id,
-					batch_head);
-
-	reply(reply_data, response_token.buf, response_token.len + 1);
-	total_response_len += response_token.len + 1;
-
-	trace2_data_string("fsmonitor", the_repository, "response/token",
-			   response_token.buf);
-	trace_printf_key(&trace_fsmonitor, "response token: %s", response_token.buf);
-
 	shown = kh_init_str();
 	for (batch = batch_head;
 	     batch && batch->batch_seq_nr >= requested_oldest_seq_nr;
