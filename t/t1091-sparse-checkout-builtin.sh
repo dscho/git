@@ -255,7 +255,7 @@ test_expect_success 'sparse-index enabled and disabled' '
 	test_cmp expect actual &&
 
 	git -C repo config --list >config &&
-	! grep index.sparse config
+	test_cmp_config -C repo false index.sparse
 '
 
 test_expect_success 'cone mode: init and set' '
