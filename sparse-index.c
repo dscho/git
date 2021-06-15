@@ -103,7 +103,7 @@ int set_sparse_index_config(struct repository *repo, int enable)
 	char *config_path = repo_git_path(repo, "config.worktree");
 	res = git_config_set_in_file_gently(config_path,
 					    "index.sparse",
-					    enable ? "true" : NULL);
+					    enable ? "true" : "false");
 	free(config_path);
 
 	prepare_repo_settings(repo);
