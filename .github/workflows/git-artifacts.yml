@@ -1,6 +1,7 @@
 name: git-artifacts
 
 on:
+  push:
   # This workflow can be triggered manually in the Actions tab, see
   # https://github.blog/changelog/2020-07-06-github-actions-manual-triggers-with-workflow_dispatch/
   workflow_dispatch:
@@ -20,7 +21,7 @@ env:
   HOME: "${{github.workspace}}\\home"
   MSYSTEM: MINGW64
   USERPROFILE: "${{github.workspace}}\\home"
-  BUILD_ONLY: "${{github.event.inputs.build_only}}"
+  BUILD_ONLY: nuget
   REPOSITORY: "${{github.event.inputs.repository}}"
   REF: "${{github.event.inputs.ref}}"
 
@@ -510,6 +511,11 @@ jobs:
           /usr/src/build-extra/please.sh make_installers_from_mingw_w64_git --version=$(cat pkg-x86_64/ver) -o artifacts --nuget --pkg=pkg-x86_64/mingw-w64-x86_64-git-[0-9]*.tar.xz --pkg=pkg-x86_64/mingw-w64-x86_64-git-doc-html-[0-9]*.tar.xz &&
           /usr/src/build-extra/please.sh make_installers_from_mingw_w64_git --version=$(cat pkg-x86_64/ver) -o artifacts --nuget-mingit &&
           openssl dgst -sha256 artifacts/Git*.nupkg | sed "s/.* //" >artifacts/sha-256.txt
+      - name: action-tmate
+        if: failure()
+        uses: mxschmitt/action-tmate@v3
+        with:
+          limit-access-to-actor: true
       - name: Publish nuget-x86_64
         if: env.SKIP != 'true'
         uses: actions/upload-artifact@v1
