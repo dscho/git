@@ -885,6 +885,7 @@ static int cmd_clone(int argc, const char **argv)
 	char *cache_key = NULL, *shared_cache_path = NULL;
 	struct strbuf buf = STRBUF_INIT;
 	int res;
+	int gvfs_protocol;
 
 	argc = parse_options(argc, argv, NULL, clone_options, clone_usage, 0);
 
@@ -1012,8 +1013,10 @@ static int cmd_clone(int argc, const char **argv)
 		goto cleanup;
 	}
 
-	if (cache_server_url ||
-	    supports_gvfs_protocol(url, &default_cache_server_url)) {
+	gvfs_protocol = cache_server_url ||
+			supports_gvfs_protocol(url, &default_cache_server_url);
+
+	if (gvfs_protocol) {
 		if (!cache_server_url)
 			cache_server_url = default_cache_server_url;
 		if (set_config("core.useGVFSHelper=true") ||
@@ -1048,7 +1051,12 @@ static int cmd_clone(int argc, const char **argv)
 		return error(_("could not configure '%s'"), dir);
 
 	if ((res = run_git("fetch", "--quiet", "origin", NULL))) {
-		warning(_("Partial clone failed; Trying full clone"));
+		if (gvfs_protocol) {
+			res = error(_("failed to prefetch commits and trees"));
+			goto cleanup;
+		}
+
+		warning(_("partial clone failed; attempting full clone"));
 
 		if (set_config("remote.origin.promisor") ||
 		    set_config("remote.origin.partialCloneFilter")) {
