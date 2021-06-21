@@ -196,12 +196,6 @@ static int set_recommended_config(int reconfigure)
 		{ "maintenance.incremental-repack.enabled", "true" },
 		{ "maintenance.incremental-repack.auto", "0" },
 		{ "maintenance.incremental-repack.schedule", "daily" },
-#ifdef HAVE_FSMONITOR_DAEMON_BACKEND
-		/*
-		 * Enable the built-in FSMonitor on supported platforms.
-		 */
-		{ "core.useBuiltinFSMonitor", "true" },
-#endif
 		{ "core.configWriteLockTimeoutMS", "150" },
 		{ NULL, NULL },
 	};
