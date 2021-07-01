@@ -11,6 +11,20 @@
 #include "packfile.h"
 #include "hook.h"
 
+const char *get_shell_path(const char *fallback)
+{
+	static const char *shell;
+	static int initialized;
+
+	if (!initialized) {
+		if (!git_config_get_pathname("core.shell", &shell))
+			setenv("SHELL", shell, 1);
+		initialized = 1;
+	}
+
+	return shell ? shell : fallback;
+}
+
 void child_process_init(struct child_process *child)
 {
 	struct child_process blank = CHILD_PROCESS_INIT;
@@ -272,9 +286,9 @@ static const char **prepare_shell_cmd(struct strvec *out, const char **argv)
 
 	if (strcspn(argv[0], "|&;<>()$`\\\"' \t\n*?[#~=%") != strlen(argv[0])) {
 #ifndef GIT_WINDOWS_NATIVE
-		strvec_push(out, SHELL_PATH);
+		strvec_push(out, get_shell_path(SHELL_PATH));
 #else
-		strvec_push(out, "sh");
+		strvec_push(out, get_shell_path("sh"));
 #endif
 		strvec_push(out, "-c");
 
@@ -404,7 +418,7 @@ static int prepare_cmd(struct strvec *out, const struct child_process *cmd)
 	 * Add SHELL_PATH so in the event exec fails with ENOEXEC we can
 	 * attempt to interpret the command with 'sh'.
 	 */
-	strvec_push(out, SHELL_PATH);
+	strvec_push(out, get_shell_path(SHELL_PATH));
 
 	if (cmd->git_cmd) {
 		prepare_git_cmd(out, cmd->args.v);

@@ -264,4 +264,11 @@ test_expect_success MINGW 'can spawn .bat with argv[0] containing spaces' '
 	grep "git-upload-pack" out
 '
 
+SQ="'"
+test_expect_success 'core.shell' '
+	test_config_global core.shell "$GIT_EXEC_PATH/git$X" &&
+	test_must_fail git -c alias.eq="!a.b=c" eq 2>actual &&
+	grep "${SQ}a.b=c${SQ} is not a git command" actual
+'
+
 test_done
