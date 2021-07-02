@@ -120,8 +120,7 @@ void prepare_repo_settings(struct repository *r)
 	if (!repo_config_get_bool(r, "feature.experimental", &value) && value) {
 		UPDATE_DEFAULT_BOOL(r->settings.fetch_negotiation_algorithm, FETCH_NEGOTIATION_SKIPPING);
 		if (feature_many_files && fsmonitor_ipc__is_supported())
-			UPDATE_DEFAULT_BOOL(r->settings.use_builtin_fsmonitor,
-					    1);
+			UPDATE_DEFAULT_BOOL(r->settings.fsmonitor_mode, FSMONITOR_MODE_IPC);
 	}
 
 	/* Hack for test programs like test-dump-untracked-cache */
