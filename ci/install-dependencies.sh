@@ -9,7 +9,7 @@ P4WHENCE=http://filehost.perforce.com/perforce/r$LINUX_P4_VERSION
 LFSWHENCE=https://github.com/github/git-lfs/releases/download/v$LINUX_GIT_LFS_VERSION
 UBUNTU_COMMON_PKGS="make libssl-dev libcurl4-openssl-dev libexpat-dev
  tcl tk gettext zlib1g-dev perl-modules liberror-perl libauthen-sasl-perl
- libemail-valid-perl libio-socket-ssl-perl libnet-smtp-ssl-perl"
+ libemail-valid-perl libio-socket-ssl-perl libnet-smtp-ssl-perl valgrind"
 
 case "$jobname" in
 linux-clang|linux-gcc)
@@ -59,6 +59,8 @@ osx-clang|osx-gcc)
 		brew link gcc@9
 		;;
 	esac
+	brew tap LouisBrunner/valgrind
+	brew install --HEAD LouisBrunner/valgrind/valgrind
 	;;
 StaticAnalysis)
 	sudo apt-get -q update
