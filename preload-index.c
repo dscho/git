@@ -10,7 +10,7 @@
 #include "thread-utils.h"
 #include "repository.h"
 
-struct fscache *fscache;
+static struct fscache *fscache;
 
 /*
  * Mostly randomly chosen maximum thread counts: we
