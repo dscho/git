@@ -219,7 +219,7 @@
 /.vscode/
 /tags
 /TAGS
-/cscope*
+/cscope.out
 /compile_commands.json
 *.hcc
 *.obj
