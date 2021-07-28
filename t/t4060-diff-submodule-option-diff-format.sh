@@ -361,7 +361,6 @@ test_expect_success 'typechanged submodule(submodule->blob)' '
 rm -f sm1 &&
 test_create_repo sm1 &&
 head6=$(add_file sm1 foo6 foo7)
-fullhead6=$(cd sm1; git rev-parse --verify HEAD)
 test_expect_success 'nonexistent commit' '
 	git diff-index -p --submodule=diff HEAD >actual &&
 	cat >expected <<-EOF &&
@@ -704,10 +703,26 @@ test_expect_success 'path filter' '
 	diff_cmp expected actual
 '
 
-commit_file sm2
+cat >.gitmodules <<-EOF
+[submodule "sm2"]
+	path = sm2
+	url = bogus_url
+EOF
+git add .gitmodules
+commit_file sm2 .gitmodules
+
 test_expect_success 'given commit' '
 	git diff-index -p --submodule=diff HEAD^ >actual &&
 	cat >expected <<-EOF &&
+	diff --git a/.gitmodules b/.gitmodules
+	new file mode 100644
+	index 1234567..89abcde
+	--- /dev/null
+	+++ b/.gitmodules
+	@@ -0,0 +1,3 @@
+	+[submodule "sm2"]
+	+path = sm2
+	+url = bogus_url
 	Submodule sm1 $head7...0000000 (submodule deleted)
 	Submodule sm2 0000000...$head9 (new submodule)
 	diff --git a/sm2/foo8 b/sm2/foo8
@@ -729,15 +744,21 @@ test_expect_success 'given commit' '
 '
 
 test_expect_success 'setup .git file for sm2' '
-	(cd sm2 &&
-	 REAL="$(pwd)/../.real" &&
-	 mv .git "$REAL" &&
-	 echo "gitdir: $REAL" >.git)
+	git submodule absorbgitdirs sm2
 '
 
 test_expect_success 'diff --submodule=diff with .git file' '
 	git diff --submodule=diff HEAD^ >actual &&
 	cat >expected <<-EOF &&
+	diff --git a/.gitmodules b/.gitmodules
+	new file mode 100644
+	index 1234567..89abcde
+	--- /dev/null
+	+++ b/.gitmodules
+	@@ -0,0 +1,3 @@
+	+[submodule "sm2"]
+	+path = sm2
+	+url = bogus_url
 	Submodule sm1 $head7...0000000 (submodule deleted)
 	Submodule sm2 0000000...$head9 (new submodule)
 	diff --git a/sm2/foo8 b/sm2/foo8
@@ -757,6 +778,19 @@ test_expect_success 'diff --submodule=diff with .git file' '
 	EOF
 	diff_cmp expected actual
 '
+
+mv sm2 sm2-bak
+
+test_expect_success 'deleted submodule with .git file' '
+	git diff-index -p --submodule=diff HEAD >actual &&
+	cat >expected <<-EOF &&
+	Submodule sm1 $head7...0000000 (submodule deleted)
+	Submodule sm2 $head9...0000000 (submodule deleted)
+	EOF
+	diff_cmp expected actual
+'
+
+mv sm2-bak sm2
 
 test_expect_success 'setup nested submodule' '
 	git submodule add -f ./sm2 &&
