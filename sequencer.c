@@ -1148,10 +1148,12 @@ int update_head_with_reflog(const struct commit *old_head,
 static int run_rewrite_hook(const struct object_id *oldoid,
 			    const struct object_id *newoid)
 {
-	struct run_hooks_opt opt = RUN_HOOKS_OPT_INIT;
+	struct run_hooks_opt opt;
 	struct strbuf tmp = STRBUF_INIT;
 	struct string_list to_stdin = STRING_LIST_INIT_DUP;
 	int code;
+
+	run_hooks_opt_init_async(&opt);
 
 	strvec_push(&opt.args, "amend");
 
@@ -4523,7 +4525,7 @@ cleanup_head_ref:
 		if (!stat(rebase_path_rewritten_list(), &st) &&
 				st.st_size > 0) {
 			struct child_process notes_cp = CHILD_PROCESS_INIT;
-			struct run_hooks_opt hook_opt = RUN_HOOKS_OPT_INIT;
+			struct run_hooks_opt hook_opt;
 
 			notes_cp.in = open(rebase_path_rewritten_list(), O_RDONLY);
 			notes_cp.git_cmd = 1;
@@ -4533,6 +4535,7 @@ cleanup_head_ref:
 			/* we don't care if this copying failed */
 			run_command(&notes_cp);
 
+			run_hooks_opt_init_async(&hook_opt);
 			hook_opt.path_to_stdin = rebase_path_rewritten_list();
 			strvec_push(&hook_opt.args, "rebase");
 			run_hooks("post-rewrite", &hook_opt);

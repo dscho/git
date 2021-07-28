@@ -3069,7 +3069,7 @@ static int do_write_locked_index(struct index_state *istate, struct lock_file *l
 {
 	int ret;
 	int was_full = !istate->sparse_index;
-	struct run_hooks_opt hook_opt = RUN_HOOKS_OPT_INIT;
+	struct run_hooks_opt hook_opt;
 
 	ret = convert_to_sparse(istate);
 
@@ -3098,6 +3098,7 @@ static int do_write_locked_index(struct index_state *istate, struct lock_file *l
 	else
 		ret = close_lock_file_gently(lock);
 
+	run_hooks_opt_init_async(&hook_opt);
 	strvec_pushl(&hook_opt.args,
 		     istate->updated_workdir ? "1" : "0",
 		     istate->updated_skipworktree ? "1" : "0",

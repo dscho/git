@@ -1198,10 +1198,12 @@ static int run_pre_push_hook(struct transport *transport,
 			     struct ref *remote_refs)
 {
 	int ret = 0;
-	struct run_hooks_opt opt = RUN_HOOKS_OPT_INIT;
+	struct run_hooks_opt opt;
 	struct strbuf tmp = STRBUF_INIT;
 	struct ref *r;
 	struct string_list to_stdin = STRING_LIST_INIT_DUP;
+
+	run_hooks_opt_init_async(&opt);
 
 	strvec_push(&opt.args, transport->remote->name);
 	strvec_push(&opt.args, transport->url);

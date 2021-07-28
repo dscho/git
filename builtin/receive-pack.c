@@ -909,7 +909,7 @@ static int run_receive_hook(struct command *commands,
 			    int skip_broken,
 			    const struct string_list *push_options)
 {
-	struct run_hooks_opt opt = RUN_HOOKS_OPT_INIT;
+	struct run_hooks_opt opt;
 	struct receive_hook_feed_context ctx;
 	int rc;
 	struct command *iter = commands;
@@ -921,6 +921,7 @@ static int run_receive_hook(struct command *commands,
 		return 0;
 
 	/* pre-receive hooks should run in series as the hook updates refs */
+	run_hooks_opt_init_async(&opt);
 	if (!strcmp(hook_name, "pre-receive"))
 		opt.jobs = 1;
 
@@ -955,9 +956,10 @@ static int run_receive_hook(struct command *commands,
 
 static int run_update_hook(struct command *cmd)
 {
-	struct run_hooks_opt opt = RUN_HOOKS_OPT_INIT;
+	struct run_hooks_opt opt;
 	int code;
 
+	run_hooks_opt_init_async(&opt);
 	strvec_pushl(&opt.args,
 		     cmd->ref_name,
 		     oid_to_hex(&cmd->old_oid),
@@ -1442,7 +1444,10 @@ static const char *push_to_checkout(unsigned char *hash,
 				    struct strvec *env,
 				    const char *work_tree)
 {
-	struct run_hooks_opt opt = RUN_HOOKS_OPT_INIT;
+	struct run_hooks_opt opt;
+
+
+	run_hooks_opt_init_sync(&opt);
 	opt.invoked_hook = invoked_hook;
 
 	strvec_pushf(env, "GIT_WORK_TREE=%s", absolute_path(work_tree));
@@ -1641,8 +1646,9 @@ static const char *update(struct command *cmd, struct shallow_info *si)
 static void run_update_post_hook(struct command *commands)
 {
 	struct command *cmd;
-	struct run_hooks_opt opt = RUN_HOOKS_OPT_INIT;
+	struct run_hooks_opt opt;
 
+	run_hooks_opt_init_async(&opt);
 	for (cmd = commands; cmd; cmd = cmd->next) {
 		if (cmd->error_string || cmd->did_not_exist)
 			continue;

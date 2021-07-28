@@ -107,9 +107,10 @@ struct branch_info {
 static int post_checkout_hook(struct commit *old_commit, struct commit *new_commit,
 			      int changed)
 {
-	struct run_hooks_opt opt = RUN_HOOKS_OPT_INIT;
+	struct run_hooks_opt opt;
 	int rc;
 
+	run_hooks_opt_init_sync(&opt);
 	/* "new_commit" can be NULL when checking out from the index before
 	   a commit exists. */
 	strvec_pushl(&opt.args,

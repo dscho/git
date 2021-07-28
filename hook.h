@@ -3,13 +3,22 @@
 #include "strbuf.h"
 #include "strvec.h"
 #include "run-command.h"
+#include "list.h"
 
 /*
  * Returns the path to the hook file, or NULL if the hook is missing
  * or disabled. Note that this points to static storage that will be
  * overwritten by further calls to find_hook and run_hook_*.
+ *
+ * If the hook is not a native hook (e.g. present in Documentation/githooks.txt)
+ * find_hook() will die(). find_hook_gently() does not consult the native hook
+ * list and will check for any hook name in the hooks directory regardless of
+ * whether it is known. find_hook() should be used by internal calls to hooks,
+ * and find_hook_gently() should only be used when the hookname was provided by
+ * the user, such as by 'git hook run my-wrapper-hook'.
  */
 const char *find_hook(const char *name);
+const char *find_hook_gently(const char *name);
 
 /*
  * A boolean version of find_hook()
@@ -17,8 +26,11 @@ const char *find_hook(const char *name);
 int hook_exists(const char *hookname);
 
 struct hook {
+	struct list_head list;
 	/* The path to the hook */
-	const char *hook_path;
+	const char *command;
+
+	unsigned from_hookdir : 1;
 
 	/*
 	 * Use this to keep state for your feed_pipe_fn if you are using
@@ -26,6 +38,21 @@ struct hook {
 	 */
 	void *feed_pipe_cb_data;
 };
+
+/*
+ * Provides a linked list of 'struct hook' detailing commands which should run
+ * in response to the 'hookname' event, in execution order.
+ *
+ * If allow_unknown is unset, hooks will be checked against the hook list
+ * generated from Documentation/githooks.txt. Otherwise, any hook name will be
+ * allowed. allow_unknown should only be set when the hook name is provided by
+ * the user; internal calls to hook_list should make sure the hook they are
+ * invoking is present in Documentation/githooks.txt.
+ */
+struct list_head* hook_list(const char *hookname, int allow_unknown);
+
+/* Provides the number of threads to use for parallel hook execution. */
+int configured_hook_jobs(void);
 
 struct run_hooks_opt
 {
@@ -85,12 +112,6 @@ struct run_hooks_opt
 	int *invoked_hook;
 };
 
-#define RUN_HOOKS_OPT_INIT { \
-	.jobs = 1, \
-	.env = STRVEC_INIT, \
-	.args = STRVEC_INIT, \
-}
-
 /*
  * To specify a 'struct string_list', set 'run_hooks_opt.feed_pipe_ctx' to the
  * string_list and set 'run_hooks_opt.feed_pipe' to 'pipe_from_string_list()'.
@@ -103,11 +124,14 @@ struct hook_cb_data {
 	/* rc reflects the cumulative failure state */
 	int rc;
 	const char *hook_name;
+	struct list_head *head;
 	struct hook *run_me;
 	struct run_hooks_opt *options;
 	int *invoked_hook;
 };
 
+void run_hooks_opt_init_sync(struct run_hooks_opt *o);
+void run_hooks_opt_init_async(struct run_hooks_opt *o);
 void run_hooks_opt_clear(struct run_hooks_opt *o);
 
 /*
@@ -120,6 +144,10 @@ int run_hooks(const char *hook_name, struct run_hooks_opt *options);
  * Takes an already resolved hook and runs it. Internally the simpler
  * run_hooks() will call this.
  */
-int run_found_hooks(const char *hookname, const char *hook_path,
+int run_found_hooks(const char *hookname, struct list_head *hooks,
 		    struct run_hooks_opt *options);
+
+/* Empties the list at 'head', calling 'free_hook()' on each entry */
+void clear_hook_list(struct list_head *head);
+
 #endif

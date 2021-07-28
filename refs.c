@@ -2083,7 +2083,7 @@ static int run_transaction_hook(struct ref_transaction *transaction,
 				const char *state)
 {
 	struct strbuf buf = STRBUF_INIT;
-	struct run_hooks_opt opt = RUN_HOOKS_OPT_INIT;
+	struct run_hooks_opt opt;
 	struct string_list to_stdin = STRING_LIST_INIT_DUP;
 	int ret = 0, i;
 	char o[GIT_MAX_HEXSZ + 1], n[GIT_MAX_HEXSZ + 1];
@@ -2091,6 +2091,7 @@ static int run_transaction_hook(struct ref_transaction *transaction,
 	if (!hook_exists("reference-transaction"))
 		return ret;
 
+	run_hooks_opt_init_async(&opt);
 	strvec_push(&opt.args, state);
 
 	for (i = 0; i < transaction->nr; i++) {

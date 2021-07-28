@@ -349,7 +349,7 @@ static void add_repack_incremental_option(void)
 
 static int need_to_gc(void)
 {
-	struct run_hooks_opt hook_opt = RUN_HOOKS_OPT_INIT;
+	struct run_hooks_opt hook_opt;
 
 	/*
 	 * Setting gc.auto to 0 or negative can disable the
@@ -397,6 +397,7 @@ static int need_to_gc(void)
 	else
 		return 0;
 
+	run_hooks_opt_init_async(&hook_opt);
 	if (run_hooks("pre-auto-gc", &hook_opt)) {
 		run_hooks_opt_clear(&hook_opt);
 		return 0;

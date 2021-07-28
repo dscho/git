@@ -446,8 +446,9 @@ static void am_destroy(const struct am_state *state)
 static int run_applypatch_msg_hook(struct am_state *state)
 {
 	int ret;
-	struct run_hooks_opt opt = RUN_HOOKS_OPT_INIT;
+	struct run_hooks_opt opt;
 
+	run_hooks_opt_init_sync(&opt);
 	assert(state->msg);
 	strvec_push(&opt.args, am_path(state, "final-commit"));
 	ret = run_hooks("applypatch-msg", &opt);
@@ -468,9 +469,10 @@ static int run_applypatch_msg_hook(struct am_state *state)
  */
 static int run_post_rewrite_hook(const struct am_state *state)
 {
-	struct run_hooks_opt opt = RUN_HOOKS_OPT_INIT;
+	struct run_hooks_opt opt;
 	int ret;
 
+	run_hooks_opt_init_async(&opt);
 	strvec_push(&opt.args, "rebase");
 	opt.path_to_stdin = am_path(state, "rewritten");
 
@@ -1603,9 +1605,10 @@ static void do_commit(const struct am_state *state)
 	struct commit_list *parents = NULL;
 	const char *reflog_msg, *author, *committer = NULL;
 	struct strbuf sb = STRBUF_INIT;
-	struct run_hooks_opt hook_opt_pre = RUN_HOOKS_OPT_INIT;
-	struct run_hooks_opt hook_opt_post = RUN_HOOKS_OPT_INIT;
+	struct run_hooks_opt hook_opt_pre;
+	struct run_hooks_opt hook_opt_post;
 
+	run_hooks_opt_init_async(&hook_opt_pre);
 	if (run_hooks("pre-applypatch", &hook_opt_pre)) {
 		run_hooks_opt_clear(&hook_opt_pre);
 		exit(1);
@@ -1660,6 +1663,7 @@ static void do_commit(const struct am_state *state)
 		fclose(fp);
 	}
 
+	run_hooks_opt_init_async(&hook_opt_post);
 	run_hooks("post-applypatch", &hook_opt_post);
 
 	run_hooks_opt_clear(&hook_opt_pre);
