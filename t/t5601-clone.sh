@@ -753,6 +753,30 @@ test_expect_success 'batch missing blob request does not inadvertently try to fe
 	git clone --filter=blob:limit=0 "file://$(pwd)/server" client
 '
 
+test_expect_success 'clone with submodule with update=none is not active' '
+	rm -rf server client &&
+
+	test_create_repo server &&
+	echo a >server/a &&
+	echo b >server/b &&
+	git -C server add a b &&
+	git -C server commit -m x &&
+
+	echo aa >server/a &&
+	echo bb >server/b &&
+	git -C server submodule add --name c "$(pwd)/repo_for_submodule" c &&
+	git -C server config -f .gitmodules submodule.c.update none &&
+	git -C server add a b c .gitmodules &&
+	git -C server commit -m x &&
+
+	git clone --recurse-submodules server client &&
+	git -C client config submodule.c.active >actual &&
+	echo false >expected &&
+	test_cmp actual expected &&
+	# This would fail if the submodule were active, since it is not checked out.
+	git -C client reset --recurse-submodules --hard
+'
+
 . "$TEST_DIRECTORY"/lib-httpd.sh
 start_httpd
 

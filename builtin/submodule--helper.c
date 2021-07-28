@@ -687,6 +687,12 @@ static void init_submodule(const char *path, const char *prefix,
 
 		if (git_config_set_gently(sb.buf, upd))
 			die(_("Failed to register update mode for submodule path '%s'"), displaypath);
+
+		if (sub->update_strategy.type == SM_UPDATE_NONE) {
+			strbuf_reset(&sb);
+			strbuf_addf(&sb, "submodule.%s.active", sub->name);
+			git_config_set_gently(sb.buf, "false");
+		}
 	}
 	strbuf_release(&sb);
 	free(displaypath);
