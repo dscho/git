@@ -766,6 +766,23 @@ test_expect_success 'sparse-index is not expanded: merge conflict in cone' '
 	)
 '
 
+test_expect_success 'sparse-index is not expanded: merge conflict in cone' '
+	init_repos &&
+
+	for side in right left
+	do
+		git -C sparse-index checkout -b expand-$side base &&
+		echo $side >sparse-index/deep/a &&
+		git -C sparse-index commit -a -m "$side" || return 1
+	done &&
+
+	(
+		sane_unset GIT_TEST_MERGE_ALGORITHM &&
+		git -C sparse-index config pull.twohead ort &&
+		ensure_not_expanded ! merge -m merged expand-right
+	)
+'
+
 # NEEDSWORK: a sparse-checkout behaves differently from a full checkout
 # in this scenario, but it shouldn't.
 test_expect_success 'reset mixed and checkout orphan' '
