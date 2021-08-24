@@ -758,6 +758,7 @@ static int cmd_clone(int argc, const char **argv)
 	int full_clone = 0, single_branch = 0;
 	const char *cache_server_url = NULL, *local_cache_root = NULL;
 	char *default_cache_server_url = NULL, *local_cache_root_abs = NULL;
+	int no_fetch_commits_and_trees = 0;
 	struct option clone_options[] = {
 		OPT_STRING('b', "branch", &branch, N_("<branch>"),
 			   N_("branch to checkout after clone")),
@@ -772,6 +773,10 @@ static int cmd_clone(int argc, const char **argv)
 		OPT_STRING(0, "local-cache-path", &local_cache_root,
 			   N_("<path>"),
 			   N_("override the path for the local Scalar cache")),
+		OPT_SET_INT_F(0, "no-fetch-commits-and-trees",
+			      &no_fetch_commits_and_trees,
+			      N_("no longer has any effect"), 0,
+			      PARSE_OPT_HIDDEN),
 		OPT_END(),
 	};
 	const char * const clone_usage[] = {
