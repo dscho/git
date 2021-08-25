@@ -98,7 +98,7 @@ jobs:
         path: artifacts
   windows-test-git-svn:
     runs-on: windows-latest
-    if: github.ref == 'refs/heads/main' || github.base_ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.base_ref == 'refs/heads/main' || github.ref == 'refs/heads/test-git-svn-on-main'
     needs: [windows-build]
     steps:
     - name: download tracked files and build artifacts
