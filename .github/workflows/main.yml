@@ -83,11 +83,13 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - uses: git-for-windows/setup-git-for-windows-sdk@v1
+    - name: exclude Perl tests unless targeting `main`
+      if: github.ref != 'main' && github.head_ref != 'main' && github.ref != 'shears/master'
+      run: echo NO_PERL=1 >>$GITHUB_ENV
     - name: build
       shell: bash
       env:
         HOME: ${{runner.workspace}}
-        NO_PERL: 1
       run: ci/make-test-artifacts.sh artifacts
     - name: zip up tracked files
       run: git archive -o artifacts/tracked.tar.gz HEAD
@@ -130,7 +132,6 @@ jobs:
     needs: ci-config
     if: needs.ci-config.outputs.enabled == 'yes'
     env:
-      NO_PERL: 1
       GIT_CONFIG_PARAMETERS: "'user.name=CI' 'user.email=ci@git'"
     runs-on: windows-latest
     strategy:
@@ -154,6 +155,9 @@ jobs:
     - name: copy dlls to root
       shell: cmd
       run: compat\vcbuild\vcpkg_copy_dlls.bat release ${{ matrix.arch }}-windows
+    - name: exclude Perl tests unless targeting `main`
+      if: github.ref != 'main' && github.head_ref != 'main' && github.ref != 'shears/master'
+      run: echo NO_PERL=1 >>$GITHUB_ENV
     - name: generate Visual Studio solution
       shell: bash
       run: |
