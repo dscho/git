@@ -510,6 +510,32 @@ test_expect_success 'checkout and reset (mixed) [sparse]' '
 	test_sparse_match git reset update-folder2
 '
 
+# NEEDSWORK: with mixed reset, files with differences between HEAD and <commit>
+# will be added to the work tree even if outside the sparse checkout
+# definition, and even if the file is modified to a state of having no local
+# changes. The file is "re-ignored" if a hard reset is executed. We may want to
+# change this behavior in the future and enforce that files are not written
+# outside of the sparse checkout definition.
+test_expect_success 'checkout and mixed reset file tracking [sparse]' '
+	init_repos &&
+
+	test_all_match git checkout -b reset-test update-deep &&
+	test_all_match git reset update-folder1 &&
+	test_all_match git reset update-deep &&
+
+	# At this point, there are no changes in the working tree. However,
+	# folder1/a now exists locally (even though it is outside of the sparse
+	# paths).
+	run_on_sparse test_path_exists folder1 &&
+
+	run_on_all rm folder1/a &&
+	test_all_match git status --porcelain=v2 &&
+
+	test_all_match git reset --hard update-deep &&
+	run_on_sparse test_path_is_missing folder1 &&
+	test_path_exists full-checkout/folder1
+'
+
 test_expect_success 'merge, cherry-pick, and rebase' '
 	init_repos &&
 
