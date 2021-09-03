@@ -443,6 +443,9 @@ static int sparse_checkout_init(int argc, const char **argv)
 		/* force an index rewrite */
 		repo_read_index(the_repository);
 		the_repository->index->updated_workdir = 1;
+
+		if (!init_opts.sparse_index)
+			ensure_full_index(the_repository->index);
 	}
 
 	core_apply_sparse_checkout = 1;
