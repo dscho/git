@@ -125,7 +125,7 @@ static int index_has_unmerged_entries(struct index_state *istate)
 int convert_to_sparse(struct index_state *istate, int flags)
 {
 	int test_env;
-	if (istate->sparse_index || !istate->cache_nr ||
+	if (istate->sparse_index == COLLAPSED || !istate->cache_nr ||
 	    !core_apply_sparse_checkout || !core_sparse_checkout_cone)
 		return 0;
 
@@ -202,7 +202,7 @@ int convert_to_sparse(struct index_state *istate, int flags)
 	FREE_AND_NULL(istate->fsmonitor_dirty);
 	FREE_AND_NULL(istate->fsmonitor_last_update);
 
-	istate->sparse_index = 1;
+	istate->sparse_index = COLLAPSED;
 	trace2_region_leave("index", "convert_to_sparse", istate->repo);
 	return 0;
 }
@@ -247,7 +247,7 @@ void expand_to_pattern_list(struct index_state *istate,
 	 * If the index is already full, then keep it full. We will convert
 	 * it to a sparse index on write, if possible.
 	 */
-	if (!istate || !istate->sparse_index)
+	if (!istate || istate->sparse_index == COMPLETELY_FULL)
 		return;
 
 	/*
