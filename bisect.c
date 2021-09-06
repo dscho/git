@@ -683,20 +683,21 @@ static void bisect_common(struct rev_info *revs)
 }
 
 static enum bisect_error error_if_skipped_commits(struct commit_list *tried,
-				    const struct object_id *bad)
+						  const struct object_id *bad,
+						  FILE *out)
 {
 	if (!tried)
 		return BISECT_OK;
 
-	printf("There are only 'skip'ped commits left to test.\n"
-	       "The first %s commit could be any of:\n", term_bad);
+	fprintf(out, "There are only 'skip'ped commits left to test.\n"
+		"The first %s commit could be any of:\n", term_bad);
 
 	for ( ; tried; tried = tried->next)
-		printf("%s\n", oid_to_hex(&tried->item->object.oid));
+		fprintf(out, "%s\n", oid_to_hex(&tried->item->object.oid));
 
 	if (bad)
-		printf("%s\n", oid_to_hex(bad));
-	printf(_("We cannot bisect more!\n"));
+		fprintf(out, "%s\n", oid_to_hex(bad));
+	fprintf(out, _("We cannot bisect more!\n"));
 
 	return BISECT_ONLY_SKIPPED_LEFT;
 }
@@ -725,10 +726,12 @@ static int is_expected_rev(const struct object_id *oid)
 	return res;
 }
 
-static enum bisect_error bisect_checkout(const struct object_id *bisect_rev, int no_checkout)
+static enum bisect_error bisect_checkout(const struct object_id *bisect_rev,
+					 int no_checkout, FILE *out)
 {
 	char bisect_rev_hex[GIT_MAX_HEXSZ + 1];
 	enum bisect_error res = BISECT_OK;
+	struct child_process cp = CHILD_PROCESS_INIT;
 
 	oid_to_hex_r(bisect_rev_hex, bisect_rev);
 	update_ref(NULL, "BISECT_EXPECTED_REV", bisect_rev, NULL, 0, UPDATE_REFS_DIE_ON_ERR);
@@ -749,7 +752,10 @@ static enum bisect_error bisect_checkout(const struct object_id *bisect_rev, int
 	}
 
 	argv_show_branch[1] = bisect_rev_hex;
-	res = run_command_v_opt(argv_show_branch, RUN_GIT_CMD);
+	cp.argv = argv_show_branch;
+	cp.git_cmd = 1;
+	cp.out = dup(fileno(out));
+	res = run_command(&cp);
 	/*
 	 * Errors in `run_command()` itself, signaled by res < 0,
 	 * and errors in the child process, signaled by res > 0
@@ -841,7 +847,8 @@ static void handle_skipped_merge_base(const struct object_id *mb)
  * for early success, this will be converted back to 0 in
  * check_good_are_ancestors_of_bad().
  */
-static enum bisect_error check_merge_bases(int rev_nr, struct commit **rev, int no_checkout)
+static enum bisect_error check_merge_bases(int rev_nr, struct commit **rev,
+					   int no_checkout, FILE *out)
 {
 	enum bisect_error res = BISECT_OK;
 	struct commit_list *result;
@@ -858,8 +865,8 @@ static enum bisect_error check_merge_bases(int rev_nr, struct commit **rev, int 
 		} else if (0 <= oid_array_lookup(&skipped_revs, mb)) {
 			handle_skipped_merge_base(mb);
 		} else {
-			printf(_("Bisecting: a merge base must be tested\n"));
-			res = bisect_checkout(mb, no_checkout);
+			fprintf(out, _("Bisecting: a merge base must be tested\n"));
+			res = bisect_checkout(mb, no_checkout, out);
 			if (!res)
 				/* indicate early success */
 				res = BISECT_INTERNAL_SUCCESS_MERGE_BASE;
@@ -898,8 +905,9 @@ static int check_ancestors(struct repository *r, int rev_nr,
  */
 
 static enum bisect_error check_good_are_ancestors_of_bad(struct repository *r,
-					    const char *prefix,
-					    int no_checkout)
+							 const char *prefix,
+							 int no_checkout,
+							 FILE *out)
 {
 	char *filename;
 	struct stat st;
@@ -924,7 +932,7 @@ static enum bisect_error check_good_are_ancestors_of_bad(struct repository *r,
 
 	rev = get_bad_and_good_commits(r, &rev_nr);
 	if (check_ancestors(r, rev_nr, rev, prefix))
-		res = check_merge_bases(rev_nr, rev, no_checkout);
+		res = check_merge_bases(rev_nr, rev, no_checkout, out);
 	free(rev);
 
 	if (!res) {
@@ -953,7 +961,7 @@ static enum bisect_error check_good_are_ancestors_of_bad(struct repository *r,
  */
 static void show_diff_tree(struct repository *r,
 			   const char *prefix,
-			   struct commit *commit)
+			   struct commit *commit, FILE *out)
 {
 	const char *argv[] = {
 		"diff-tree", "--pretty", "--stat", "--summary", "--cc", NULL
@@ -964,6 +972,7 @@ static void show_diff_tree(struct repository *r,
 	repo_init_revisions(r, &opt, prefix);
 
 	setup_revisions(ARRAY_SIZE(argv) - 1, argv, &opt, NULL);
+	opt.diffopt.file = out;
 	log_tree_commit(&opt, commit);
 }
 
@@ -1007,7 +1016,8 @@ void read_bisect_terms(const char **read_bad, const char **read_good)
  * the end of bisect_helper::cmd_bisect__helper() helps bypassing
  * all the code related to finding a commit to test.
  */
-enum bisect_error bisect_next_all(struct repository *r, const char *prefix)
+enum bisect_error bisect_next_all(struct repository *r, const char *prefix,
+				  FILE *out)
 {
 	struct rev_info revs;
 	struct commit_list *tried;
@@ -1032,7 +1042,7 @@ enum bisect_error bisect_next_all(struct repository *r, const char *prefix)
 	if (skipped_revs.nr)
 		bisect_flags |= FIND_BISECTION_ALL;
 
-	res = check_good_are_ancestors_of_bad(r, prefix, no_checkout);
+	res = check_good_are_ancestors_of_bad(r, prefix, no_checkout, out);
 	if (res)
 		return res;
 
@@ -1051,10 +1061,10 @@ enum bisect_error bisect_next_all(struct repository *r, const char *prefix)
 		 * We should return error here only if the "bad"
 		 * commit is also a "skip" commit.
 		 */
-		res = error_if_skipped_commits(tried, NULL);
+		res = error_if_skipped_commits(tried, NULL, out);
 		if (res < 0)
 			return res;
-		printf(_("%s was both %s and %s\n"),
+		fprintf(out, _("%s was both %s and %s\n"),
 		       oid_to_hex(current_bad_oid),
 		       term_good,
 		       term_bad);
@@ -1072,13 +1082,13 @@ enum bisect_error bisect_next_all(struct repository *r, const char *prefix)
 	bisect_rev = &revs.commits->item->object.oid;
 
 	if (oideq(bisect_rev, current_bad_oid)) {
-		res = error_if_skipped_commits(tried, current_bad_oid);
+		res = error_if_skipped_commits(tried, current_bad_oid, out);
 		if (res)
 			return res;
-		printf("%s is the first %s commit\n", oid_to_hex(bisect_rev),
-			term_bad);
+		fprintf(out, "%s is the first %s commit\n",
+			oid_to_hex(bisect_rev), term_bad);
 
-		show_diff_tree(r, prefix, revs.commits->item);
+		show_diff_tree(r, prefix, revs.commits->item, out);
 		/*
 		 * This means the bisection process succeeded.
 		 * Using BISECT_INTERNAL_SUCCESS_1ST_BAD_FOUND (-10)
@@ -1098,14 +1108,14 @@ enum bisect_error bisect_next_all(struct repository *r, const char *prefix)
 	 * TRANSLATORS: the last %s will be replaced with "(roughly %d
 	 * steps)" translation.
 	 */
-	printf(Q_("Bisecting: %d revision left to test after this %s\n",
-		  "Bisecting: %d revisions left to test after this %s\n",
-		  nr), nr, steps_msg);
+	fprintf(out, Q_("Bisecting: %d revision left to test after this %s\n",
+			"Bisecting: %d revisions left to test after this %s\n",
+			nr), nr, steps_msg);
 	free(steps_msg);
 	/* Clean up objects used, as they will be reused. */
 	repo_clear_commit_marks(r, ALL_REV_FLAGS);
 
-	return bisect_checkout(bisect_rev, no_checkout);
+	return bisect_checkout(bisect_rev, no_checkout, out);
 }
 
 static inline int log2i(int n)

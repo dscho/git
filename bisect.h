@@ -61,7 +61,8 @@ enum bisect_error {
 	BISECT_INTERNAL_SUCCESS_MERGE_BASE = -11
 };
 
-enum bisect_error bisect_next_all(struct repository *r, const char *prefix);
+enum bisect_error bisect_next_all(struct repository *r, const char *prefix,
+				  FILE *out);
 
 int estimate_bisect_steps(int all);
 

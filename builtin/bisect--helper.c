@@ -581,7 +581,8 @@ static int bisect_successful(struct bisect_terms *terms)
 	return res;
 }
 
-static enum bisect_error bisect_next(struct bisect_terms *terms, const char *prefix)
+static enum bisect_error bisect_next(struct bisect_terms *terms,
+				     const char *prefix, FILE *out)
 {
 	enum bisect_error res;
 
@@ -592,7 +593,7 @@ static enum bisect_error bisect_next(struct bisect_terms *terms, const char *pre
 		return BISECT_FAILED;
 
 	/* Perform all bisection computation */
-	res = bisect_next_all(the_repository, prefix);
+	res = bisect_next_all(the_repository, prefix, out);
 
 	if (res == BISECT_INTERNAL_SUCCESS_1ST_BAD_FOUND) {
 		res = bisect_successful(terms);
@@ -604,12 +605,13 @@ static enum bisect_error bisect_next(struct bisect_terms *terms, const char *pre
 	return res;
 }
 
-static enum bisect_error bisect_auto_next(struct bisect_terms *terms, const char *prefix)
+static enum bisect_error bisect_auto_next(struct bisect_terms *terms,
+					  const char *prefix, FILE *out)
 {
 	if (bisect_next_check(terms, NULL))
 		return BISECT_OK;
 
-	return bisect_next(terms, prefix);
+	return bisect_next(terms, prefix, out);
 }
 
 static enum bisect_error bisect_start(struct bisect_terms *terms, const char **argv, int argc)
@@ -808,7 +810,7 @@ finish:
 	if (res)
 		return res;
 
-	res = bisect_auto_next(terms, NULL);
+	res = bisect_auto_next(terms, NULL, stdout);
 	if (!is_bisect_success(res))
 		bisect_clean_state();
 	return res;
@@ -847,7 +849,7 @@ static int bisect_autostart(struct bisect_terms *terms)
 }
 
 static enum bisect_error bisect_state(struct bisect_terms *terms, const char **argv,
-				      int argc)
+				      int argc, FILE *out)
 {
 	const char *state;
 	int i, verify_expected = 1;
@@ -924,7 +926,7 @@ static enum bisect_error bisect_state(struct bisect_terms *terms, const char **a
 	}
 
 	oid_array_clear(&revs);
-	return bisect_auto_next(terms, NULL);
+	return bisect_auto_next(terms, NULL, out);
 }
 
 static enum bisect_error bisect_log(void)
@@ -1013,7 +1015,7 @@ static enum bisect_error bisect_replay(struct bisect_terms *terms, const char *f
 	if (res)
 		return BISECT_FAILED;
 
-	return bisect_auto_next(terms, NULL);
+	return bisect_auto_next(terms, NULL, stdout);
 }
 
 static enum bisect_error bisect_skip(struct bisect_terms *terms, const char **argv, int argc)
@@ -1045,7 +1047,7 @@ static enum bisect_error bisect_skip(struct bisect_terms *terms, const char **ar
 			strvec_push(&argv_state, argv[i]);
 		}
 	}
-	res = bisect_state(terms, argv_state.v, argv_state.nr);
+	res = bisect_state(terms, argv_state.v, argv_state.nr, stdout);
 
 	strvec_clear(&argv_state);
 	return res;
@@ -1096,7 +1098,6 @@ static int bisect_run(struct bisect_terms *terms, const char **argv, int argc)
 	struct strvec args = STRVEC_INIT;
 	struct strvec run_args = STRVEC_INIT;
 	const char *new_state;
-	int temporary_stdout_fd, saved_stdout;
 
 	if (bisect_next_check(terms, NULL))
 		return BISECT_FAILED;
@@ -1111,6 +1112,8 @@ static int bisect_run(struct bisect_terms *terms, const char **argv, int argc)
 	strvec_push(&run_args, command.buf);
 
 	while (1) {
+		FILE *f;
+
 		strvec_clear(&args);
 
 		printf(_("running %s\n"), command.buf);
@@ -1130,19 +1133,13 @@ static int bisect_run(struct bisect_terms *terms, const char **argv, int argc)
 		else
 			new_state = terms->term_bad;
 
-		temporary_stdout_fd = open(git_path_bisect_run(), O_CREAT | O_WRONLY | O_TRUNC, 0666);
+		f = fopen_for_writing(git_path_bisect_run());
 
-		if (temporary_stdout_fd < 0)
+		if (!f)
 			return error_errno(_("cannot open file '%s' for writing"), git_path_bisect_run());
 
-		saved_stdout = dup(1);
-		dup2(temporary_stdout_fd, 1);
-
-		res = bisect_state(terms, &new_state, 1);
-
-		dup2(saved_stdout, 1);
-		close(saved_stdout);
-		close(temporary_stdout_fd);
+		res = bisect_state(terms, &new_state, 1, f);
+		fclose(f);
 
 		print_file_to_stdout(git_path_bisect_run());
 
@@ -1240,12 +1237,12 @@ int cmd_bisect__helper(int argc, const char **argv, const char *prefix)
 		if (argc)
 			return error(_("--bisect-next requires 0 arguments"));
 		get_terms(&terms);
-		res = bisect_next(&terms, prefix);
+		res = bisect_next(&terms, prefix, stdout);
 		break;
 	case BISECT_STATE:
 		set_terms(&terms, "bad", "good");
 		get_terms(&terms);
-		res = bisect_state(&terms, argv, argc);
+		res = bisect_state(&terms, argv, argc, stdout);
 		break;
 	case BISECT_LOG:
 		if (argc)
