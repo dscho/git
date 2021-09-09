@@ -425,6 +425,10 @@ static int add_cacheinfo(unsigned int mode, const struct object_id *oid,
 		ce->ce_flags |= CE_VALID;
 	option = allow_add ? ADD_CACHE_OK_TO_ADD : 0;
 	option |= allow_replace ? ADD_CACHE_OK_TO_REPLACE : 0;
+
+	/* TODO: ensure full index to maintain expected behavior */
+	ensure_full_index(&the_index);
+
 	if (add_cache_entry(ce, option))
 		return error("%s: cannot add to the index - missing --add option?",
 			     path);
@@ -1081,6 +1085,9 @@ int cmd_update_index(int argc, const char **argv, const char *prefix)
 		usage_with_options(update_index_usage, options);
 
 	git_config(git_default_config, NULL);
+
+	prepare_repo_settings(r);
+	the_repository->settings.command_requires_full_index = 0;
 
 	/* we will diagnose later if it turns out that we need to update it */
 	newfd = hold_locked_index(&lock_file, 0);
