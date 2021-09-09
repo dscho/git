@@ -747,17 +747,23 @@ static int do_reupdate(int ac, const char **av,
 		 * commit.  Update everything in the index.
 		 */
 		has_head = 0;
+
  redo:
-	/* TODO: audit for interaction with sparse-index. */
-	ensure_full_index(&the_index);
 	for (pos = 0; pos < active_nr; pos++) {
 		const struct cache_entry *ce = active_cache[pos];
 		struct cache_entry *old = NULL;
 		int save_nr;
 		char *path;
 
-		if (ce_stage(ce) || !ce_path_match(&the_index, ce, &pathspec, NULL))
+		/*
+		 * We can safely skip re-updating sparse directories because if there
+		 * were any changes to re-update inside of the sparse directory, it
+		 * would not be sparse.
+		 */
+		if (S_ISSPARSEDIR(ce->ce_mode) || ce_stage(ce) ||
+		    !ce_path_match(&the_index, ce, &pathspec, NULL))
 			continue;
+
 		if (has_head)
 			old = read_one_ent(NULL, &head_oid,
 					   ce->name, ce_namelen(ce), 0);
