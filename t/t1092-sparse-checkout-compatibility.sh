@@ -618,6 +618,156 @@ test_expect_success 'reset with wildcard pathspec' '
 	test_all_match git status --porcelain=v2
 '
 
+# NEEDSWORK: although update-index executes without error on files outside
+# the sparse checkout definition, it does not actually add the file to the
+# index. This is also true when "--no-ignore-skip-worktree-entries" is
+# specified.
+test_expect_success 'update-index add outside sparse definition' '
+	init_repos &&
+
+	write_script edit-contents <<-\EOF &&
+	echo text >>$1
+	EOF
+
+	run_on_sparse mkdir -p folder1 &&
+	run_on_sparse cp ../initial-repo/folder1/a folder1/a &&
+
+	# Edit the file only in sparse checkouts so that, when checking the status
+	# of the index, the unmodified full-checkout is compared to the "modified"
+	# sparse checkouts.
+	run_on_sparse ../edit-contents folder1/a &&
+
+	test_sparse_match git update-index --add folder1/a &&
+	test_all_match git status --porcelain=v2 &&
+	test_sparse_match git update-index --add --no-ignore-skip-worktree-entries folder1/a &&
+	test_all_match git status --porcelain=v2
+'
+
+test_expect_success 'update-index remove outside sparse definition' '
+	init_repos &&
+
+	# When --remove is specified, files outside the sparse checkout definition
+	# are considered "removed".
+	rm -f full-checkout/folder1/a &&
+	test_all_match git update-index --remove folder1/a &&
+	test_all_match git status --porcelain=v2 &&
+
+	git reset --hard &&
+
+	# When --ignore-skip-worktree-entries is explicitly specified, a file
+	# outside the sparse definition is not added to the index as "removed"
+	# (thus matching the unmodified full-checkout).
+	test_sparse_match git update-index --remove --ignore-skip-worktree-entries folder1/a &&
+	test_all_match git status --porcelain=v2 &&
+
+	git reset --hard &&
+
+	# --force-remove supercedes --ignore-skip-worktree-entries and always
+	# removes the file from the index.
+	test_all_match git update-index --force-remove --ignore-skip-worktree-entries folder1/a &&
+	test_all_match git status --porcelain=v2
+'
+
+test_expect_success 'update-index folder add/remove' '
+	init_repos &&
+
+	test_all_match test_must_fail git update-index --add --remove deep &&
+	test_all_match test_must_fail git update-index --add --remove deep/ &&
+
+	# NEEDSWORK: attempting to update-index on an existing folder outside the
+	# sparse checkout definition does not throw an error (as it does for folders
+	# inside the definition, or in the full checkout). However, it is a no-op.
+	test_sparse_match git update-index --add --remove folder1 &&
+	test_sparse_match git update-index --add --remove folder1/ &&
+	test_sparse_match git update-index --force-remove folder1/ &&
+	test_all_match git status --porcelain=v2 &&
+
+	# New folders, even in sparse checkouts, throw an error on update-index
+	run_on_all mkdir folder3 &&
+	run_on_all cp a folder3/a &&
+	run_on_all test_must_fail git update-index --add --remove folder3
+'
+
+test_expect_success 'update-index with updated flags' '
+	init_repos &&
+
+	# NEEDSWORK: updating flags runs inconsistently on directories, performing no
+	# operation with warning text specifying the path being ignored if a trailing
+	# slash is in the path, but throwing an error if there is no trailing slash.
+	test_all_match test_must_fail git update-index --no-skip-worktree folder1 &&
+	test_all_match git update-index --no-skip-worktree folder1/ &&
+	test_all_match git status --porcelain=v2 &&
+
+	# Removing the skip-worktree bit from a file outside the sparse checkout
+	# will cause the file to appear as unstaged and deleted.
+	test_sparse_match git update-index --no-skip-worktree folder1/a &&
+	rm -f full-checkout/folder1/a &&
+	test_all_match git status --porcelain=v2
+'
+
+test_expect_success 'update-index --again file outside sparse definition' '
+	init_repos &&
+
+	write_script edit-contents <<-\EOF &&
+	echo text >>$1
+	EOF
+
+	# When a file is manually added and modified outside the checkout
+	# definition, it will not be changed with `--again` because its changes are
+	# not tracked in the index.
+	run_on_sparse mkdir -p folder1 &&
+	run_on_sparse ../edit-contents folder1/a &&
+	test_sparse_match git update-index --again &&
+	test_sparse_match git status --porcelain=v2 &&
+
+	# Update the sparse checkouts so that folder1/a is no longer skipped and
+	# exists on-disk
+	run_on_sparse cp ../initial-repo/folder1/a folder1/a &&
+	test_sparse_match git update-index --no-skip-worktree folder1/a &&
+	test_all_match git status --porcelain=v2 &&
+
+	# Stage change for commit
+	run_on_all ../edit-contents folder1/a &&
+	test_all_match git update-index folder1/a &&
+	test_all_match git status --porcelain=v2 &&
+
+	# Modify the file
+	run_on_all ../edit-contents folder1/a &&
+	test_all_match git status --porcelain=v2 &&
+
+	# Run update-index --again, which re-stages the local changes
+	test_all_match git update-index --again &&
+	test_all_match git ls-files -s folder1/a &&
+	test_all_match git status --porcelain=v2 &&
+
+	# Running update-index --again with staged changes after manually deleting
+	# the file on disk will cause it to fail if --remove is not also specified
+	run_on_all rm -f folder1/a &&
+	test_all_match test_must_fail git update-index --again folder1 &&
+	test_all_match git update-index --remove --again &&
+	test_all_match git status --porcelain=v2
+'
+
+test_expect_success 'update-index --cacheinfo' '
+	init_repos &&
+
+	deep_a_oid=$(git -C full-checkout rev-parse update-deep:deep/a) &&
+	folder2_oid=$(git -C full-checkout rev-parse update-folder2:folder2) &&
+	folder1_a_oid=$(git -C full-checkout rev-parse update-folder1:folder1/a) &&
+
+	test_all_match git update-index --cacheinfo 100644 $deep_a_oid deep/a &&
+	test_all_match git status --porcelain=v2 &&
+
+	# Cannot add sparse directory, even in sparse index case
+	test_all_match test_must_fail git update-index --add --cacheinfo 040000 $folder2_oid folder2/ &&
+
+	# Sparse match only - because folder1/a is outside the sparse checkout
+	# definition (and thus not on-disk), it will appear as "deleted" in
+	# unstaged changes.
+	test_all_match git update-index --add --cacheinfo 100644 $folder1_a_oid folder1/a &&
+	test_sparse_match git status --porcelain=v2
+'
+
 test_expect_success 'merge, cherry-pick, and rebase' '
 	init_repos &&
 
