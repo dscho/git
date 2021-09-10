@@ -128,8 +128,9 @@ static int checkout_all(const char *prefix, int prefix_length, int include_spars
 	int i, errs = 0;
 	struct cache_entry *last_ce = NULL;
 
-	/* TODO: audit for interaction with sparse-index. */
-	ensure_full_index(&the_index);
+	if (include_sparse)
+		ensure_full_index(&the_index);
+
 	for (i = 0; i < active_nr ; i++) {
 		struct cache_entry *ce = active_cache[i];
 		if (!include_sparse && !path_in_sparse_checkout(ce->name, &the_index))
