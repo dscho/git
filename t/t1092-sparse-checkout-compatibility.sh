@@ -1098,6 +1098,7 @@ test_expect_success 'sparse-index is not expanded' '
 	ensure_not_expanded add . &&
 
 	ensure_not_expanded checkout-index -f a &&
+	ensure_not_expanded checkout-index -f --all &&
 	for ref in update-deep update-folder1 update-folder2 update-deep
 	do
 		echo >>sparse-index/README.md &&
