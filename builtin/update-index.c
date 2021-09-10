@@ -410,6 +410,9 @@ static int add_cacheinfo(unsigned int mode, const struct object_id *oid,
 	if (!verify_path(path, mode))
 		return error("Invalid path '%s'", path);
 
+	if (S_ISSPARSEDIR(mode))
+		return error("%s: cannot add directory as cache entry", path);
+
 	len = strlen(path);
 	ce = make_empty_cache_entry(&the_index, len);
 
