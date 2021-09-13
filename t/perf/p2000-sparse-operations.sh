@@ -117,5 +117,7 @@ test_perf_on_all git diff
 test_perf_on_all git diff --cached
 test_perf_on_all git blame $SPARSE_CONE/a
 test_perf_on_all git blame $SPARSE_CONE/f3/a
+test_perf_on_all git update-index --add --remove
+test_perf_on_all git sparse-checkout reapply
 
 test_done
