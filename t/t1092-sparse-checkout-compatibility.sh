@@ -805,6 +805,122 @@ test_expect_success 'update-index --cacheinfo' '
 	test_sparse_match git status --porcelain=v2
 '
 
+test_expect_success 'read-tree --merge with files outside sparse definition' '
+	init_repos &&
+
+	test_all_match git checkout -b test-branch update-folder1 &&
+	for MERGE_TREES in "base HEAD update-folder2" \
+			   "update-folder1 update-folder2" \
+			   "update-folder2"
+	do
+		# Clean up and remove on-disk files
+		test_all_match git reset --hard HEAD &&
+		test_sparse_match git sparse-checkout reapply &&
+
+		# Although the index matches, without --no-sparse-checkout, outside-of-
+		# definition files will not exist on disk for sparse checkouts
+		test_all_match git read-tree -mu $MERGE_TREES &&
+		test_all_match git status --porcelain=v2 &&
+		test_path_is_missing sparse-checkout/folder2 &&
+		test_path_is_missing sparse-index/folder2 &&
+
+		test_all_match git read-tree --reset -u HEAD &&
+		test_all_match git status --porcelain=v2 &&
+
+		test_all_match git read-tree -mu --no-sparse-checkout $MERGE_TREES &&
+		test_all_match git status --porcelain=v2 &&
+		test_cmp sparse-checkout/folder2/a sparse-index/folder2/a &&
+		test_cmp sparse-checkout/folder2/a full-checkout/folder2/a || return 1
+	done
+'
+
+test_expect_success 'read-tree --merge with edit/edit conflicts in sparse directories' '
+	init_repos &&
+
+	# Merge of multiple changes to same directory (but not same files) should
+	# succeed
+	test_all_match git read-tree -mu base rename-base update-folder1 &&
+	test_all_match git status --porcelain=v2 &&
+
+	test_all_match git reset --hard &&
+
+	test_all_match git read-tree -mu rename-base update-folder2 &&
+	test_all_match git status --porcelain=v2 &&
+
+	test_all_match git reset --hard &&
+
+	test_all_match test_must_fail git read-tree -mu base update-folder1 rename-out-to-in &&
+	test_all_match test_must_fail git read-tree -mu rename-out-to-in update-folder1
+'
+
+test_expect_success 'read-tree --merge with modified file outside definition' '
+	init_repos &&
+
+	write_script edit-contents <<-\EOF &&
+	echo text >>$1
+	EOF
+
+	test_all_match git checkout -b test-branch update-folder1 &&
+	run_on_sparse mkdir -p folder2 &&
+	run_on_all ../edit-contents folder2/a &&
+
+	# With manually-modified file, full-checkout cannot merge, but it is ignored
+	# in sparse checkouts
+	test_must_fail git -C full-checkout read-tree -mu update-folder2 &&
+	test_sparse_match git read-tree -mu update-folder2 &&
+	test_sparse_match git status --porcelain=v2 &&
+
+	# Reset only the sparse checkouts to "undo" the merge. All three checkouts
+	# now have matching indexes and matching folder2/a on disk.
+	test_sparse_match git read-tree --reset -u HEAD &&
+
+	# When --no-sparse-checkout is specified, sparse checkouts identify the file
+	# on disk and prevent the merge
+	test_all_match test_must_fail git read-tree -mu --no-sparse-checkout update-folder2
+'
+
+test_expect_success 'read-tree --prefix outside sparse definition' '
+	init_repos &&
+
+	# Cannot read-tree --prefix with a single argument when files exist within
+	# prefix
+	test_all_match test_must_fail git read-tree --prefix=folder1/ -u update-folder1 &&
+
+	test_all_match git read-tree --prefix=folder2/0 -u rename-base &&
+	test_path_is_missing sparse-checkout/folder2 &&
+	test_path_is_missing sparse-index/folder2 &&
+
+	test_all_match git read-tree --reset -u HEAD &&
+	test_all_match git read-tree --prefix=folder2/0 -u --no-sparse-checkout rename-base &&
+	test_cmp sparse-checkout/folder2/0/a sparse-index/folder2/0/a &&
+	test_cmp sparse-checkout/folder2/0/a full-checkout/folder2/0/a
+'
+
+# TODO: predating any sparse index compatibility changes to `read-tree`, this
+# merge fails due to a status difference between the sparse index and non-sparse
+# index checkouts. Specifically, `folder2/0` (a directory) appears modified in
+# the sparse index, but `folder2/0/a` (correctly?) appears instead as a
+# modified entry in the non-sparse index checkouts.
+test_expect_failure 'read-tree --merge with directory-file conflicts' '
+	init_repos &&
+
+	test_all_match git checkout -b test-branch rename-base &&
+
+	# Although the index matches, without --no-sparse-checkout, outside-of-
+	# definition files will not exist on disk for sparse checkouts
+	test_sparse_match git read-tree -mu rename-out-to-out &&
+	test_sparse_match git status --porcelain=v2 &&
+	test_path_is_missing sparse-checkout/folder2 &&
+	test_path_is_missing sparse-index/folder2 &&
+
+	test_sparse_match git read-tree --reset -u HEAD &&
+	test_sparse_match git status --porcelain=v2 &&
+
+	test_sparse_match git read-tree -mu --no-sparse-checkout rename-out-to-out &&
+	test_sparse_match git status --porcelain=v2 &&
+	test_cmp sparse-checkout/folder2/0/1 sparse-index/folder2/0/1
+'
+
 test_expect_success 'merge, cherry-pick, and rebase' '
 	init_repos &&
 
