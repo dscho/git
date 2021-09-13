@@ -55,7 +55,7 @@ test_expect_success 'setup repo and indexes' '
 	git -c core.sparseCheckoutCone=true clone --branch=wide --sparse . full-v3 &&
 	(
 		cd full-v3 &&
-		git sparse-checkout init --cone &&
+		git sparse-checkout init --cone --no-sparse-index &&
 		git sparse-checkout set $SPARSE_CONE &&
 		git config index.version 3 &&
 		git update-index --index-version=3 &&
@@ -64,7 +64,7 @@ test_expect_success 'setup repo and indexes' '
 	git -c core.sparseCheckoutCone=true clone --branch=wide --sparse . full-v4 &&
 	(
 		cd full-v4 &&
-		git sparse-checkout init --cone &&
+		git sparse-checkout init --cone --no-sparse-index &&
 		git sparse-checkout set $SPARSE_CONE &&
 		git config index.version 4 &&
 		git update-index --index-version=4 &&
@@ -110,5 +110,12 @@ test_perf_on_all git add -A
 test_perf_on_all git add .
 test_perf_on_all git commit -a -m A
 test_perf_on_all git checkout -f -
+test_perf_on_all git reset
+test_perf_on_all git reset --hard
+test_perf_on_all git reset -- does-not-exist
+test_perf_on_all git update-index --add --remove
+test_perf_on_all git diff
+test_perf_on_all git diff --staged
+test_perf_on_all git sparse-checkout reapply
 
 test_done
