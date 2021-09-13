@@ -64,6 +64,14 @@ test_expect_success '--cacheinfo mode,sha1,path (new syntax)' '
 	test_cmp expect actual
 '
 
+test_expect_success '--cacheinfo does not accept directory mode' '
+	mkdir folder1 &&
+	echo content >folder1/content &&
+	git add folder1 &&
+	folder1_oid=$(git ls-files -s folder1 | git hash-object --stdin) &&
+	test_must_fail git update-index --add --cacheinfo 040000 $folder1_oid folder1/
+'
+
 test_expect_success '.lock files cleaned up' '
 	mkdir cleanup &&
 	(
