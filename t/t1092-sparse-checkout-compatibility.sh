@@ -1332,6 +1332,17 @@ test_expect_success 'sparse index is not expanded: update-index' '
 	ensure_not_expanded update-index --add --remove --again
 '
 
+test_expect_success 'sparse index is not expanded: read-tree' '
+	init_repos &&
+
+	ensure_not_expanded checkout -b test-branch update-folder1 &&
+	for MERGE_TREES in "update-folder2"
+	do
+		ensure_not_expanded read-tree -mu $MERGE_TREES &&
+		ensure_not_expanded reset --hard HEAD || return 1
+	done
+'
+
 # NEEDSWORK: a sparse-checkout behaves differently from a full checkout
 # in this scenario, but it shouldn't.
 test_expect_success 'reset mixed and checkout orphan' '
