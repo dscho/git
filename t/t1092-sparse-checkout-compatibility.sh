@@ -896,12 +896,7 @@ test_expect_success 'read-tree --prefix outside sparse definition' '
 	test_cmp sparse-checkout/folder2/0/a full-checkout/folder2/0/a
 '
 
-# TODO: predating any sparse index compatibility changes to `read-tree`, this
-# merge fails due to a status difference between the sparse index and non-sparse
-# index checkouts. Specifically, `folder2/0` (a directory) appears modified in
-# the sparse index, but `folder2/0/a` (correctly?) appears instead as a
-# modified entry in the non-sparse index checkouts.
-test_expect_failure 'read-tree --merge with directory-file conflicts' '
+test_expect_success 'read-tree --merge with directory-file conflicts' '
 	init_repos &&
 
 	test_all_match git checkout -b test-branch rename-base &&
