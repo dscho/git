@@ -12,6 +12,7 @@ SYNOPSIS
 'git checkout-index' [-u] [-q] [-a] [-f] [-n] [--prefix=<string>]
 		   [--stage=<number>|all]
 		   [--temp]
+		   [--sparse]
 		   [-z] [--stdin]
 		   [--] [<file>...]
 
@@ -37,8 +38,9 @@ OPTIONS
 
 -a::
 --all::
-	checks out all files in the index.  Cannot be used
-	together with explicit filenames.
+	checks out all files in the index, excluding those outside
+	any specified sparse checkout patterns (see `--sparse`).
+	Cannot be used together with explicit filenames.
 
 -n::
 --no-create::
@@ -58,6 +60,10 @@ OPTIONS
 	Instead of copying the files to the working directory
 	write the content to temporary files.  The temporary name
 	associations will be written to stdout.
+
+--sparse::
+	Refresh files outside of the sparse checkout boundary. May
+	only be used in conjunction with `--all`.
 
 --stdin::
 	Instead of taking list of paths from the command line,
