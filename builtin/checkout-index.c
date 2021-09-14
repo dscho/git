@@ -7,6 +7,7 @@
 #define USE_THE_INDEX_COMPATIBILITY_MACROS
 #include "builtin.h"
 #include "config.h"
+#include "dir.h"
 #include "lockfile.h"
 #include "quote.h"
 #include "cache-tree.h"
@@ -65,6 +66,7 @@ static int checkout_file(const char *name, const char *prefix)
 	int namelen = strlen(name);
 	int pos = cache_name_pos(name, namelen);
 	int has_same_name = 0;
+	int is_file = 0;
 	int did_checkout = 0;
 	int errs = 0;
 
@@ -78,6 +80,9 @@ static int checkout_file(const char *name, const char *prefix)
 			break;
 		has_same_name = 1;
 		pos++;
+		if (S_ISSPARSEDIR(ce->ce_mode))
+			break;
+		is_file = 1;
 		if (ce_stage(ce) != checkout_stage
 		    && (CHECKOUT_ALL != checkout_stage || !ce_stage(ce)))
 			continue;
@@ -106,6 +111,8 @@ static int checkout_file(const char *name, const char *prefix)
 		fprintf(stderr, "git checkout-index: %s ", name);
 		if (!has_same_name)
 			fprintf(stderr, "is not in the cache");
+		else if (!is_file)
+			fprintf(stderr, "is a sparse directory");
 		else if (checkout_stage)
 			fprintf(stderr, "does not exist at stage %d",
 				checkout_stage);
@@ -116,15 +123,18 @@ static int checkout_file(const char *name, const char *prefix)
 	return -1;
 }
 
-static int checkout_all(const char *prefix, int prefix_length)
+static int checkout_all(const char *prefix, int prefix_length, int include_sparse)
 {
 	int i, errs = 0;
 	struct cache_entry *last_ce = NULL;
 
-	/* TODO: audit for interaction with sparse-index. */
-	ensure_full_index(&the_index);
+	if (include_sparse)
+		ensure_full_index(&the_index);
+
 	for (i = 0; i < active_nr ; i++) {
 		struct cache_entry *ce = active_cache[i];
+		if (!include_sparse && !path_in_sparse_checkout(ce->name, &the_index))
+			continue;
 		if (ce_stage(ce) != checkout_stage
 		    && (CHECKOUT_ALL != checkout_stage || !ce_stage(ce)))
 			continue;
@@ -176,6 +186,7 @@ int cmd_checkout_index(int argc, const char **argv, const char *prefix)
 	int i;
 	struct lock_file lock_file = LOCK_INIT;
 	int all = 0;
+	int include_sparse = 0;
 	int read_from_stdin = 0;
 	int prefix_length;
 	int force = 0, quiet = 0, not_new = 0;
@@ -185,6 +196,8 @@ int cmd_checkout_index(int argc, const char **argv, const char *prefix)
 	struct option builtin_checkout_index_options[] = {
 		OPT_BOOL('a', "all", &all,
 			N_("check out all files in the index")),
+		OPT_BOOL(0, "sparse", &include_sparse,
+			N_("do not skip files outside the sparse checkout boundary")),
 		OPT__FORCE(&force, N_("force overwrite of existing files"), 0),
 		OPT__QUIET(&quiet,
 			N_("no warning for existing files and files not in index")),
@@ -211,6 +224,9 @@ int cmd_checkout_index(int argc, const char **argv, const char *prefix)
 				   builtin_checkout_index_options);
 	git_config(git_default_config, NULL);
 	prefix_length = prefix ? strlen(prefix) : 0;
+
+	prepare_repo_settings(the_repository);
+	the_repository->settings.command_requires_full_index = 0;
 
 	if (read_cache() < 0) {
 		die("invalid cache");
@@ -247,6 +263,8 @@ int cmd_checkout_index(int argc, const char **argv, const char *prefix)
 
 		if (all)
 			die("git checkout-index: don't mix '--all' and explicit filenames");
+		if (include_sparse)
+			die("git checkout-index: don't mix '--sparse' and explicit filenames");
 		if (read_from_stdin)
 			die("git checkout-index: don't mix '--stdin' and explicit filenames");
 		p = prefix_path(prefix, prefix_length, arg);
@@ -280,7 +298,7 @@ int cmd_checkout_index(int argc, const char **argv, const char *prefix)
 	}
 
 	if (all)
-		err |= checkout_all(prefix, prefix_length);
+		err |= checkout_all(prefix, prefix_length, include_sparse);
 
 	if (pc_workers > 1)
 		err |= run_parallel_checkout(&state, pc_workers, pc_threshold,
