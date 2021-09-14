@@ -930,6 +930,67 @@ test_expect_success 'cherry-pick with conflicts' '
 	test_all_match test_must_fail git cherry-pick to-cherry-pick
 '
 
+test_expect_success 'checkout-index inside sparse definition' '
+	init_repos &&
+
+	run_on_all rm -f deep/a &&
+	test_all_match git checkout-index -- deep/a &&
+	test_all_match git status --porcelain=v2 &&
+
+	echo test >>new-a &&
+	run_on_all cp ../new-a a &&
+	test_all_match test_must_fail git checkout-index -- a &&
+	test_all_match git checkout-index -f -- a &&
+	test_all_match git status --porcelain=v2
+'
+
+test_expect_success 'checkout-index outside sparse definition' '
+	init_repos &&
+
+	# File does not exist on disk yet for sparse checkouts, so checkout-index
+	# succeeds without -f
+	test_sparse_match git checkout-index -- folder1/a &&
+	test_cmp sparse-checkout/folder1/a sparse-index/folder1/a &&
+	test_cmp sparse-checkout/folder1/a full-checkout/folder1/a &&
+
+	run_on_sparse rm -rf folder1 &&
+	echo test >new-a &&
+	run_on_sparse mkdir -p folder1 &&
+	run_on_all cp ../new-a folder1/a &&
+
+	test_all_match test_must_fail git checkout-index -- folder1/a &&
+	test_all_match git checkout-index -f -- folder1/a &&
+	test_cmp sparse-checkout/folder1/a sparse-index/folder1/a &&
+	test_cmp sparse-checkout/folder1/a full-checkout/folder1/a
+'
+
+test_expect_success 'checkout-index with folders' '
+	init_repos &&
+
+	# Inside checkout definition
+	test_all_match test_must_fail git checkout-index -f -- deep/ &&
+
+	# Outside checkout definition
+	# Note: although all tests fail (as expected), the messaging differs. For
+	# non-sparse index checkouts, the error is that the "file" does not appear
+	# in the index; for sparse checkouts, the error is explicitly that the
+	# entry is a sparse directory.
+	run_on_all test_must_fail git checkout-index -f -- folder1/ &&
+	test_cmp full-checkout-err sparse-checkout-err &&
+	! test_cmp full-checkout-err sparse-index-err &&
+	grep "is a sparse directory" sparse-index-err
+'
+
+test_expect_success 'checkout-index --all' '
+	init_repos &&
+
+	test_all_match git checkout-index --all &&
+	test_sparse_match test_path_is_missing folder1 &&
+
+	test_all_match git checkout-index --sparse --all &&
+	test_all_match test_path_exists folder1
+'
+
 test_expect_success 'clean' '
 	init_repos &&
 
@@ -1036,6 +1097,8 @@ test_expect_success 'sparse-index is not expanded' '
 	echo >>sparse-index/untracked.txt &&
 	ensure_not_expanded add . &&
 
+	ensure_not_expanded checkout-index -f a &&
+	ensure_not_expanded checkout-index -f --all &&
 	for ref in update-deep update-folder1 update-folder2 update-deep
 	do
 		echo >>sparse-index/README.md &&
