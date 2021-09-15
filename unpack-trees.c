@@ -1756,6 +1756,58 @@ int unpack_trees(unsigned len, struct tree_desc *t, struct unpack_trees_options 
 		setup_standard_excludes(o->dir);
 	}
 
+	/*
+	 * If the prefix is equal to or contained within a sparse directory, the
+	 * index needs to be expanded to traverse with the specified prefix. Note
+	 * that only the src_index is checked because the prefix is only specified
+	 * in cases where src_index == dst_index.
+	 */
+	if (o->prefix && o->src_index->sparse_index) {
+		int i, ce_len;
+		struct cache_entry *ce;
+		int prefix_len = strlen(o->prefix);
+
+		if (prefix_len > 0) {
+			for (i = 0; i < o->src_index->cache_nr; i++) {
+				ce = o->src_index->cache[i];
+				ce_len = ce_namelen(ce);
+
+				if (!S_ISSPARSEDIR(ce->ce_mode))
+					continue;
+
+				/*
+				 * Normalize comparison length for cache entry vs. prefix -
+				 * either may have a trailing slash, which we do not want to
+				 * compare (can assume both are directories).
+				 */
+				if (ce->name[ce_len - 1] == '/')
+					ce_len--;
+				if (o->prefix[prefix_len - 1] == '/')
+					prefix_len--;
+
+				/*
+				 * If prefix length is shorter, then it is either a parent to
+				 * this sparse directory, or a completely different path. In
+				 * either case, we don't need to expand the index
+				 */
+				if (prefix_len < ce_len)
+					continue;
+
+				/*
+				 * Avoid the case of expanding the index with a prefix
+				 * a/beta for a sparse directory a/b.
+				 */
+				if (ce_len < prefix_len && o->prefix[ce_len] != '/')
+					continue;
+
+				if (!strncmp(ce->name, o->prefix, ce_len)) {
+					ensure_full_index(o->src_index);
+					break;
+				}
+			}
+		}
+	}
+
 	if (!core_apply_sparse_checkout || !o->update)
 		o->skip_sparse_checkout = 1;
 	if (!o->skip_sparse_checkout && !o->pl) {
