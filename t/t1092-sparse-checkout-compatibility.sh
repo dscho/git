@@ -1404,6 +1404,15 @@ test_expect_success 'stash -u outside sparse checkout definition' '
 	test_all_match git status --porcelain=v2
 '
 
+test_expect_success 'sparse index is not expanded: blame' '
+	init_repos &&
+
+	ensure_not_expanded blame a &&
+	ensure_not_expanded blame deep/a &&
+	ensure_not_expanded blame deep/deeper1/a &&
+	ensure_not_expanded blame deep/deeper1/deepest/a
+'
+
 # NEEDSWORK: a sparse-checkout behaves differently from a full checkout
 # in this scenario, but it shouldn't.
 test_expect_success 'reset mixed and checkout orphan' '
