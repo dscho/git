@@ -128,11 +128,18 @@ static int checkout_all(const char *prefix, int prefix_length, int include_spars
 	int i, errs = 0;
 	struct cache_entry *last_ce = NULL;
 
-	if (include_sparse)
-		ensure_full_index(&the_index);
-
 	for (i = 0; i < active_nr ; i++) {
 		struct cache_entry *ce = active_cache[i];
+		if (include_sparse && S_ISSPARSEDIR(ce->ce_mode)) {
+			/*
+			 * If the current entry is a sparse directory (and entries outside the
+			 * sparse checkout definition are included), expand the index and
+			 * continue the loop on the current index position (now pointing to the
+			 * first entry inside the expanded sparse directory).
+			 */
+			ensure_full_index(&the_index);
+			ce = active_cache[i];
+		}
 		if (!include_sparse && !path_in_sparse_checkout(ce->name, &the_index))
 			continue;
 		if (ce_stage(ce) != checkout_stage
