@@ -1961,6 +1961,30 @@ int unpack_trees(unsigned len, struct tree_desc *t, struct unpack_trees_options 
 		}
 	}
 
+	/*
+	 * After unpacking trees, the index will be marked "sparse" if any sparse
+	 * directories have been encountered. However, the index may still be
+	 * sparse if there are no sparse directories. To make sure the index is
+	 * marked "sparse" as often as possible, the index is marked sparse if
+	 * all of the following are true:
+	 * - the command in progress allows use of a sparse index
+	 * - the index is not already sparse
+	 * - cone-mode sparse checkout with sparse index is enabled for the repo
+	 * - all index entries are inside of the sparse checkout cone
+	 */
+	if (!repo->settings.command_requires_full_index && !o->result.sparse_index &&
+	    core_apply_sparse_checkout && core_sparse_checkout_cone && repo->settings.sparse_index) {
+		o->result.sparse_index = COLLAPSED;
+		for (i = 0; i < o->result.cache_nr; i++) {
+			struct cache_entry *ce = o->result.cache[i];
+
+			if (!path_in_cone_mode_sparse_checkout(ce->name, &o->result)) {
+				o->result.sparse_index = COMPLETELY_FULL;
+				break;
+			}
+		}
+	}
+
 	ret = check_updates(o, &o->result) ? (-2) : 0;
 	if (o->dst_index) {
 		move_index_extensions(&o->result, o->src_index);
