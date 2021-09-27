@@ -541,32 +541,6 @@ test_expect_success 'checkout and reset (mixed)' '
 	run_on_sparse test_path_is_missing folder1
 '
 
-# NEEDSWORK: with mixed reset, files with differences between HEAD and <commit>
-# will be added to the work tree even if outside the sparse checkout
-# definition, and even if the file is modified to a state of having no local
-# changes. The file is "re-ignored" if a hard reset is executed. We may want to
-# change this behavior in the future and enforce that files are not written
-# outside of the sparse checkout definition.
-test_expect_success 'checkout and mixed reset file tracking [sparse]' '
-	init_repos &&
-
-	test_all_match git checkout -b reset-test update-deep &&
-	test_all_match git reset update-folder1 &&
-	test_all_match git reset update-deep &&
-
-	# At this point, there are no changes in the working tree. However,
-	# folder1/a now exists locally (even though it is outside of the sparse
-	# paths).
-	run_on_sparse test_path_exists folder1 &&
-
-	run_on_all rm folder1/a &&
-	test_all_match git status --porcelain=v2 &&
-
-	test_all_match git reset --hard update-deep &&
-	run_on_sparse test_path_is_missing folder1 &&
-	test_path_exists full-checkout/folder1
-'
-
 test_expect_success 'checkout and reset (merge)' '
 	init_repos &&
 
@@ -621,31 +595,34 @@ test_expect_success 'reset with pathspecs inside sparse definition' '
 	test_all_match git status --porcelain=v2
 '
 
-test_expect_success 'reset with sparse directory pathspec outside definition' '
+# Although the working tree differs between full and sparse checkouts after
+# reset, the state of the index is the same.
+test_expect_success 'reset with pathspecs outside sparse definition' '
 	init_repos &&
+	test_all_match git checkout -b reset-test base &&
 
-	test_all_match git checkout -b reset-test update-deep &&
-	test_all_match git reset --hard update-folder1 &&
-	test_all_match git reset base -- folder1 &&
-	test_all_match git status --porcelain=v2
-'
+	test_sparse_match git reset update-folder1 -- folder1 &&
+	git -C full-checkout reset update-folder1 -- folder1 &&
+	test_sparse_match git status --porcelain=v2 &&
+	test_all_match git rev-parse HEAD:folder1 &&
 
-test_expect_success 'reset with pathspec match in sparse directory' '
-	init_repos &&
-
-	test_all_match git checkout -b reset-test update-deep &&
-	test_all_match git reset --hard update-folder1 &&
-	test_all_match git reset base -- folder1/a &&
-	test_all_match git status --porcelain=v2
+	test_sparse_match git reset update-folder2 -- folder2/a &&
+	git -C full-checkout reset update-folder2 -- folder2/a &&
+	test_sparse_match git status --porcelain=v2 &&
+	test_all_match git rev-parse HEAD:folder2/a
 '
 
 test_expect_success 'reset with wildcard pathspec' '
 	init_repos &&
 
 	test_all_match git checkout -b reset-test update-deep &&
-	test_all_match git reset --hard update-folder1 &&
 	test_all_match git reset base -- \*/a &&
-	test_all_match git status --porcelain=v2
+	test_all_match git status --porcelain=v2 &&
+	test_all_match git rev-parse HEAD:folder1/a &&
+
+	test_all_match git reset base -- folder\* &&
+	test_all_match git status --porcelain=v2 &&
+	test_all_match git rev-parse HEAD:folder2
 '
 
 # NEEDSWORK: although update-index executes without error on files outside
