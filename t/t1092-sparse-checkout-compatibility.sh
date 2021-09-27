@@ -518,13 +518,14 @@ test_expect_success 'blame with pathspec inside sparse definition' '
 
 # TODO: blame currently does not support blaming files outside of the
 # sparse definition. It complains that the file doesn't exist locally.
-test_expect_failure 'blame with pathspec outside sparse definition' '
+test_expect_success 'blame with pathspec outside sparse definition' '
 	init_repos &&
 
-	test_all_match git blame folder1/a &&
-	test_all_match git blame folder2/a &&
-	test_all_match git blame deep/deeper2/a &&
-	test_all_match git blame deep/deeper2/deepest/a
+	test_sparse_match git sparse-checkout set &&
+	test_sparse_match test_must_fail git blame folder1/a &&
+	test_sparse_match test_must_fail git blame folder2/a &&
+	test_sparse_match test_must_fail git blame deep/deeper2/a &&
+	test_sparse_match test_must_fail git blame deep/deeper2/deepest/a
 '
 
 # TODO: This behaves correctly in microsoft/git. Why?
@@ -1402,6 +1403,15 @@ test_expect_success 'stash -u outside sparse checkout definition' '
 
 	test_all_match git stash pop -q &&
 	test_all_match git status --porcelain=v2
+'
+
+test_expect_success 'sparse index is not expanded: blame' '
+	init_repos &&
+
+	ensure_not_expanded blame a &&
+	ensure_not_expanded blame deep/a &&
+	ensure_not_expanded blame deep/deeper1/a &&
+	ensure_not_expanded blame deep/deeper1/deepest/a
 '
 
 # NEEDSWORK: a sparse-checkout behaves differently from a full checkout

@@ -898,6 +898,8 @@ int cmd_blame(int argc, const char **argv, const char *prefix)
 	long anchor;
 	const int hexsz = the_hash_algo->hexsz;
 
+	prepare_repo_settings(the_repository);
+	the_repository->settings.command_requires_full_index = 0;
 	setup_default_color_by_age();
 	git_config(git_blame_config, &output_option);
 	repo_init_revisions(the_repository, &revs, NULL);
