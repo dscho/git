@@ -144,8 +144,8 @@ static void update_index_from_diff(struct diff_queue_struct *q,
 	for (i = 0; i < q->nr; i++) {
 		struct diff_filespec *one = q->queue[i]->one;
 		struct diff_filespec *two = q->queue[i]->two;
-		int is_missing = !(one->mode && !is_null_oid(&one->oid));
 		int was_missing = !two->mode && is_null_oid(&two->oid);
+		int is_in_reset_tree = one->mode && !is_null_oid(&one->oid);
 		struct cache_entry *ce;
 		struct cache_entry *ceBefore;
 		struct checkout state = CHECKOUT_INIT;
@@ -163,7 +163,7 @@ static void update_index_from_diff(struct diff_queue_struct *q,
 		if (core_apply_sparse_checkout && !file_exists(two->path))
 		{
 			pos = cache_name_pos(two->path, strlen(two->path));
-			if ((pos >= 0 && ce_skip_worktree(active_cache[pos])) && (is_missing || !was_missing))
+			if ((pos >= 0 && ce_skip_worktree(active_cache[pos])) && (is_in_reset_tree || !was_missing))
 			{
 				state.force = 1;
 				state.refresh_cache = 1;
@@ -178,7 +178,7 @@ static void update_index_from_diff(struct diff_queue_struct *q,
 			}
 		}
 
-		if (is_missing && !intent_to_add) {
+		if (!is_in_reset_tree && !intent_to_add) {
 			remove_file_from_cache(one->path);
 			continue;
 		}
@@ -188,7 +188,7 @@ static void update_index_from_diff(struct diff_queue_struct *q,
 		if (!ce)
 			die(_("make_cache_entry failed for path '%s'"),
 			    one->path);
-		if (is_missing) {
+		if (!is_in_reset_tree) {
 			ce->ce_flags |= CE_INTENT_TO_ADD;
 			set_object_name_for_intent_to_add_entry(ce);
 		}
