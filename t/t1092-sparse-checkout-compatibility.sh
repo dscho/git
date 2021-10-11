@@ -528,25 +528,17 @@ test_expect_success 'blame with pathspec outside sparse definition' '
 	test_sparse_match test_must_fail git blame deep/deeper2/deepest/a
 '
 
-# TODO: This behaves correctly in microsoft/git. Why?
 test_expect_success 'checkout and reset (mixed)' '
 	init_repos &&
 
 	test_all_match git checkout -b reset-test update-deep &&
 	test_all_match git reset deepest &&
-	test_all_match git reset update-folder1 &&
-	test_all_match git reset update-folder2
-'
 
-# NEEDSWORK: a sparse-checkout behaves differently from a full checkout
-# in this scenario, but it shouldn't.
-test_expect_success 'checkout and reset (mixed) [sparse]' '
-	init_repos &&
-
-	test_sparse_match git checkout -b reset-test update-deep &&
-	test_sparse_match git reset deepest &&
+	# Because skip-worktree is preserved, resetting to update-folder1
+	# will show worktree changes for full-checkout that are not present
+	# in sparse-checkout or sparse-index.
 	test_sparse_match git reset update-folder1 &&
-	test_sparse_match git reset update-folder2
+	run_on_sparse test_path_is_missing folder1
 '
 
 # NEEDSWORK: with mixed reset, files with differences between HEAD and <commit>

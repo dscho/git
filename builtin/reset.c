@@ -28,7 +28,6 @@
 #include "strbuf.h"
 #include "quote.h"
 #include "dir.h"
-#include "entry.h"
 
 #define REFRESH_INDEX_DELAY_WARNING_IN_MS (2 * 1000)
 
@@ -138,45 +137,13 @@ static void update_index_from_diff(struct diff_queue_struct *q,
 		struct diff_options *opt, void *data)
 {
 	int i;
-	int pos;
 	int intent_to_add = *(int *)data;
 
 	for (i = 0; i < q->nr; i++) {
+		int pos;
 		struct diff_filespec *one = q->queue[i]->one;
-		struct diff_filespec *two = q->queue[i]->two;
-		int was_missing = !two->mode && is_null_oid(&two->oid);
 		int is_in_reset_tree = one->mode && !is_null_oid(&one->oid);
 		struct cache_entry *ce;
-		struct cache_entry *ceBefore;
-		struct checkout state = CHECKOUT_INIT;
-
-		/*
-		 * When using the sparse-checkout feature the cache entries that are
-		 * added here will not have the skip-worktree bit set.
-		 * Without this code there is data that is lost because the files that
-		 * would normally be in the working directory are not there and show as
-		 * deleted for the next status or in the case of added files just disappear.
-		 * We need to create the previous version of the files in the working
-		 * directory so that they will have the right content and the next
-		 * status call will show modified or untracked files correctly.
-		 */
-		if (core_apply_sparse_checkout && !file_exists(two->path))
-		{
-			pos = cache_name_pos(two->path, strlen(two->path));
-			if ((pos >= 0 && ce_skip_worktree(active_cache[pos])) && (is_in_reset_tree || !was_missing))
-			{
-				state.force = 1;
-				state.refresh_cache = 1;
-				state.istate = &the_index;
-				ceBefore = make_cache_entry(&the_index, two->mode, &two->oid, two->path,
-					0, 0);
-				if (!ceBefore)
-					die(_("make_cache_entry failed for path '%s'"),
-						two->path);
-
-				checkout_entry(ceBefore, &state, NULL, NULL);
-			}
-		}
 
 		if (!is_in_reset_tree && !intent_to_add) {
 			remove_file_from_cache(one->path);
@@ -185,6 +152,20 @@ static void update_index_from_diff(struct diff_queue_struct *q,
 
 		ce = make_cache_entry(&the_index, one->mode, &one->oid, one->path,
 				      0, 0);
+
+		/*
+		 * If the file 1) corresponds to an existing index entry with
+		 * skip-worktree set, or 2) does not exist in the index but is
+		 * outside the sparse checkout definition, add a skip-worktree bit
+		 * to the new index entry. Note that a sparse index will be expanded
+		 * if this entry is outside the sparse cone - this is necessary
+		 * to properly construct the reset sparse directory.
+		 */
+		pos = cache_name_pos(one->path, strlen(one->path));
+		if ((pos >= 0 && ce_skip_worktree(active_cache[pos])) ||
+		    (pos < 0 && !path_in_sparse_checkout(one->path, &the_index)))
+			ce->ce_flags |= CE_SKIP_WORKTREE;
+
 		if (!ce)
 			die(_("make_cache_entry failed for path '%s'"),
 			    one->path);
