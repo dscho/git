@@ -2411,7 +2411,8 @@ int do_read_index(struct index_state *istate, const char *path, int must_exist)
 	 * settings and other properties of the index (if necessary).
 	 */
 	prepare_repo_settings(istate->repo);
-	if (istate->repo->settings.command_requires_full_index)
+	if (!istate->repo->settings.sparse_index ||
+	    istate->repo->settings.command_requires_full_index)
 		ensure_full_index(istate);
 	else
 		ensure_correct_sparsity(istate);
