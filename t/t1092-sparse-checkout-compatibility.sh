@@ -679,7 +679,6 @@ test_expect_success 'update-index folder add/remove' '
 	init_repos &&
 
 	test_all_match test_must_fail git update-index --add --remove deep &&
-	test_all_match test_must_fail git update-index --add --remove deep/ &&
 
 	# NEEDSWORK: attempting to update-index on an existing folder outside the
 	# sparse checkout definition does not throw an error (as it does for folders
@@ -889,7 +888,9 @@ test_expect_success 'read-tree --merge with directory-file conflicts' '
 test_expect_success 'merge, cherry-pick, and rebase' '
 	init_repos &&
 
-	for OPERATION in "merge -m merge" cherry-pick "rebase --apply" "rebase --merge"
+	# microsoft/git specific: we need to use "quiet" mode
+	# to avoid different stderr for some rebases.
+	for OPERATION in "merge -m merge" cherry-pick "rebase -q --apply" "rebase -q --merge"
 	do
 		test_all_match git checkout -B temp update-deep &&
 		test_all_match git $OPERATION update-folder1 &&
