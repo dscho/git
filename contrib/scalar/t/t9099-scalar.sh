@@ -10,7 +10,7 @@ PATH=$(pwd)/..:$PATH
 
 . ../../../t/test-lib.sh
 
-GIT_TEST_MAINT_SCHEDULER="crontab:test-tool crontab ../cron.txt"
+GIT_TEST_MAINT_SCHEDULER="crontab:test-tool crontab ../cron.txt,launchctl:true,schtasks:true"
 export GIT_TEST_MAINT_SCHEDULER
 
 # Do not write any files outside the trash directory
