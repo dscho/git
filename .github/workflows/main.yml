@@ -288,6 +288,12 @@ jobs:
     - uses: actions/checkout@v2
     - run: ci/install-dependencies.sh
     - run: ci/run-static-analysis.sh
+    - name: disallow Unicode directional formatting
+      run: |
+        # Use UTF-8-aware `printf` to feed a byte pattern to non-UTF-8-aware `git grep`
+        # (Ubuntu's `git grep` is compiled without support for libpcre).
+        ! LANG=C git grep -Il "$(LANG=C.UTF-8 printf \
+          '\\(\u202a\\|\u202b\\|\u202c\\|\u202d\\|\u202e\\|\u2066\\|\u2067\\|\u2068\\|\u2069\\)')"
   sparse:
     needs: ci-config
     if: needs.ci-config.outputs.enabled == 'yes'
