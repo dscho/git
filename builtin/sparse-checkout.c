@@ -428,13 +428,25 @@ static int sparse_checkout_init(int argc, const char **argv)
 	} else
 		mode = MODE_ALL_PATTERNS;
 
-	if (set_config(mode))
-		return 1;
-
 	memset(&pl, 0, sizeof(pl));
+	pl.use_cone_patterns = core_sparse_checkout_cone;
 
 	sparse_filename = get_sparse_checkout_filename();
 	res = add_patterns_from_file_to_list(sparse_filename, "", 0, &pl, NULL, 0);
+
+	/*
+	 * If res >= 0, file already exists. If in cone mode init, verify that the
+	 * patterns are cone mode-compatible (if applicable). Otherwise, fall back
+	 * on non-cone mode sparse checkout.
+	 */
+	if (res >= 0 && core_sparse_checkout_cone && !pl.use_cone_patterns) {
+		warning(_("unable to initialize from existing patterns; disabling cone mode"));
+		mode = MODE_ALL_PATTERNS;
+		core_sparse_checkout_cone = 0;
+	}
+
+	if (set_config(mode))
+		return 1;
 
 	if (init_opts.sparse_index >= 0) {
 		if (set_sparse_index_config(the_repository, init_opts.sparse_index) < 0)
