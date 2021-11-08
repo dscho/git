@@ -768,4 +768,13 @@ test_expect_success 'malformed cone-mode patterns' '
 	grep "warning: disabling cone pattern matching" err
 '
 
+test_expect_success 'init with cone mode verifies existing cone patterns' '
+	# Set non-cone mode pattern
+	echo "/deep/deeper*" >repo/.git/info/sparse-checkout &&
+
+	git -C repo sparse-checkout init --cone 2>err &&
+	test_i18ngrep "disabling cone mode" err &&
+	test_must_fail git -C repo config core.sparsecheckoutcone
+'
+
 test_done
