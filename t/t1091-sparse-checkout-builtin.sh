@@ -725,4 +725,18 @@ test_expect_success 'init with cone mode verifies existing cone patterns' '
 	test_must_fail git -C repo config core.sparsecheckoutcone
 '
 
+test_expect_success 'add with cone mode verifies existing cone patterns' '
+	rm -f repo/.git/info/sparse-checkout &&
+
+	git -C repo sparse-checkout init --cone &&
+	cat >repo/.git/info/sparse-checkout <<-\EOF &&
+	/*
+	!/*/
+	/deep/deeper*/
+	EOF
+
+	test_must_fail git -C repo sparse-checkout add folder1 2>err &&
+	test_i18ngrep "unable to use existing sparse-checkout patterns in cone mode" err
+'
+
 test_done

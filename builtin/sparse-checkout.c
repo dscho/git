@@ -613,12 +613,20 @@ static void add_patterns_cone_mode(int argc, const char **argv,
 	add_patterns_from_input(pl, argc, argv);
 
 	memset(&existing, 0, sizeof(existing));
-	existing.use_cone_patterns = core_sparse_checkout_cone;
+	existing.use_cone_patterns = 1;
 
 	if (add_patterns_from_file_to_list(sparse_filename, "", 0,
 					   &existing, NULL, 0))
 		die(_("unable to load existing sparse-checkout patterns"));
 	free(sparse_filename);
+
+	/*
+	 * If use_cone_patterns has been disabled, at least one of the existing
+	 * patterns is invalid for cone mode. In that case, the hashmap does not
+	 * correctly reflect patterns, so we must exit early.
+	 */
+	if (existing.use_cone_patterns == 0)
+		die(_("unable to use existing sparse-checkout patterns in cone mode"));
 
 	hashmap_for_each_entry(&existing.recursive_hashmap, &iter, pe, ent) {
 		if (!hashmap_contains_parent(&pl->recursive_hashmap,
