@@ -715,6 +715,11 @@ static void add_pattern_to_hashsets(struct pattern_list *pl, struct path_pattern
 	if (!pl->use_cone_patterns)
 		return;
 
+	if (*given->pattern != '/') {
+		warning(_("unrecognized pattern: '%s'"), given->pattern);
+		goto clear_hashmaps;
+	}
+
 	if (given->flags & PATTERN_FLAG_NEGATIVE &&
 	    given->flags & PATTERN_FLAG_MUSTBEDIR &&
 	    !strcmp(given->pattern, "/*")) {
