@@ -48,10 +48,10 @@ esac
 # Any new "test" targets should not go after this "make", but should
 # adjust $MAKE_TARGETS. Otherwise compilation-only targets above will
 # start running tests.
-make
+group Build make
 if test -n "$run_tests"
 then
-	make test ||
+	group "Run tests" make test ||
 	handle_failed_tests
 fi
 check_unignored_build_artifacts
