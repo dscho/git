@@ -184,7 +184,7 @@ static int xwcstoutfn(char *utf, int utflen, const wchar_t *wcs, int wcslen)
 /*
  * Allocate and initialize an fsentry from a FILE_FULL_DIR_INFORMATION structure.
  */
-static struct fsentry *fseentry_create_entry(struct fscache *cache,
+static struct fsentry *fsentry_create_entry(struct fscache *cache,
 					     struct fsentry *list,
 					     PFILE_FULL_DIR_INFORMATION fdata)
 {
@@ -311,7 +311,7 @@ static struct fsentry *fsentry_create_list(struct fscache *cache, const struct f
 	di = (PFILE_FULL_DIR_INFORMATION)(cache->buffer);
 	for (;;) {
 
-		*phead = fseentry_create_entry(cache, list, di);
+		*phead = fsentry_create_entry(cache, list, di);
 		phead = &(*phead)->next;
 
 		/* If there is no offset in the entry, the buffer has been exhausted. */
