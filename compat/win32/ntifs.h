@@ -9,17 +9,17 @@
 typedef _Return_type_success_(return >= 0) LONG NTSTATUS;
 #define NT_SUCCESS(Status)  (((NTSTATUS)(Status)) >= 0)
 
+#if !defined(_NTSECAPI_) && !defined(_WINTERNL_) && \
+	!defined(__UNICODE_STRING_DEFINED)
+#define __UNICODE_STRING_DEFINED
 typedef struct _UNICODE_STRING {
 	USHORT Length;
 	USHORT MaximumLength;
-#ifdef MIDL_PASS
-	[size_is(MaximumLength / 2), length_is((Length) / 2)] USHORT * Buffer;
-#else // MIDL_PASS
-	_Field_size_bytes_part_(MaximumLength, Length) PWCH   Buffer;
-#endif // MIDL_PASS
+	PWSTR Buffer;
 } UNICODE_STRING;
 typedef UNICODE_STRING *PUNICODE_STRING;
 typedef const UNICODE_STRING *PCUNICODE_STRING;
+#endif /* !_NTSECAPI_ && !_WINTERNL_ && !__UNICODE_STRING_DEFINED */
 
 typedef enum _FILE_INFORMATION_CLASS {
 	FileDirectoryInformation = 1,
