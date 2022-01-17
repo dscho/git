@@ -1,6 +1,13 @@
 #include "../../git-compat-util.h"
-#include <winternl.h>
 #include "lazyload.h"
+
+typedef struct _IO_STATUS_BLOCK {
+	union {
+		NTSTATUS Status;
+		PVOID    Pointer;
+	} u;
+	ULONG_PTR Information;
+} IO_STATUS_BLOCK, *PIO_STATUS_BLOCK;
 
 int win32_fsync_no_flush(int fd)
 {
