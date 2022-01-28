@@ -201,4 +201,27 @@ test_expect_success 'can override merge of unrelated histories' '
 	test_cmp expect actual
 '
 
+test_expect_success 'respect merge.renames' '
+	git switch -c rename1 side1 &&
+	git mv numbers sequence &&
+	test_tick &&
+	git commit -m sequence &&
+
+	git switch -c rename2 side1 &&
+	git mv numbers counting &&
+	test_tick &&
+	git commit -m counting &&
+
+	test_must_fail git merge-tree --write-tree rename1 rename2 >tree &&
+	grep numbers tree &&
+	grep sequence tree &&
+	grep counting tree &&
+
+	test_config merge.renames false &&
+	git merge-tree --write-tree rename1 rename2 >tree &&
+	TREE=$(cat tree) &&
+	git diff side1:numbers $TREE:sequence &&
+	git diff $TREE:sequence $TREE:counting
+'
+
 test_done
