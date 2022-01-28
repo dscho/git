@@ -596,7 +596,8 @@ void diffcore_fix_diff_index(void);
 int diff_queue_is_empty(void);
 void diff_flush(struct diff_options*);
 void diff_free(struct diff_options*);
-void diff_warn_rename_limit(const char *varname, int needed, int degraded_cc);
+void diff_warn_rename_limit(const char *varname, int needed, int degraded_cc,
+			    FILE *out);
 
 /* diff-raw status letters */
 #define DIFF_STATUS_ADDED		'A'
