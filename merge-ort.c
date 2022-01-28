@@ -3047,6 +3047,11 @@ static int detect_and_process_renames(struct merge_options *opt,
 	unsigned detection_run = 0;
 
 	memset(&combined, 0, sizeof(combined));
+	if (opt->detect_renames == 0) {
+		renames->redo_after_renames = 0;
+		renames->cached_pairs_valid_side = 0;
+		goto cleanup;
+	}
 	if (!possible_renames(renames))
 		goto cleanup;
 
