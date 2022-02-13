@@ -3,16 +3,32 @@ name: git-artifacts
 on:
   # This workflow can be triggered manually in the Actions tab, see
   # https://github.blog/changelog/2020-07-06-github-actions-manual-triggers-with-workflow_dispatch/
-  workflow_dispatch:
+  workflow_call:
     inputs:
       build_only:
         description: 'Optionally restrict what artifacts to build'
+        type: string
         required: false
       ref:
         description: 'Optionally override which branch to build'
+        type: string
         required: false
       repository:
         description: 'Optionally override from where to fetch the specified ref'
+        type: string
+        required: false
+    secrets:
+      CODESIGN_P12:
+        description: 'The code-signing key, with line feed characters replaced by percent characters'
+        required: false
+      CODESIGN_PASS:
+        description: 'The passphrase for the code-signing key'
+        required: false
+      GPGKEY:
+        description: '<id> --passphrase <phrase> --yes --batch --no-tty --pinentry-mode loopback --digest-algo SHA256'
+        required: false
+      PRIVGPGKEY:
+        description: 'The private key, line feed characters replaced with percent characters'
         required: false
 
 env:
@@ -20,9 +36,9 @@ env:
   HOME: "${{github.workspace}}\\home"
   MSYSTEM: MINGW64
   USERPROFILE: "${{github.workspace}}\\home"
-  BUILD_ONLY: "${{github.event.inputs.build_only}}"
-  REPOSITORY: "${{github.event.inputs.repository}}"
-  REF: "${{github.event.inputs.ref}}"
+  BUILD_ONLY: "${{inputs.build_only}}"
+  REPOSITORY: "${{inputs.repository}}"
+  REF: "${{inputs.ref}}"
 
 jobs:
   bundle-artifacts:
