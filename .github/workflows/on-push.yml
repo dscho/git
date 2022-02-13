@@ -1,0 +1,9 @@
+name: "Build Git artifacts on `push`"
+
+on: push
+
+jobs:
+  git-artifacts:
+    uses: ./.github/workflows/git-artifacts.yml
+    with:
+      build_only: "installer-x86_64 portable-x86_64"
