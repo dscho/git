@@ -53,7 +53,7 @@ test_expect_success 'setup optionspec-only-hidden-switches' '
 |
 |some-command does foo and bar!
 |--
-|hidden1* A hidden switch
+|hidden1* a hidden switch
 EOF
 '
 
@@ -131,7 +131,7 @@ test_expect_success 'test --parseopt help-all output hidden switches' '
 |
 |    some-command does foo and bar!
 |
-|    --hidden1             A hidden switch
+|    --hidden1             a hidden switch
 |
 |EOF
 END_EXPECT
