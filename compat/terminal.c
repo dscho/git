@@ -29,9 +29,15 @@ void restore_term(void)
 		return;
 
 	tcsetattr(term_fd, TCSAFLUSH, &old_term);
+
 	close(term_fd);
 	term_fd = -1;
 	sigchain_pop_common();
+}
+
+static int is_controlling_terminal(int fd)
+{
+	return (getpgid(0) == tcgetpgrp(fd));
 }
 
 int save_term(int full_duplex)
@@ -40,6 +46,11 @@ int save_term(int full_duplex)
 		term_fd = open("/dev/tty", O_RDWR);
 	if (term_fd < 0)
 		return -1;
+	if (full_duplex && !is_controlling_terminal(term_fd)) {
+		close(term_fd);
+		term_fd = -1;
+		return -1;
+	}
 	if (tcgetattr(term_fd, &old_term) < 0)
 		return -1;
 	sigchain_push_common(restore_term_on_signal);
