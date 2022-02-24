@@ -1504,7 +1504,7 @@ int cmd_fsmonitor__daemon(int argc, const char **argv, const char *prefix)
 			    N_("use <n> ipc worker threads")),
 		OPT_INTEGER(0, "start-timeout",
 			    &fsmonitor__start_timeout_sec,
-			    N_("Max seconds to wait for background daemon startup")),
+			    N_("max seconds to wait for background daemon startup")),
 
 		OPT_END()
 	};
