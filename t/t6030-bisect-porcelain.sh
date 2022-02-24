@@ -990,7 +990,6 @@ test_expect_success 'git bisect reset cleans bisection state properly' '
 	test_path_is_missing ".git/BISECT_LOG" &&
 	test_path_is_missing ".git/BISECT_RUN" &&
 	test_path_is_missing ".git/BISECT_TERMS" &&
-	test_path_is_missing ".git/head-name" &&
 	test_path_is_missing ".git/BISECT_HEAD" &&
 	test_path_is_missing ".git/BISECT_START"
 '
@@ -1023,6 +1022,16 @@ test_expect_success 'bisect visualize with a filename with dash and space' '
 	git add -- "./-hello 2" &&
 	git commit --quiet -m "Add test line" -- "./-hello 2" &&
 	git bisect visualize -p -- "-hello 2"
+'
+
+test_expect_success 'testing' '
+	git bisect reset &&
+	git bisect start $HASH4 $HASH1 &&
+	write_script test_script.sh <<-\EOF &&
+	rm .git/BISECT*
+	EOF
+	test_must_fail git bisect run ./test_script.sh 2>error &&
+	grep "git bisect good.*exited with error code" error
 '
 
 test_done
