@@ -126,7 +126,7 @@ test_expect_success "one time repo setup" '
 	fi &&
 
 	mkdir 1_file 10_files 100_files 1000_files 10000_files &&
-	touch_files 1 &&
+	: 1_file directory should be left empty &&
 	touch_files 10 &&
 	touch_files 100 &&
 	touch_files 1000 &&

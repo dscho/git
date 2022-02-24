@@ -9,8 +9,44 @@
  */
 struct fsmonitor_settings {
 	enum fsmonitor_mode mode;
+	enum fsmonitor_reason reason;
 	char *hook_path;
 };
+
+static void set_incompatible(struct repository *r,
+			     enum fsmonitor_reason reason)
+{
+	struct fsmonitor_settings *s = r->settings.fsmonitor;
+
+	s->mode = FSMONITOR_MODE_INCOMPATIBLE;
+	s->reason = reason;
+}
+
+static int check_for_incompatible(struct repository *r)
+{
+	if (!r->worktree) {
+		/*
+		 * Bare repositories don't have a working directory and
+		 * therefore have nothing to watch.
+		 */
+		set_incompatible(r, FSMONITOR_REASON_BARE);
+		return 1;
+	}
+
+#ifdef HAVE_FSMONITOR_OS_SETTINGS
+	{
+		enum fsmonitor_reason reason;
+
+		reason = fsm_os__incompatible(r);
+		if (reason != FSMONITOR_REASON_ZERO) {
+			set_incompatible(r, reason);
+			return 1;
+		}
+	}
+#endif
+
+	return 0;
+}
 
 static void lookup_fsmonitor_settings(struct repository *r)
 {
@@ -78,6 +114,9 @@ void fsm_settings__set_ipc(struct repository *r)
 {
 	lookup_fsmonitor_settings(r);
 
+	if (check_for_incompatible(r))
+		return;
+
 	r->settings.fsmonitor->mode = FSMONITOR_MODE_IPC;
 	FREE_AND_NULL(r->settings.fsmonitor->hook_path);
 }
@@ -85,6 +124,9 @@ void fsm_settings__set_ipc(struct repository *r)
 void fsm_settings__set_hook(struct repository *r, const char *path)
 {
 	lookup_fsmonitor_settings(r);
+
+	if (check_for_incompatible(r))
+		return;
 
 	r->settings.fsmonitor->mode = FSMONITOR_MODE_HOOK;
 	FREE_AND_NULL(r->settings.fsmonitor->hook_path);
@@ -96,5 +138,47 @@ void fsm_settings__set_disabled(struct repository *r)
 	lookup_fsmonitor_settings(r);
 
 	r->settings.fsmonitor->mode = FSMONITOR_MODE_DISABLED;
+	r->settings.fsmonitor->reason = FSMONITOR_REASON_ZERO;
 	FREE_AND_NULL(r->settings.fsmonitor->hook_path);
+}
+
+static void create_reason_message(struct repository *r,
+				  struct strbuf *buf_reason)
+{
+	struct fsmonitor_settings *s = r->settings.fsmonitor;
+
+	switch (s->reason) {
+	case FSMONITOR_REASON_ZERO:
+		return;
+
+	case FSMONITOR_REASON_BARE:
+		strbuf_addstr(buf_reason,
+			      _("bare repos are incompatible with fsmonitor"));
+		return;
+
+	case FSMONITOR_REASON_VIRTUAL:
+		strbuf_addstr(buf_reason,
+			      _("virtual repos are incompatible with fsmonitor"));
+		return;
+
+	case FSMONITOR_REASON_REMOTE:
+		strbuf_addstr(buf_reason,
+			      _("remote repos are incompatible with fsmonitor"));
+		return;
+
+	default:
+		BUG("Unhandled case in create_reason_message '%d'", s->reason);
+	}
+}
+
+enum fsmonitor_reason fsm_settings__get_reason(struct repository *r,
+					       struct strbuf *buf_reason)
+{
+	lookup_fsmonitor_settings(r);
+
+	strbuf_reset(buf_reason);
+	if (r->settings.fsmonitor->mode == FSMONITOR_MODE_INCOMPATIBLE)
+		create_reason_message(r, buf_reason);
+
+	return r->settings.fsmonitor->reason;
 }
