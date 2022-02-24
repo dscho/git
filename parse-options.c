@@ -492,6 +492,12 @@ static void parse_options_check(const struct option *opts)
 		default:
 			; /* ok. (usually accepts an argument) */
 		}
+		if (opts->type != OPTION_GROUP && opts->help &&
+			opts->help[0] && isupper(opts->help[0]) &&
+			!(opts->help[1] && isupper(opts->help[1])))
+			err |= optbug(opts, xstrfmt("help should not start with capital letter unless needed: %s", opts->help));
+		if (opts->help && !ends_with(opts->help, "...") && ends_with(opts->help, "."))
+			err |= optbug(opts, xstrfmt("help should not end with a dot: %s", opts->help));
 		if (opts->argh &&
 		    strcspn(opts->argh, " _") != strlen(opts->argh))
 			err |= optbug(opts, "multi-word argh should use dash to separate words");
