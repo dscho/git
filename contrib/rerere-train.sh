@@ -66,14 +66,9 @@ original_HEAD=$(git rev-parse --verify HEAD) || {
 
 mkdir -p "$GIT_DIR/rr-cache" || exit
 
-git rev-list --parents "$@" |
+git rev-list --parents --merges "$@" |
 while read commit parent1 other_parents
 do
-	if test -z "$other_parents"
-	then
-		# Skip non-merges
-		continue
-	fi
 	git checkout -q "$parent1^0"
 	if git merge $other_parents >/dev/null 2>&1
 	then
@@ -86,7 +81,7 @@ do
 	fi
 	if test -s "$GIT_DIR/MERGE_RR"
 	then
-		git show -s --pretty=format:"Learning from %h %s" "$commit"
+		git show -s --format="Learning from %h %s" "$commit"
 		git rerere
 		git checkout -q $commit -- .
 		git rerere
