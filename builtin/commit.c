@@ -1515,7 +1515,7 @@ int cmd_status(int argc, const char **argv, const char *prefix)
 		OPT_BOOL(0, "show-ignored-directory", &show_ignored_directory,
 			N_("(DEPRECATED: use --ignore=matching instead) Only "
 			   "show directories that match an ignore pattern "
-			   "name.")),
+			   "name")),
 		OPT_BOOL(0, "no-lock-index", &no_lock_index,
 			 N_("(DEPRECATED: use `git --no-optional-locks status` "
 			    "instead) Do not lock the index")),
