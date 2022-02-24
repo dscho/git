@@ -27,6 +27,8 @@
 extern "C" {
 #endif /* #ifdef __cplusplus */
 
+#include "git-xdiff.h"
+
 /* xpparm_t.flags */
 #define XDF_NEED_MINIMAL (1 << 0)
 
@@ -82,7 +84,7 @@ typedef struct s_xpparam {
 	unsigned long flags;
 
 	/* -I<regex> */
-	regex_t **ignore_regex;
+	xdl_regex_t **ignore_regex;
 	size_t ignore_regex_nr;
 
 	/* See Documentation/diff-options.txt. */
@@ -118,10 +120,6 @@ typedef struct s_bdiffparam {
 	long bsize;
 } bdiffparam_t;
 
-
-#define xdl_malloc(x) xmalloc(x)
-#define xdl_free(ptr) free(ptr)
-#define xdl_realloc(ptr,x) xrealloc(ptr,x)
 
 void *xdl_mmfile_first(mmfile_t *mmf, long *size);
 long xdl_mmfile_size(mmfile_t *mmf);

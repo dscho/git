@@ -832,7 +832,7 @@ int xdl_change_compact(xdfile_t *xdf, xdfile_t *xdfo, long flags) {
 			/* Shift the group backward as much as possible: */
 			while (!group_slide_up(xdf, &g))
 				if (group_previous(xdfo, &go))
-					BUG("group sync broken sliding up");
+					XDL_BUG("group sync broken sliding up");
 
 			/*
 			 * This is this highest that this group can be shifted.
@@ -848,7 +848,7 @@ int xdl_change_compact(xdfile_t *xdf, xdfile_t *xdfo, long flags) {
 				if (group_slide_down(xdf, &g))
 					break;
 				if (group_next(xdfo, &go))
-					BUG("group sync broken sliding down");
+					XDL_BUG("group sync broken sliding down");
 
 				if (go.end > go.start)
 					end_matching_other = g.end;
@@ -873,9 +873,9 @@ int xdl_change_compact(xdfile_t *xdf, xdfile_t *xdfo, long flags) {
 			 */
 			while (go.end == go.start) {
 				if (group_slide_up(xdf, &g))
-					BUG("match disappeared");
+					XDL_BUG("match disappeared");
 				if (group_previous(xdfo, &go))
-					BUG("group sync broken sliding to match");
+					XDL_BUG("group sync broken sliding to match");
 			}
 		} else if (flags & XDF_INDENT_HEURISTIC) {
 			/*
@@ -916,9 +916,9 @@ int xdl_change_compact(xdfile_t *xdf, xdfile_t *xdfo, long flags) {
 
 			while (g.end > best_shift) {
 				if (group_slide_up(xdf, &g))
-					BUG("best shift unreached");
+					XDL_BUG("best shift unreached");
 				if (group_previous(xdfo, &go))
-					BUG("group sync broken sliding to blank line");
+					XDL_BUG("group sync broken sliding to blank line");
 			}
 		}
 
@@ -927,11 +927,11 @@ int xdl_change_compact(xdfile_t *xdf, xdfile_t *xdfo, long flags) {
 		if (group_next(xdf, &g))
 			break;
 		if (group_next(xdfo, &go))
-			BUG("group sync broken moving to next group");
+			XDL_BUG("group sync broken moving to next group");
 	}
 
 	if (!group_next(xdfo, &go))
-		BUG("group sync broken at end of file");
+		XDL_BUG("group sync broken at end of file");
 
 	return 0;
 }
@@ -1011,11 +1011,11 @@ static void xdl_mark_ignorable_lines(xdchange_t *xscr, xdfenv_t *xe, long flags)
 }
 
 static int record_matches_regex(xrecord_t *rec, xpparam_t const *xpp) {
-	regmatch_t regmatch;
+	xdl_regmatch_t regmatch;
 	int i;
 
 	for (i = 0; i < xpp->ignore_regex_nr; i++)
-		if (!regexec_buf(xpp->ignore_regex[i], rec->ptr, rec->size, 1,
+		if (!xdl_regexec_buf(xpp->ignore_regex[i], rec->ptr, rec->size, 1,
 				 &regmatch, 0))
 			return 1;
 
