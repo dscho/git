@@ -392,7 +392,8 @@ void clear_skip_worktree_from_present_files(struct index_state *istate)
 
 	int i;
 
-	if (!core_apply_sparse_checkout)
+	if (!core_apply_sparse_checkout ||
+	    core_expect_files_outside_sparse_patterns)
 		return;
 
 restart:
