@@ -305,7 +305,8 @@ static int fsck_walk_tree(struct tree *tree, void *data, struct fsck_options *op
 	const char *name;
 
 	if (parse_tree(tree))
-		return -1;
+		return error("could not parse tree %s",
+			     fsck_describe_object(options, &tree->object.oid));
 
 	name = fsck_get_object_name(options, &tree->object.oid);
 	if (init_tree_desc_gently(&desc, tree->buffer, tree->size))

@@ -231,13 +231,10 @@ void *read_object_file_extended(struct repository *r,
 				const struct object_id *oid,
 				enum object_type *type,
 				unsigned long *size, int lookup_replace);
-static inline void *repo_read_object_file(struct repository *r,
-					  const struct object_id *oid,
-					  enum object_type *type,
-					  unsigned long *size)
-{
-	return read_object_file_extended(r, oid, type, size, 1);
-}
+void *repo_read_object_file(struct repository *r,
+			    const struct object_id *oid,
+			    enum object_type *type,
+			    unsigned long *size);
 #ifndef NO_THE_REPOSITORY_COMPATIBILITY_MACROS
 #define read_object_file(oid, type, size) repo_read_object_file(the_repository, oid, type, size)
 #endif

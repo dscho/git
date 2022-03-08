@@ -359,7 +359,8 @@ static void check_connectivity(void)
 	int i, max;
 
 	/* Traverse the pending reachable objects */
-	traverse_reachable();
+	if (traverse_reachable())
+		errors_found |= ERROR_REACHABLE;
 
 	/*
 	 * With --connectivity-only, we won't have actually opened and marked

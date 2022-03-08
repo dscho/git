@@ -686,6 +686,39 @@ test_expect_success 'fsck --connectivity-only' '
 	)
 '
 
+test_expect_success 'fsck --connectivity-only --name-objects' '
+	rm -rf connectivity-only &&
+	git init -b main connectivity-only &&
+	(
+		cd connectivity-only &&
+		test_commit empty &&
+
+		# Drop the index now; we want to be sure that we
+		# recursively notice the broken objects
+		# because they are reachable from refs, not because
+		# they are in the index.
+		rm -f .git/index &&
+
+		# corrupt the blob, but in a way that we can still identify
+		# its type. That lets us see that --connectivity-only is
+		# not actually looking at the contents, but leaves it
+		# free to examine the type if it chooses.
+		empty=.git/objects/$(test_oid_to_path $EMPTY_BLOB) &&
+		mkdir -p "${empty%/*}" &&
+		blob=$(echo unrelated | git hash-object -w --stdin) &&
+		mv -f $(sha1_file $blob) $empty &&
+		tree=$(git rev-parse HEAD:) &&
+		suffix=${tree#??} &&
+		tree=.git/objects/${tree%$suffix}/$suffix &&
+		rm -f $tree &&
+		echo invalid >$tree &&
+
+		test_must_fail >out 2>err \
+			git fsck --connectivity-only --name-objects &&
+		grep refs/heads/main err
+	)
+'
+
 test_expect_success 'fsck --connectivity-only with explicit head' '
 	rm -rf connectivity-only &&
 	git init connectivity-only &&

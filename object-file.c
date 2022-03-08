@@ -1720,6 +1720,39 @@ void *read_object_file_extended(struct repository *r,
 	return NULL;
 }
 
+void *repo_read_object_file(struct repository *r,
+			    const struct object_id *oid,
+			    enum object_type *type,
+			    unsigned long *size)
+{
+	void *data;
+	const struct packed_git *p;
+	const char *path;
+	struct stat st;
+	const struct object_id *repl = lookup_replace_object(r, oid);
+
+	errno = 0;
+	data = read_object(r, repl, type, size);
+	if (data)
+		return data;
+
+	obj_read_lock();
+	if (errno && errno != ENOENT)
+		error_errno(_("failed to read object %s"), oid_to_hex(oid));
+	else if (repl != oid)
+		error(_("replacement %s not found for %s"),
+		      oid_to_hex(repl), oid_to_hex(oid));
+	else if (!stat_loose_object(r, repl, &st, &path))
+		error(_("loose object %s (stored in %s) is corrupt"),
+		      oid_to_hex(repl), path);
+	else if ((p = has_packed_and_bad(r, repl)) != NULL)
+		error(_("packed object %s (stored in %s) is corrupt"),
+		      oid_to_hex(repl), p->pack_name);
+	obj_read_unlock();
+
+	return NULL;
+}
+
 void *read_object_with_reference(struct repository *r,
 				 const struct object_id *oid,
 				 const char *required_type_name,
