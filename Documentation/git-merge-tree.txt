@@ -187,6 +187,13 @@ a file with exactly one higher order stage.  In all cases, the
 <<IM,Informational messages>> section has the necessary info, though it
 is not designed to be machine parseable.
 
+Do NOT assume that each paths from <<CFI,Conflicted file info>>, and
+the logical conflicts in the <<IM,Informational messages>> have a
+one-to-one mapping, nor that there is a one-to-many mapping, nor a
+many-to-one mapping.  Many-to-many mappings exist, meaning that each
+path can have many logical conflict types in a single merge, and each
+logical conflict type can affect many paths.
+
 Do NOT assume all filenames listed in the <<IM,Informational messages>>
 section had conflicts.  Messages can be included for files that have no
 conflicts, such as "Auto-merging <file>".
