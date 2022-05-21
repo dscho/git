@@ -621,7 +621,7 @@ static int apply_stash(int argc, const char **argv, const char *prefix)
 	int index = 0;
 	struct stash_info info;
 	struct option options[] = {
-		OPT__QUIET(&quiet, N_("be quiet, only report errors")),
+		//OPT__QUIET(&quiet, N_("be quiet, only report errors")),
 		OPT_BOOL(0, "index", &index,
 			 N_("attempt to recreate the index")),
 		OPT_END()
@@ -684,7 +684,7 @@ static int drop_stash(int argc, const char **argv, const char *prefix)
 	int quiet = 0;
 	struct stash_info info;
 	struct option options[] = {
-		OPT__QUIET(&quiet, N_("be quiet, only report errors")),
+		//OPT__QUIET(&quiet, N_("be quiet, only report errors")),
 		OPT_END()
 	};
 
@@ -708,7 +708,7 @@ static int pop_stash(int argc, const char **argv, const char *prefix)
 	int quiet = 0;
 	struct stash_info info;
 	struct option options[] = {
-		OPT__QUIET(&quiet, N_("be quiet, only report errors")),
+		//OPT__QUIET(&quiet, N_("be quiet, only report errors")),
 		OPT_BOOL(0, "index", &index,
 			 N_("attempt to recreate the index")),
 		OPT_END()
@@ -961,7 +961,7 @@ static int store_stash(int argc, const char **argv, const char *prefix)
 	struct object_id obj;
 	struct object_context dummy;
 	struct option options[] = {
-		OPT__QUIET(&quiet, N_("be quiet")),
+		//OPT__QUIET(&quiet, N_("be quiet")),
 		OPT_STRING('m', "message", &stash_msg, "message",
 			   N_("stash message")),
 		OPT_END()

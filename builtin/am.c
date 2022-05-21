@@ -2332,7 +2332,7 @@ int cmd_am(int argc, const char **argv, const char *prefix)
 			N_("historical option -- no-op")),
 		OPT_BOOL('3', "3way", &state.threeway,
 			N_("allow fall back on 3way merging if needed")),
-		OPT__QUIET(&state.quiet, N_("be quiet")),
+		//OPT__QUIET(&state.quiet, N_("be quiet")),
 		OPT_SET_INT('s', "signoff", &state.signoff,
 			N_("add a Signed-off-by trailer to the commit message"),
 			SIGNOFF_EXPLICIT),
