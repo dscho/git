@@ -517,7 +517,8 @@ static int curl_empty_auth_enabled(void)
 
 static void init_curl_http_auth(struct active_request_slot *slot)
 {
-	if (!http_auth.username || !*http_auth.username) {
+	if (!http_auth.authtype &&
+		(!http_auth.username || !*http_auth.username)) {
 		if (curl_empty_auth_enabled())
 			curl_easy_setopt(slot->curl, CURLOPT_USERPWD, ":");
 		return;
@@ -525,8 +526,25 @@ static void init_curl_http_auth(struct active_request_slot *slot)
 
 	credential_fill(&http_auth);
 
-	curl_easy_setopt(slot->curl, CURLOPT_USERNAME, http_auth.username);
-	curl_easy_setopt(slot->curl, CURLOPT_PASSWORD, http_auth.password);
+	if (!http_auth.authtype || !strcasecmp(http_auth.authtype, "basic")
+				|| !strcasecmp(http_auth.authtype, "digest")) {
+		curl_easy_setopt(slot->curl, CURLOPT_USERNAME,
+			http_auth.username);
+		curl_easy_setopt(slot->curl, CURLOPT_PASSWORD,
+			http_auth.password);
+#ifdef GIT_CURL_HAVE_CURLAUTH_BEARER
+	} else if (!strcasecmp(http_auth.authtype, "bearer")) {
+		curl_easy_setopt(slot->curl, CURLOPT_HTTPAUTH, CURLAUTH_BEARER);
+		curl_easy_setopt(slot->curl, CURLOPT_XOAUTH2_BEARER,
+			http_auth.password);
+#endif
+	} else {
+		struct strbuf auth = STRBUF_INIT;
+		strbuf_addf(&auth, "Authorization: %s %s",
+			http_auth.authtype, http_auth.password);
+		slot->headers = curl_slist_append(slot->headers, auth.buf);
+		strbuf_release(&auth);
+	}
 }
 
 /* *var must be free-able */
