@@ -790,8 +790,10 @@ static void path_msg(struct merge_options *opt,
 
 	/* Ensure path_conflicts (ptr to array of logical_conflict) allocated */
 	path_conflicts = strmap_get(&opt->priv->conflicts, primary_path);
-	if (!path_conflicts)
+	if (!path_conflicts) {
 		path_conflicts = xcalloc(1, sizeof(*path_conflicts));
+		strmap_put(&opt->priv->conflicts, primary_path, path_conflicts);
+	}
 
 	/* Add a logical_conflict at the end to store info from this call */
 	ALLOC_GROW(path_conflicts->info,
