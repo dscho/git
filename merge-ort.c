@@ -4453,7 +4453,7 @@ void merge_display_update_messages(struct merge_options *opt,
 			struct logical_conflict *conf = &conflicts->info[i];
 
 			if (detailed) {
-				printf("%ld", conf->paths.nr);
+				printf("%lu", (unsigned long)conf->paths.nr);
 				putchar('\0');
 				for (int n = 0; n < conf->paths.nr; n++) {
 					fputs(conf->paths.v[n], stdout);
