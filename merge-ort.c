@@ -842,9 +842,6 @@ static void path_msg(struct merge_options *opt,
 
 		strbuf_release(&tmp);
 	}
-
-	/* Ensure message is newline terminated */
-	strbuf_addch(sb, '\n');
 }
 
 static struct diff_filespec *pool_alloc_filespec(struct mem_pool *pool,
