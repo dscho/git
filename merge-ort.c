@@ -602,7 +602,7 @@ static const char *type_short_descriptions[NB_CONFLICT_TYPES] = {
 };
 
 struct logical_conflicts {
-	int nr;
+	size_t alloc, nr;
 	struct logical_conflict *info;
 };
 
@@ -794,8 +794,9 @@ static void path_msg(struct merge_options *opt,
 		path_conflicts = xcalloc(1, sizeof(*path_conflicts));
 
 	/* Add a logical_conflict at the end to store info from this call */
-	REALLOC_ARRAY(path_conflicts->info, path_conflicts->nr);
-	cur = &path_conflicts->info[path_conflicts->nr - 1];
+	ALLOC_GROW(path_conflicts->info,
+		   path_conflicts->nr + 1, path_conflicts->alloc);
+	cur = &path_conflicts->info[path_conflicts->nr++];
 	cur->type = type;
 	strvec_init(&cur->paths);
 	strbuf_init(&cur->message, 0);
@@ -3936,7 +3937,7 @@ static void process_entry(struct merge_options *opt,
 			if (rename_b)
 				b_path = unique_path(&opt->priv->paths,
 						     path, opt->branch2);
-			
+
 			if (rename_a && rename_b) {
 				path_msg(opt, CONFLICT_DISTINCT_MODES, 0,
 					 path, a_path, b_path, NULL,
