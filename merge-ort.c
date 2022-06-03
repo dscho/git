@@ -4557,6 +4557,8 @@ void merge_finalize(struct merge_options *opt,
 		    struct merge_result *result)
 {
 	struct merge_options_internal *opti = result->priv;
+	struct hashmap_iter iter;
+	struct strmap_entry *e;
 
 	if (opt->renormalize)
 		git_attr_set_direction(GIT_ATTR_CHECKIN);
@@ -4564,6 +4566,15 @@ void merge_finalize(struct merge_options *opt,
 
 	clear_or_reinit_internal_opts(opti, 0);
 	FREE_AND_NULL(opti);
+
+	/* Release and free each strbuf found in path_messages */
+	strmap_for_each_entry(result->path_messages, &iter, e) {
+		struct strbuf *buf = e->value;
+
+		strbuf_release(buf);
+	}
+	strmap_clear(result->path_messages, 1);
+	FREE_AND_NULL(result->path_messages);
 }
 
 /*** Function Grouping: helper functions for merge_incore_*() ***/
