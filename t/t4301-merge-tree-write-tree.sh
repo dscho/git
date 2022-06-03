@@ -188,6 +188,7 @@ test_expect_success 'NUL terminated conflicted file "lines"' '
 
 	test_expect_code 1 git merge-tree --write-tree -z tweak1 side2 >out &&
 	anonymize_hash out >actual &&
+	printf "\\n" >>actual &&
 
 	# Expected results:
 	#   "greeting" should merge with conflicts
@@ -207,13 +208,14 @@ test_expect_success 'NUL terminated conflicted file "lines"' '
 
 	EOF
 
-	cat <<-EOF >>expect &&
-	Auto-merging greeting
-	CONFLICT (content): Merge conflict in greeting
-	CONFLICT (file/directory): directory in the way of whatever from tweak1; moving it to whatever~tweak1 instead.
-	CONFLICT (modify/delete): whatever~tweak1 deleted in side2 and modified in tweak1.  Version tweak1 of whatever~tweak1 left in tree.
-	Auto-merging Αυτά μου φαίνονται κινέζικα
-	CONFLICT (content): Merge conflict in Αυτά μου φαίνονται κινέζικα
+	q_to_nul <<-EOF >>expect &&
+	1QgreetingQAuto-mergingQAuto-merging greeting
+	Q1QgreetingQCONFLICT (contents)QCONFLICT (content): Merge conflict in greeting
+	Q2Qwhatever~tweak1QwhateverQCONFLICT (file/directory)QCONFLICT (file/directory): directory in the way of whatever from tweak1; moving it to whatever~tweak1 instead.
+	Q1Qwhatever~tweak1QCONFLICT (modify/delete)QCONFLICT (modify/delete): whatever~tweak1 deleted in side2 and modified in tweak1.  Version tweak1 of whatever~tweak1 left in tree.
+	Q1QΑυτά μου φαίνονται κινέζικαQAuto-mergingQAuto-merging Αυτά μου φαίνονται κινέζικα
+	Q1QΑυτά μου φαίνονται κινέζικαQCONFLICT (contents)QCONFLICT (content): Merge conflict in Αυτά μου φαίνονται κινέζικα
+	Q
 	EOF
 
 	test_cmp expect actual
