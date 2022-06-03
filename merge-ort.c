@@ -4787,6 +4787,8 @@ static void merge_ort_nonrecursive_internal(struct merge_options *opt,
 					    struct merge_result *result)
 {
 	struct object_id working_tree_oid;
+	struct hashmap_iter iter;
+	struct strmap_entry *e;
 
 	if (opt->subtree_shift) {
 		side2 = shift_tree_object(opt->repo, side1, side2,
@@ -4827,7 +4829,27 @@ redo:
 	trace2_region_leave("merge", "process_entries", opt->repo);
 
 	/* Set return values */
-	result->path_messages = &opt->priv->output;
+	result->path_messages = xcalloc(1, sizeof(*result->path_messages));
+	strmap_init_with_options(result->path_messages, NULL, 0);
+	strmap_for_each_entry(&opt->priv->conflicts, &iter, e) {
+		const char *path = e->key;
+		struct strbuf *buf = strmap_get(result->path_messages, path);
+		struct logical_conflicts *conflicts = e->value;
+
+		if (!buf) {
+			buf = xcalloc(1, sizeof(*buf));
+			strbuf_init(buf, 0);
+			strmap_put(result->path_messages, path, buf);
+		}
+
+		for (int i = 0; i < conflicts->nr; i++) {
+			if (buf->len)
+				strbuf_addch(buf, '\n');
+			strbuf_addbuf(buf, &conflicts->info[i].message);
+			strbuf_trim_trailing_newline(buf);
+		}
+	}
+
 	result->tree = parse_tree_indirect(&working_tree_oid);
 	/* existence of conflicted entries implies unclean */
 	result->clean &= strmap_empty(&opt->priv->conflicted);
