@@ -2464,7 +2464,7 @@ static char *check_for_directory_rename(struct merge_options *opt,
 	otherinfo = strmap_get_entry(dir_rename_exclusions, new_dir);
 	if (otherinfo) {
 		path_msg(opt, INFO_DIR_RENAME_SKIPPED_DUE_TO_RERENAME, 1,
-			 rename_info->key, path, new_dir,
+			 rename_info->key, path, new_dir, NULL,
 			 _("WARNING: Avoiding applying %s -> %s rename "
 			   "to %s, because %s itself was renamed."),
 			 rename_info->key, new_dir, path, new_dir);
