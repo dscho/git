@@ -4456,10 +4456,11 @@ void merge_display_update_messages(struct merge_options *opt,
 				printf("%ld", conf->paths.nr);
 				putchar('\0');
 				for (int n = 0; n < conf->paths.nr; n++) {
-					puts(conf->paths.v[i]);
+					fputs(conf->paths.v[n], stdout);
 					putchar('\0');
 				}
-				puts(type_short_descriptions[conf->type]);
+				fputs(type_short_descriptions[conf->type],
+				      stdout);
 				putchar('\0');
 			}
 			puts(conf->message.buf);
