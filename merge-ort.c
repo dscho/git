@@ -575,7 +575,6 @@ static const char *type_short_descriptions[] = {
 struct logical_conflict_info {
 	enum conflict_and_info_types type;
 	struct strvec paths;
-	struct strbuf message;
 };
 
 /*** Function Grouping: various utility functions ***/
@@ -670,7 +669,6 @@ static void clear_or_reinit_internal_opts(struct merge_options_internal *opti,
 				struct logical_conflict_info *info =
 					list->items[i].util;
 				strvec_clear(&info->paths);
-				strbuf_release(&info->message);
 			}
 			/*
 			 * While strictly speaking we don't need to
@@ -743,7 +741,8 @@ static void path_msg(struct merge_options *opt,
 	va_list ap;
 	struct string_list *path_conflicts;
 	struct logical_conflict_info *info;
-	struct strbuf *dest, *sb;
+	struct strbuf buf = STRBUF_INIT;
+	struct strbuf *dest;
 	struct strbuf tmp = STRBUF_INIT;
 
 	/* Sanity checks */
@@ -760,7 +759,7 @@ static void path_msg(struct merge_options *opt,
 	path_conflicts = strmap_get(&opt->priv->conflicts, primary_path);
 	if (!path_conflicts) {
 		path_conflicts = xmalloc(sizeof(*path_conflicts));
-		string_list_init_nodup(path_conflicts);
+		string_list_init_dup(path_conflicts);
 		strmap_put(&opt->priv->conflicts, primary_path, path_conflicts);
 	}
 
@@ -768,7 +767,6 @@ static void path_msg(struct merge_options *opt,
 	info = xcalloc(1, sizeof(*info));
 	info->type = type;
 	strvec_init(&info->paths);
-	strbuf_init(&info->message, 0);
 
 	/* Handle the list of paths */
 	strvec_push(&info->paths, primary_path);
@@ -781,37 +779,37 @@ static void path_msg(struct merge_options *opt,
 		strvec_push(&info->paths, other_paths->items[i].string);
 
 	/* Handle message and its format, in normal case */
-	dest = (opt->record_conflict_msgs_as_headers ? &tmp : &info->message);
+	dest = (opt->record_conflict_msgs_as_headers ? &tmp : &buf);
 	va_start(ap, message_fmt);
 	strbuf_vaddf(dest, message_fmt, ap);
 	va_end(ap);
 
 	/* Handle specialized formatting of message under --remerge-diff */
-	sb = &info->message;
 	if (opt->record_conflict_msgs_as_headers) {
 		int i_sb = 0, i_tmp = 0;
 
 		/* Start with the specified prefix */
 		if (opt->msg_header_prefix)
-			strbuf_addf(sb, "%s ", opt->msg_header_prefix);
+			strbuf_addf(&buf, "%s ", opt->msg_header_prefix);
 
 		/* Copy tmp to sb, adding spaces after newlines */
-		strbuf_grow(sb, sb->len + 2*tmp.len); /* more than sufficient */
+		strbuf_grow(&buf, buf.len + 2*tmp.len); /* more than sufficient */
 		for (; i_tmp < tmp.len; i_tmp++, i_sb++) {
 			/* Copy next character from tmp to sb */
-			sb->buf[sb->len + i_sb] = tmp.buf[i_tmp];
+			buf.buf[buf.len + i_sb] = tmp.buf[i_tmp];
 
 			/* If we copied a newline, add a space */
 			if (tmp.buf[i_tmp] == '\n')
-				sb->buf[++i_sb] = ' ';
+				buf.buf[++i_sb] = ' ';
 		}
 		/* Update length and ensure it's NUL-terminated */
-		sb->len += i_sb;
-		sb->buf[sb->len] = '\0';
+		buf.len += i_sb;
+		buf.buf[buf.len] = '\0';
 
 		strbuf_release(&tmp);
 	}
-	string_list_append(path_conflicts, sb->buf)->util = info;
+	string_list_append_nodup(path_conflicts, strbuf_detach(&buf, NULL))
+		->util = info;
 }
 
 static struct diff_filespec *pool_alloc_filespec(struct mem_pool *pool,
@@ -4434,7 +4432,7 @@ void merge_display_update_messages(struct merge_options *opt,
 				      stdout);
 				putchar('\0');
 			}
-			puts(info->message.buf);
+			puts(conflicts->items[i].string);
 			if (detailed)
 				putchar('\0');
 		}
