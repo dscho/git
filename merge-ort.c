@@ -352,7 +352,8 @@ struct merge_options_internal {
 	 * conflicts: logical conflicts and messages stored by _primary_ path
 	 *
 	 * This is a map of pathnames (a subset of the keys in "paths" above)
-	 * to struct logical_conflicts.  Note, though, that for each path,
+	 * to struct string_list, with each item's `util` containing a
+	 * `struct logical_conflict_info`. Note, though, that for each path,
 	 * it only stores the logical conflicts for which that path is the
 	 * primary path; the path might be part of additional conflicts.
 	 */
