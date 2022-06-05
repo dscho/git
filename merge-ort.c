@@ -780,7 +780,9 @@ static void path_msg(struct merge_options *opt,
 
 	/* Sanity checks */
 	assert(omittable_hint ==
-	       !starts_with(type_short_descriptions[type], "CONFLICT"));
+	       !starts_with(type_short_descriptions[type], "CONFLICT") ||
+	       type == CONFLICT_DIR_RENAME_SUGGESTED ||
+	       type == CONFLICT_PRESENT_DESPITE_SKIPPED);
 	if (opt->record_conflict_msgs_as_headers && omittable_hint)
 		return; /* Do not record mere hints in headers */
 	if (opt->record_conflict_msgs_as_headers && opt->priv->call_depth)
