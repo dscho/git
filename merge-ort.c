@@ -527,78 +527,48 @@ enum conflict_and_info_types {
  * We can add more entries, but DO NOT change any of these strings.  Also,
  * Order MUST match conflict_info_and_types.
  */
-static const char *type_short_descriptions[NB_CONFLICT_TYPES] = {
+static const char *type_short_descriptions[] = {
 	/*** "Simple" conflicts and informational messages ***/
-	/* INFO_AUTO_MERGING */
-	"Auto-merging",
-
-	/* CONFLICT_CONTENTS */
-	"CONFLICT (contents)",
-
-	/* CONFLICT_BINARY */
-	"CONFLICT (binary)",
-
-	/* CONFLICT_FILE_DIRECTORY */
-	"CONFLICT (file/directory)",
-
-	/* CONFLICT_DISTINCT_MODES */
-	"CONFLICT (distinct modes)",
-
-	/* CONFLICT_MODIFY_DELETE */
-	"CONFLICT (modify/delete)",
-
-	/* CONFLICT_PRESENT_DESPITE_SKIPPED */
-	"CONFLICT (upgrade your version of git)",
+	[INFO_AUTO_MERGING] = "Auto-merging",
+	[CONFLICT_CONTENTS] = "CONFLICT (contents)",
+	[CONFLICT_BINARY] = "CONFLICT (binary)",
+	[CONFLICT_FILE_DIRECTORY] = "CONFLICT (file/directory)",
+	[CONFLICT_DISTINCT_MODES] = "CONFLICT (distinct modes)",
+	[CONFLICT_MODIFY_DELETE] = "CONFLICT (modify/delete)",
+	[CONFLICT_PRESENT_DESPITE_SKIPPED] =
+		"CONFLICT (upgrade your version of git)",
 
 	/*** Regular rename ***/
-	/* CONFLICT_RENAME_RENAME */
-	"CONFLICT (rename/rename)",
-
-	/* CONFLICT_RENAME_COLLIDES */
-	"CONFLICT (rename involved in collision)",
-
-	/* CONFLICT_RENAME_DELETE */
-	"CONFLICT (rename/delete)",
+	[CONFLICT_RENAME_RENAME] = "CONFLICT (rename/rename)",
+	[CONFLICT_RENAME_COLLIDES] = "CONFLICT (rename involved in collision)",
+	[CONFLICT_RENAME_DELETE] = "CONFLICT (rename/delete)",
 
 	/*** Basic directory rename ***/
-	/* CONFLICT_DIR_RENAME_SUGGESTED */
-	"CONFLICT (directory rename suggested)",
-
-	/* INFO_DIR_RENAME_APPLIED */
-	"Path updated due to directory rename",
+	[CONFLICT_DIR_RENAME_SUGGESTED] =
+		"CONFLICT (directory rename suggested)",
+	[INFO_DIR_RENAME_APPLIED] = "Path updated due to directory rename",
 
 	/*** Special directory rename cases ***/
-	/* INFO_DIR_RENAME_SKIPPED_DUE_TO_RERENAME */
-	"Directory rename skipped since directory was renamed on both sides",
-
-	/* CONFLICT_DIR_RENAME_FILE_IN_WAY */
-	"CONFLICT (file in way of directory rename)",
-
-	/* CONFLICT_DIR_RENAME_COLLISION */
-	"CONFLICT(directory rename collision)",
-
-	/* CONFLICT_DIR_RENAME_SPLIT */
-	"CONFLICT(directory rename unclear split)",
+	[INFO_DIR_RENAME_SKIPPED_DUE_TO_RERENAME] =
+		"Directory rename skipped since directory was renamed on both sides",
+	[CONFLICT_DIR_RENAME_FILE_IN_WAY] =
+		"CONFLICT (file in way of directory rename)",
+	[CONFLICT_DIR_RENAME_COLLISION] = "CONFLICT(directory rename collision)",
+	[CONFLICT_DIR_RENAME_SPLIT] = "CONFLICT(directory rename unclear split)",
 
 	/*** Basic submodule ***/
-	/* INFO_SUBMODULE_FAST_FORWARDING */
-	"Fast forwarding submodule",
-
-	/* CONFLICT_SUBMODULE_FAILED_TO_MERGE */
-	"CONFLICT (submodule)",
+	[INFO_SUBMODULE_FAST_FORWARDING] = "Fast forwarding submodule",
+	[CONFLICT_SUBMODULE_FAILED_TO_MERGE] = "CONFLICT (submodule)",
 
 	/*** Special submodule cases broken out from FAILED_TO_MERGE ***/
-	/* CONFLICT_SUBMODULE_FAILED_TO_MERGE_BUT_POSSIBLE_RESOLUTION */
-	"CONFLICT (submodule with possible resolution)",
-
-	/* CONFLICT_SUBMODULE_NOT_INITIALIZED */
-	"CONFLICT (submodule not initialized)",
-
-	/* CONFLICT_SUBMODULE_HISTORY_NOT_AVAILABLE */
-	"CONFLICT (submodule history not available)",
-
-	/* CONFLICT_SUBMODULE_MAY_HAVE_REWINDS */
-	"CONFLICT (submodule may have rewinds)",
+	[CONFLICT_SUBMODULE_FAILED_TO_MERGE_BUT_POSSIBLE_RESOLUTION] =
+		"CONFLICT (submodule with possible resolution)",
+	[CONFLICT_SUBMODULE_NOT_INITIALIZED] =
+		"CONFLICT (submodule not initialized)",
+	[CONFLICT_SUBMODULE_HISTORY_NOT_AVAILABLE] =
+		"CONFLICT (submodule history not available)",
+	[CONFLICT_SUBMODULE_MAY_HAVE_REWINDS] =
+		"CONFLICT (submodule may have rewinds)",
 };
 
 struct logical_conflicts {
