@@ -571,12 +571,7 @@ static const char *type_short_descriptions[] = {
 		"CONFLICT (submodule may have rewinds)",
 };
 
-struct logical_conflicts {
-	size_t alloc, nr;
-	struct logical_conflict *info;
-};
-
-struct logical_conflict {
+struct logical_conflict_info {
 	enum conflict_and_info_types type;
 	struct strvec paths;
 	struct strbuf message;
@@ -669,10 +664,12 @@ static void clear_or_reinit_internal_opts(struct merge_options_internal *opti,
 
 		/* Release and free each strbuf found in output */
 		strmap_for_each_entry(&opti->conflicts, &iter, e) {
-			struct logical_conflicts *conflicts = e->value;
-			for (int i=0; i<conflicts->nr; i++) {
-				strvec_clear(&conflicts->info[i].paths);
-				strbuf_release(&conflicts->info[i].message);
+			struct string_list *list = e->value;
+			for (int i = 0; i < list->nr; i++) {
+				struct logical_conflict_info *info =
+					list->items[i].util;
+				strvec_clear(&info->paths);
+				strbuf_release(&info->message);
 			}
 			/*
 			 * While strictly speaking we don't need to
@@ -682,8 +679,8 @@ static void clear_or_reinit_internal_opts(struct merge_options_internal *opti,
 			 * to do another strmap_for_each_entry() loop, so we
 			 * just free it while we're iterating anyway.
 			 */
-			free(conflicts->info);
-			free(conflicts);
+			string_list_clear(list, 1);
+			free(list);
 		}
 		strmap_clear(&opti->conflicts, 0);
 	}
@@ -743,8 +740,8 @@ static void path_msg(struct merge_options *opt,
 		     const char *message_fmt, ...)
 {
 	va_list ap;
-	struct logical_conflicts *path_conflicts;
-	struct logical_conflict *cur;
+	struct string_list *path_conflicts;
+	struct logical_conflict_info *info;
 	struct strbuf *dest, *sb;
 	struct strbuf tmp = STRBUF_INIT;
 
@@ -761,36 +758,35 @@ static void path_msg(struct merge_options *opt,
 	/* Ensure path_conflicts (ptr to array of logical_conflict) allocated */
 	path_conflicts = strmap_get(&opt->priv->conflicts, primary_path);
 	if (!path_conflicts) {
-		path_conflicts = xcalloc(1, sizeof(*path_conflicts));
+		path_conflicts = xmalloc(sizeof(*path_conflicts));
+		string_list_init_nodup(path_conflicts);
 		strmap_put(&opt->priv->conflicts, primary_path, path_conflicts);
 	}
 
 	/* Add a logical_conflict at the end to store info from this call */
-	ALLOC_GROW(path_conflicts->info,
-		   path_conflicts->nr + 1, path_conflicts->alloc);
-	cur = &path_conflicts->info[path_conflicts->nr++];
-	cur->type = type;
-	strvec_init(&cur->paths);
-	strbuf_init(&cur->message, 0);
+	info = xcalloc(1, sizeof(*info));
+	info->type = type;
+	strvec_init(&info->paths);
+	strbuf_init(&info->message, 0);
 
 	/* Handle the list of paths */
-	strvec_push(&cur->paths, primary_path);
+	strvec_push(&info->paths, primary_path);
 	if (other_path_1)
-		strvec_push(&cur->paths, other_path_1);
+		strvec_push(&info->paths, other_path_1);
 	if (other_path_2)
-		strvec_push(&cur->paths, other_path_2);
+		strvec_push(&info->paths, other_path_2);
 	if (other_paths)
 		for (int i = 0; i < other_paths->nr; i++)
-		strvec_push(&cur->paths, other_paths->items[i].string);
+		strvec_push(&info->paths, other_paths->items[i].string);
 
 	/* Handle message and its format, in normal case */
-	dest = (opt->record_conflict_msgs_as_headers ? &tmp : &cur->message);
+	dest = (opt->record_conflict_msgs_as_headers ? &tmp : &info->message);
 	va_start(ap, message_fmt);
 	strbuf_vaddf(dest, message_fmt, ap);
 	va_end(ap);
 
 	/* Handle specialized formatting of message under --remerge-diff */
-	sb = &cur->message;
+	sb = &info->message;
 	if (opt->record_conflict_msgs_as_headers) {
 		int i_sb = 0, i_tmp = 0;
 
@@ -814,6 +810,7 @@ static void path_msg(struct merge_options *opt,
 
 		strbuf_release(&tmp);
 	}
+	string_list_append(path_conflicts, sb->buf)->util = info;
 }
 
 static struct diff_filespec *pool_alloc_filespec(struct mem_pool *pool,
@@ -4420,22 +4417,23 @@ void merge_display_update_messages(struct merge_options *opt,
 
 	/* Iterate over the items, printing them */
 	for (int path_nr = 0; path_nr < olist.nr; ++path_nr) {
-		struct logical_conflicts *conflicts = olist.items[path_nr].util;
+		struct string_list *conflicts = olist.items[path_nr].util;
 		for (int i = 0; i < conflicts->nr; i++) {
-			struct logical_conflict *conf = &conflicts->info[i];
+			struct logical_conflict_info *info =
+				conflicts->items[i].util;
 
 			if (detailed) {
-				printf("%lu", (unsigned long)conf->paths.nr);
+				printf("%lu", (unsigned long)info->paths.nr);
 				putchar('\0');
-				for (int n = 0; n < conf->paths.nr; n++) {
-					fputs(conf->paths.v[n], stdout);
+				for (int n = 0; n < info->paths.nr; n++) {
+					fputs(info->paths.v[n], stdout);
 					putchar('\0');
 				}
-				fputs(type_short_descriptions[conf->type],
+				fputs(type_short_descriptions[info->type],
 				      stdout);
 				putchar('\0');
 			}
-			puts(conf->message.buf);
+			puts(info->message.buf);
 			if (detailed)
 				putchar('\0');
 		}
@@ -4815,7 +4813,7 @@ redo:
 	strmap_for_each_entry(&opt->priv->conflicts, &iter, e) {
 		const char *path = e->key;
 		struct strbuf *buf = strmap_get(result->path_messages, path);
-		struct logical_conflicts *conflicts = e->value;
+		struct string_list *conflicts = e->value;
 
 		if (!buf) {
 			buf = xcalloc(1, sizeof(*buf));
@@ -4826,7 +4824,7 @@ redo:
 		for (int i = 0; i < conflicts->nr; i++) {
 			if (buf->len)
 				strbuf_addch(buf, '\n');
-			strbuf_addbuf(buf, &conflicts->info[i].message);
+			strbuf_addstr(buf, conflicts->items[i].string);
 			strbuf_trim_trailing_newline(buf);
 		}
 	}
