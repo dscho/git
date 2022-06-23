@@ -50,6 +50,12 @@ struct fsentry {
 	/* Pointer to the next file entry of the list. */
 	struct fsentry *next;
 
+	/*
+	 * We invalidate the FSCache lazily, by marking entries as invalidated
+	 * and upon the next `lstat()` lookup, regenerating it.
+	 */
+	int invalidated;
+
 	union {
 		/* Reference count of the directory listing. */
 		volatile long refcnt;
@@ -395,7 +401,15 @@ static struct fsentry *fscache_get(struct fscache *cache, struct fsentry *key)
 	cache->fscache_requests++;
 	/* check if entry is in cache */
 	fse = hashmap_get_entry(&cache->map, key, ent, NULL);
-	if (fse) {
+	if (fse && fse->invalidated) {
+		struct fsentry *e;
+
+		for (e = fse->list; e; e = e->next)
+			hashmap_remove(&cache->map, &e->ent, NULL);
+		hashmap_remove(&cache->map, &fse->ent, NULL);
+
+		fse = NULL;
+	} else if (fse) {
 		if (fse->st_mode)
 			fsentry_addref(fse);
 		else
@@ -405,7 +419,15 @@ static struct fsentry *fscache_get(struct fscache *cache, struct fsentry *key)
 	/* if looking for a file, check if directory listing is in cache */
 	if (!fse && key->list) {
 		fse = hashmap_get_entry(&cache->map, key->list, ent, NULL);
-		if (fse) {
+		if (fse && fse->invalidated) {
+			struct fsentry *e;
+
+			for (e = fse->list; e; e = e->next)
+				hashmap_remove(&cache->map, &e->ent, NULL);
+			hashmap_remove(&cache->map, &fse->ent, NULL);
+
+			fse = NULL;
+		} else if (fse) {
 			/*
 			 * dir entry without file entry, or dir does not
 			 * exist -> file doesn't exist
@@ -569,6 +591,33 @@ void fscache_flush(void)
 	if (cache && cache->enabled) {
 		fscache_clear(cache);
 	}
+}
+
+int fscache_invalidate_path(const char *path)
+{
+	const char *sep = find_last_dir_sep(path);
+	const char *basename = sep ? sep + 1 : path;
+	struct fscache *cache = fscache_getcache();
+	struct heap_fsentry key[2];
+	struct fsentry *fse;
+	int ret = 0;
+
+	if (!cache)
+		return 0;
+
+	/* lookup entry for path + name in cache */
+	fsentry_init(&key[0].u.ent, NULL, path, sep ? sep - path : 0);
+	fsentry_init(&key[1].u.ent, &key[0].u.ent, basename, strlen(basename));
+	fse = hashmap_get_entry(&cache->map, &key[1].u.ent, ent, NULL);
+	if (fse)
+		ret = fse->invalidated = 1;
+	else {
+		fse = hashmap_get_entry(&cache->map, &key[0].u.ent, ent, NULL);
+		if (fse)
+			ret = fse->invalidated = 1;
+	}
+
+	return ret;
 }
 
 /*

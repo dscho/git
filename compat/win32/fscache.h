@@ -20,6 +20,9 @@ int fscache_enabled(const char *path);
 void fscache_flush(void);
 #define flush_fscache() fscache_flush()
 
+int fscache_invalidate_path(const char *path);
+#define invalidate_path_in_fscache(path) fscache_invalidate_path(path)
+
 DIR *fscache_opendir(const char *dir);
 int fscache_lstat(const char *file_name, struct stat *buf);
 int fscache_is_mount_point(struct strbuf *path);

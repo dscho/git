@@ -1518,6 +1518,10 @@ struct fscache;
 #define flush_fscache() /* noop */
 #endif
 
+#ifndef invalidate_path_in_fscache
+#define invalidate_path_in_fscache(path) (0)
+#endif
+
 #ifndef getcache_fscache
 #define getcache_fscache() (NULL) /* noop */
 #endif

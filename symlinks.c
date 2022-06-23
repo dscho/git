@@ -332,6 +332,7 @@ void remove_scheduled_dirs(void)
 void invalidate_lstat_cache(void)
 {
 	reset_lstat_cache(&default_cache);
+	flush_fscache();
 }
 
 #undef rmdir

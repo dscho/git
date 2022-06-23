@@ -512,14 +512,18 @@ int mingw_unlink(const char *pathname)
 	if (xutftowcs_long_path(wpathname, pathname) < 0)
 		return -1;
 
-	if (DeleteFileW(wpathname))
+	if (DeleteFileW(wpathname)) {
+		invalidate_path_in_fscache(pathname);
 		return 0;
+	}
 
 	do {
 		/* read-only files cannot be removed */
 		_wchmod(wpathname, 0666);
-		if (!_wunlink(wpathname))
+		if (!_wunlink(wpathname)) {
+			invalidate_path_in_fscache(pathname);
 			return 0;
+		}
 		if (!is_file_in_use_error(GetLastError()))
 			break;
 		/*
@@ -527,8 +531,13 @@ int mingw_unlink(const char *pathname)
 		 * ERROR_ACCESS_DENIED (EACCES), so try _wrmdir() as well. This is the
 		 * same error we get if a file is in use (already checked above).
 		 */
-		if (!_wrmdir(wpathname))
+		if (!_wrmdir(wpathname)) {
+			invalidate_lstat_cache();
+			invalidate_path_in_fscache(pathname);
 			return 0;
+		}
+		if (!is_file_in_use_error(GetLastError()))
+			break;
 	} while (retry_ask_yes_no(&tries, "Unlink of file '%s' failed. "
 			"Should I try again?", pathname));
 	return -1;
@@ -667,6 +676,10 @@ int mingw_mkdir(const char *path, int mode)
 		process_phantom_symlinks();
 	if (!ret && needs_hiding(path))
 		return set_hidden_flag(wpath, 1);
+
+	if (!ret)
+		invalidate_path_in_fscache(path);
+
 	return ret;
 }
 
@@ -793,6 +806,10 @@ int mingw_open (const char *filename, int oflags, ...)
 		if (fd >= 0 && set_hidden_flag(wfilename, 1))
 			warning("could not mark '%s' as hidden.", filename);
 	}
+
+	if (fd >= 0 && (oflags & (O_RDONLY | O_RDWR)))
+		invalidate_path_in_fscache(filename);
+
 	return fd;
 }
 
@@ -848,6 +865,10 @@ FILE *mingw_fopen (const char *filename, const char *otype)
 		errno = ENOENT;
 	if (file && hide && set_hidden_flag(wfilename, 1))
 		warning("could not mark '%s' as hidden.", filename);
+
+	if (file && strchr(otype, 'w'))
+		invalidate_path_in_fscache(filename);
+
 	return file;
 }
 
@@ -875,6 +896,10 @@ FILE *mingw_freopen (const char *filename, const char *otype, FILE *stream)
 	file = _wfreopen(wfilename, wotype, stream);
 	if (file && hide && set_hidden_flag(wfilename, 1))
 		warning("could not mark '%s' as hidden.", filename);
+
+	if (file && strchr(otype, 'w'))
+		invalidate_path_in_fscache(filename);
+
 	return file;
 }
 
@@ -2662,8 +2687,10 @@ repeat:
 			if (attrsold == INVALID_FILE_ATTRIBUTES ||
 			    !(attrsold & FILE_ATTRIBUTE_DIRECTORY))
 				errno = EISDIR;
-			else if (!_wrmdir(wpnew))
+			else if (!_wrmdir(wpnew)) {
+				invalidate_lstat_cache();
 				goto repeat;
+			}
 			return -1;
 		}
 		if ((attrs & FILE_ATTRIBUTE_READONLY) &&

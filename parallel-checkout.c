@@ -390,6 +390,7 @@ void write_pc_item(struct parallel_checkout_item *pc_item,
 
 	pc_item->status = PC_ITEM_WRITTEN;
 
+	flush_fscache();
 out:
 	strbuf_release(&path);
 }
