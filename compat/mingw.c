@@ -524,6 +524,7 @@ int mingw_unlink(const char *pathname)
 			invalidate_path_in_fscache(pathname);
 			return 0;
 		}
+error("_wunlink: errno: %d, last error: GetLastError(): %ld", (int)errno, GetLastError());
 		if (!is_file_in_use_error(GetLastError()))
 			break;
 		/*
@@ -538,6 +539,7 @@ int mingw_unlink(const char *pathname)
 		}
 		if (!is_file_in_use_error(GetLastError()))
 			break;
+error("_wrmdir: errno: %d, last error: GetLastError(): %ld", (int)errno, GetLastError());
 	} while (retry_ask_yes_no(&tries, "Unlink of file '%s' failed. "
 			"Should I try again?", pathname));
 	return -1;
@@ -661,6 +663,7 @@ int mingw_mkdir(const char *path, int mode)
 	int ret;
 	wchar_t wpath[MAX_LONG_PATH];
 
+error("%s:%d: mkdir(%s)", __FILE__, __LINE__, path);
 	if (!is_valid_win32_path(path, 0)) {
 		errno = EINVAL;
 		return -1;

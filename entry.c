@@ -9,6 +9,17 @@
 #include "entry.h"
 #include "parallel-checkout.h"
 
+static int debug_errno(void)
+{
+	int save = errno;
+
+	error("errno is %d", save);
+
+	errno = save;
+
+	return 1;
+}
+
 static void create_directories(const char *path, int path_len,
 			       const struct checkout *state)
 {
@@ -41,6 +52,7 @@ static void create_directories(const char *path, int path_len,
 		 * one more time to create the directory.
 		 */
 		if (mkdir(buf, 0777)) {
+debug_errno();
 			if (errno == EEXIST && state->force &&
 			    !unlink_or_warn(buf) && !mkdir(buf, 0777))
 				continue;
@@ -486,6 +498,8 @@ int checkout_entry_ca(struct cache_entry *ce, struct conv_attrs *ca,
 	strbuf_add(&path, state->base_dir, state->base_dir_len);
 	strbuf_add(&path, ce->name, ce_namelen(ce));
 
+if (getenv("DDD")) open_in_gdb();
+error("%s:%d: path: %s", __FILE__, __LINE__, path.buf);
 	if (!check_path(path.buf, path.len, &st, state->base_dir_len)) {
 		const struct submodule *sub;
 		unsigned changed = ie_match_stat(state->istate, ce, &st,
@@ -512,6 +526,7 @@ int checkout_entry_ca(struct cache_entry *ce, struct conv_attrs *ca,
 					state->force ? SUBMODULE_MOVE_HEAD_FORCE : 0);
 		}
 
+error("%s:%d: changed: %d", __FILE__, __LINE__, (int)changed);
 		if (!changed)
 			return 0;
 		if (!state->force) {
@@ -525,6 +540,7 @@ int checkout_entry_ca(struct cache_entry *ce, struct conv_attrs *ca,
 		if (state->clone)
 			mark_colliding_entries(state, ce, &st);
 
+error("%s:%d: about to unlink()", __FILE__, __LINE__);
 		/*
 		 * We unlink the old file, to get the new one with the
 		 * right permissions (including umask, which is nasty
@@ -541,6 +557,7 @@ int checkout_entry_ca(struct cache_entry *ce, struct conv_attrs *ca,
 	} else if (state->not_new)
 		return 0;
 
+error("%s:%d: create_directories()", __FILE__, __LINE__);
 	create_directories(path.buf, path.len, state);
 
 	if (nr_checkouts)

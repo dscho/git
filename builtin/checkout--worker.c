@@ -125,6 +125,7 @@ int cmd_checkout__worker(int argc, const char **argv, const char *prefix)
 				   checkout_worker_options);
 
 	git_config(git_default_config, NULL);
+error("%s:%d: worker pid %d, FSCache enabled: %d", __FILE__, __LINE__, (int)getpid(), is_fscache_enabled("."));
 	argc = parse_options(argc, argv, prefix, checkout_worker_options,
 			     checkout_worker_usage, 0);
 	if (argc > 0)

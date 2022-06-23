@@ -197,6 +197,7 @@ static int handle_results(struct checkout *state)
 
 	for (i = 0; i < parallel_checkout.nr; i++) {
 		struct parallel_checkout_item *pc_item = &parallel_checkout.items[i];
+error("%s:%d: pc_item[%d].status = %d", __FILE__, __LINE__, (int)i, (int)pc_item->status);
 
 		switch(pc_item->status) {
 		case PC_ITEM_WRITTEN:
@@ -338,8 +339,10 @@ void write_pc_item(struct parallel_checkout_item *pc_item,
 	 * a symlink (checked out after we enqueued this entry for parallel
 	 * checkout). Thus, we must check the leading dirs again.
 	 */
+error("%s:%d: dir_sep %p '%s'/'%s', has_dirs_only: %d, base_dir_len: %d", __FILE__, __LINE__, dir_sep, dir_sep, path.buf, dir_sep ? (int)has_dirs_only_path(path.buf, dir_sep - path.buf, state->base_dir_len) : -999, (int)state->base_dir_len);
 	if (dir_sep && !has_dirs_only_path(path.buf, dir_sep - path.buf,
 					   state->base_dir_len)) {
+error("%s:%d: '%s' COLLIDED", __FILE__, __LINE__, path.buf);
 		pc_item->status = PC_ITEM_COLLIDED;
 		trace2_data_string("pcheckout", NULL, "collision/dirname", path.buf);
 		goto out;
@@ -356,11 +359,13 @@ void write_pc_item(struct parallel_checkout_item *pc_item,
 			 * also interesting, but the above has_dirs_only_path()
 			 * call should have already caught these cases.
 			 */
+error("%s:%d: '%s' COLLIDED", __FILE__, __LINE__, path.buf);
 			pc_item->status = PC_ITEM_COLLIDED;
 			trace2_data_string("pcheckout", NULL,
 					   "collision/basename", path.buf);
 		} else {
 			error_errno("failed to open file '%s'", path.buf);
+error("%s:%d: '%s' FAILED", __FILE__, __LINE__, path.buf);
 			pc_item->status = PC_ITEM_FAILED;
 		}
 		goto out;
@@ -368,6 +373,7 @@ void write_pc_item(struct parallel_checkout_item *pc_item,
 
 	if (write_pc_item_to_fd(pc_item, fd, path.buf)) {
 		/* Error was already reported. */
+error("%s:%d: '%s' FAILED", __FILE__, __LINE__, path.buf);
 		pc_item->status = PC_ITEM_FAILED;
 		close_and_clear(&fd);
 		unlink(path.buf);
@@ -378,16 +384,19 @@ void write_pc_item(struct parallel_checkout_item *pc_item,
 
 	if (close_and_clear(&fd)) {
 		error_errno("unable to close file '%s'", path.buf);
+error("%s:%d: '%s' FAILED", __FILE__, __LINE__, path.buf);
 		pc_item->status = PC_ITEM_FAILED;
 		goto out;
 	}
 
 	if (state->refresh_cache && !fstat_done && lstat(path.buf, &pc_item->st) < 0) {
 		error_errno("unable to stat just-written file '%s'",  path.buf);
+error("%s:%d: '%s' FAILED", __FILE__, __LINE__, path.buf);
 		pc_item->status = PC_ITEM_FAILED;
 		goto out;
 	}
 
+error("%s:%d: '%s' WRITTEN", __FILE__, __LINE__, path.buf);
 	pc_item->status = PC_ITEM_WRITTEN;
 
 	flush_fscache();
@@ -634,6 +643,7 @@ static void write_items_sequentially(struct checkout *state)
 {
 	size_t i;
 
+error("%s:%d: writing sequentially", __FILE__, __LINE__);
 	flush_fscache();
 	for (i = 0; i < parallel_checkout.nr; i++) {
 		struct parallel_checkout_item *pc_item = &parallel_checkout.items[i];
@@ -641,6 +651,7 @@ static void write_items_sequentially(struct checkout *state)
 		if (pc_item->status != PC_ITEM_COLLIDED)
 			advance_progress_meter();
 	}
+error("%s:%d: wrote sequentially", __FILE__, __LINE__);
 }
 
 int run_parallel_checkout(struct checkout *state, int num_workers, int threshold,
@@ -666,6 +677,7 @@ int run_parallel_checkout(struct checkout *state, int num_workers, int threshold
 		finish_workers(workers, num_workers);
 	}
 
+error("%s:%d: handling results", __FILE__, __LINE__);
 	ret = handle_results(state);
 
 	finish_parallel_checkout();

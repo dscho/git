@@ -401,6 +401,7 @@ static struct fsentry *fscache_get(struct fscache *cache, struct fsentry *key)
 	cache->fscache_requests++;
 	/* check if entry is in cache */
 	fse = hashmap_get_entry(&cache->map, key, ent, NULL);
+error("%s:%d: get(%s) (fse %p, invalidated: %d)", __FILE__, __LINE__, key->dirent.d_name, (void *)fse, fse ? fse->invalidated : -999);
 	if (fse && fse->invalidated) {
 		struct fsentry *e;
 
@@ -419,6 +420,7 @@ static struct fsentry *fscache_get(struct fscache *cache, struct fsentry *key)
 	/* if looking for a file, check if directory listing is in cache */
 	if (!fse && key->list) {
 		fse = hashmap_get_entry(&cache->map, key->list, ent, NULL);
+error("%s:%d: get(%s) (fse %p, invalidated: %d)", __FILE__, __LINE__, key->dirent.d_name, (void *)fse, fse ? fse->invalidated : -999);
 		if (fse && fse->invalidated) {
 			struct fsentry *e;
 
@@ -457,6 +459,7 @@ static struct fsentry *fscache_get(struct fscache *cache, struct fsentry *key)
 		return NULL;
 	}
 
+error("%s:%d: adding %s to the FSCache", __FILE__, __LINE__, fse->dirent.d_name);
 	/* add directory listing to the cache */
 	cache->fscache_misses++;
 	fscache_add(cache, fse);
@@ -589,6 +592,7 @@ void fscache_flush(void)
 	struct fscache *cache = fscache_getcache();
 
 	if (cache && cache->enabled) {
+error("%s:%d: flushing FSCache", __FILE__, __LINE__);
 		fscache_clear(cache);
 	}
 }
@@ -602,6 +606,7 @@ int fscache_invalidate_path(const char *path)
 	struct fsentry *fse;
 	int ret = 0;
 
+error("%s:%d: invalidating entry for '%s' (cache %p)", __FILE__, __LINE__, path, (void *)cache);
 	if (!cache)
 		return 0;
 
@@ -609,10 +614,12 @@ int fscache_invalidate_path(const char *path)
 	fsentry_init(&key[0].u.ent, NULL, path, sep ? sep - path : 0);
 	fsentry_init(&key[1].u.ent, &key[0].u.ent, basename, strlen(basename));
 	fse = hashmap_get_entry(&cache->map, &key[1].u.ent, ent, NULL);
+error("%s:%d: invalidating entry for '%s' (cache %p, fse %p)", __FILE__, __LINE__, path, (void *)cache, (void *)fse);
 	if (fse)
 		ret = fse->invalidated = 1;
 	else {
 		fse = hashmap_get_entry(&cache->map, &key[0].u.ent, ent, NULL);
+error("%s:%d: invalidating entry for '%s' (cache %p, fse %p)", __FILE__, __LINE__, path, (void *)cache, (void *)fse);
 		if (fse)
 			ret = fse->invalidated = 1;
 	}
@@ -634,6 +641,7 @@ int fscache_lstat(const char *filename, struct stat *st)
 	if (!cache || !do_fscache_enabled(cache, filename))
 		return mingw_lstat(filename, st);
 
+error("%s:%d: lstat(%s) via FSCache", __FILE__, __LINE__, filename);
 	cache->lstat_requests++;
 	/* split filename into path + name */
 	len = strlen(filename);

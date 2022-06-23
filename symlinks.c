@@ -137,6 +137,7 @@ static int lstat_cache_matchlen(struct cache_def *cache,
 			ret = stat(cache->path.buf, &st);
 		else
 			ret = lstat(cache->path.buf, &st);
+error("%s:%d: stat returned %d, mode: %o", __FILE__, __LINE__, ret, st.st_mode);
 
 		if (ret) {
 			*ret_flags = FL_LSTATERR;
@@ -331,6 +332,7 @@ void remove_scheduled_dirs(void)
 
 void invalidate_lstat_cache(void)
 {
+error("%s:%d: invalidating lstat cache", __FILE__, __LINE__);
 	reset_lstat_cache(&default_cache);
 	flush_fscache();
 }
