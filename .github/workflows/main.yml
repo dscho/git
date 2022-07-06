@@ -57,7 +57,13 @@ jobs:
         echo "GIT_TEST_SHELL_PATH=$(cygpath -aw /mingw64/bin/ash.exe)" >>$GITHUB_ENV &&
         echo "SHELL=$(cygpath -aw /mingw64/bin/ash.exe)" >>$GITHUB_ENV &&
         echo "SHELL_PATH=$(cygpath -aw /mingw64/bin/ash.exe)" >>GIT-BUILD-OPTIONS &&
-        echo "TEST_SHELL_PATH=$(cygpath -aw /mingw64/bin/ash.exe)" >>GIT-BUILD-OPTIONS
+        echo "TEST_SHELL_PATH=$(cygpath -aw /mingw64/bin/ash.exe)" >>GIT-BUILD-OPTIONS &&
+        ln busybox.exe bash.exe &&
+        echo "PATH='$(cygpath -amp "$(sed -n "s/.*PATH=//p" <../../etc/profile)")'" >>../../etc/profile &&
+        printf '#include <stdio.h>\n#include <stdlib.h>\nint main(int argc, char **argv) { int i; fprintf(stderr, "Tried to run `%%s` with %%d arguments\\n", argv[0], argc - 1); for (i = 1; i < argc; i++) fprintf(stderr, "arg #%%d: `%%s`\\n", i, argv[i]); exit(127); }\n' >not-found.c &&
+        cat not-found.c &&
+        gcc -o sh.exe not-found.c &&
+        ln -f sh.exe ../../usr/bin/sh.exe
     - name: test
       shell: bash
       run: . /etc/profile && ci/run-test-slice.sh ${{matrix.nr}} 10
