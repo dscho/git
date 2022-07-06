@@ -128,7 +128,10 @@ jobs:
         cd /c/git-sdk-64-minimal/mingw64/bin &&
         unzip -o /tmp/busybox.zip &&
         ln busybox.exe ash.exe &&
-        echo "GIT_TEST_SHELL_PATH=$(cygpath -aw /mingw64/bin/ash.exe)" >>$GITHUB_ENV
+        echo "GIT_TEST_SHELL_PATH=$(cygpath -aw /mingw64/bin/ash.exe)" >>$GITHUB_ENV &&
+        echo "SHELL=$(cygpath -aw /mingw64/bin/ash.exe)" >>$GITHUB_ENV &&
+        echo "SHELL_PATH=$(cygpath -aw /mingw64/bin/ash.exe)" >>GIT-BUILD-OPTIONS &&
+        echo "TEST_SHELL_PATH=$(cygpath -aw /mingw64/bin/ash.exe)" >>GIT-BUILD-OPTIONS
     - name: test
       shell: bash
       run: . /etc/profile && ci/run-test-slice.sh ${{matrix.nr}} 10
