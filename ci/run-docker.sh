@@ -25,8 +25,6 @@ docker pull "$CI_CONTAINER"
 # root@container:/# export jobname=<jobname>
 # root@container:/# /usr/src/git/ci/run-docker-build.sh <host-user-id>
 
-container_cache_dir=/tmp/container-cache
-
 docker run \
 	--interactive \
 	--env DEVELOPER \
@@ -36,12 +34,8 @@ docker run \
 	--env GIT_TEST_CLONE_2GB \
 	--env MAKEFLAGS \
 	--env jobname \
-	--env cache_dir="$container_cache_dir" \
 	--volume "${PWD}:/usr/src/git" \
-	--volume "$cache_dir:$container_cache_dir" \
 	"$CI_CONTAINER" \
 	/usr/src/git/ci/run-docker-build.sh $(id -u $USER)
 
 check_unignored_build_artifacts
-
-save_good_tree

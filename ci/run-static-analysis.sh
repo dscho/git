@@ -30,5 +30,3 @@ make hdr-check ||
 exit 1
 
 make check-pot
-
-save_good_tree
