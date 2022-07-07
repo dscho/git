@@ -454,7 +454,7 @@ run_dir_diff_test 'difftool --dir-diff' '
 '
 
 run_dir_diff_test 'difftool --dir-diff avoids repeated slashes in TMPDIR' '
-	TMPDIR="${TMPDIR:-/tmp}////" \
+	TMPDIR="${TMPDIR:-${TMP:-/tmp}}////" \
 		git difftool --dir-diff $symlinks --extcmd echo branch >output &&
 	grep -v // output >actual &&
 	test_line_count = 1 actual
