@@ -471,32 +471,22 @@ find_existing_splits () {
 }
 
 find_mainline_ref () {
-	debug "Looking for first split..."
-	dir="$1"
-	revs="$2"
+	local dir="$1"
+	shift
 
-	git log --reverse --grep="^git-subtree-dir: $dir/*\$" \
-		--no-show-signature --pretty=format:'START %H%n%s%n%n%b%nEND%n' $revs |
-	while read a b junk
-	do
-		case "$a" in
-		git-subtree-mainline:)
-			echo "$b"
-			return
-			;;
-		esac
-	done
+	debug "Looking for first split..."
+
+	git log -1 --reverse --grep="^git-subtree-dir: $dir/*\$" \
+		--no-show-signature --pretty=format:'%(trailers:key=git-subtree-mainline,only=true)' "$@"
 }
 
 exclude_processed_refs () {
 		if test -r "$cachedir/processed"
 		then
-			cat "$cachedir/processed" |
-			while read rev
-			do
-				debug "read $rev"
-				echo "^$rev"
-			done
+			test -z "$arg_debug" ||
+			sed "s/^/$(printf "%$(($indent * 2))s")read /" \
+				<"$cachedir/processed" >&2
+			sed "s/^/^/" <"$cachedir/processed"
 		fi
 }
 
@@ -1003,7 +993,7 @@ cmd_split () {
 
 	unrevs="$(find_existing_splits "$dir" "$rev") $(exclude_processed_refs)" || exit $?
 
-	mainline="$(find_mainline_ref "$dir" "$revs")"
+	mainline="$(find_mainline_ref "$dir" "$rev")"
 	if test -n "$mainline"
 	then
 		debug "Mainline $mainline predates subtree add"
