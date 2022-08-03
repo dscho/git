@@ -740,6 +740,8 @@ char *interpolate_path(const char *path, int real_home)
 		return system_path(path);
 
 #ifdef __MINGW32__
+	if (!strcmp(path, "/dev/null"))
+		return xstrdup("NUL");
 	if (path[0] == '/') {
 		warning(_("encountered old-style '%s' that should be '%%(prefix)/%s'"), path, path);
 		return system_path(path + 1);
