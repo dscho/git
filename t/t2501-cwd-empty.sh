@@ -224,7 +224,7 @@ test_expect_success '`rm -rf dir` even with only tracked files will remove somet
 	test_path_is_dir a/b
 '
 
-test_expect_success 'git version continues working from a deleted dir' '
+test_expect_success !BUSYBOX 'git version continues working from a deleted dir' '
 	mkdir tmp &&
 	(
 		cd tmp &&
@@ -269,7 +269,7 @@ test_expect_success 'rm -r leaves submodule if cwd inside' '
 		git --git-dir=../.git --work-tree=.. rm -r ../my_submodule/
 '
 
-test_expect_success 'rm -rf removes submodule even if cwd inside' '
+test_expect_success !BUSYBOX 'rm -rf removes submodule even if cwd inside' '
 	test_submodule_removal missing \
 		git --git-dir=../.git --work-tree=.. rm -rf ../my_submodule/
 '
