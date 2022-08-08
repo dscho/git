@@ -29,8 +29,8 @@
 ################################################################################
 
 debug_print () {
-	# Send message to stderr if global variable GIT_MERGETOOL_VIMDIFF is set
-	# to "true"
+	# Send message to stderr if global variable GIT_MERGETOOL_VIMDIFF_DEBUG
+	# is set.
 
 	if test -n "$GIT_MERGETOOL_VIMDIFF_DEBUG"
 	then
@@ -55,12 +55,40 @@ substring () {
 	echo "$STRING" | cut -c$(( START + 1 ))-$(( START + $LEN ))
 }
 
+enable_diff_mode () {
+	# Auxiliary function that appends extra vim commands at the end of each
+	# tab section to enable diff mode
+
+	NUMBER_OF_WINDOWS_IN_TAB=$1
+
+	if test "$NUMBER_OF_WINDOWS_IN_TAB" -eq 1
+	then
+		# Tabs that only contains one window will "diff"
+		# against all loaded/hidden buffers
+
+		echo "let tmp=bufnr('%') | execute 'silent 1,4bufdo diffthis' | execute 'buffer '.tmp"
+	else
+		# Tabs that contain more than one window will
+		# only "diff" against those windows
+
+		echo "execute 'windo diffthis'"
+	fi
+}
+
 gen_cmd_aux () {
 	# Auxiliary function used from "gen_cmd()".
 	# Read that other function documentation for more details.
+	#
+	# This function returns two items
+	#    - STDOUT:  The vim command to use
+	#    - RETCODE: The number of windows opened in the current tab
 
-	LAYOUT=$1
-	CMD=$2  # This is a second (hidden) argument used for recursion
+	WINDOWS_NR=$1 # Number of windows opened in the current tab after
+	              # having parsed the provided "LAYOUT"
+	              # If applicable, this variable will be updated and
+	              # returned in RETCODE
+	LAYOUT=$2     # Substring (from the original LAYOUT) to process
+	CMD=$3        # This is a third (hidden) argument used for recursion
 
 	debug_print
 	debug_print "LAYOUT    : $LAYOUT"
@@ -232,6 +260,7 @@ gen_cmd_aux () {
 		after="wincmd j"
 		index=$index_horizontal_split
 		terminate="true"
+		WINDOWS_NR=$(( WINDOWS_NR + 1 ))
 
 	elif ! test -z "$index_vertical_split"
 	then
@@ -239,16 +268,27 @@ gen_cmd_aux () {
 		after="wincmd l"
 		index=$index_vertical_split
 		terminate="true"
+		WINDOWS_NR=$(( WINDOWS_NR + 1 ))
 	fi
 
 	if  test "$terminate" = "true"
 	then
 		CMD="$CMD | $before"
-		CMD=$(gen_cmd_aux "$(substring "$LAYOUT" "$start" "$(( index - start ))")" "$CMD")
+		CMD=$(gen_cmd_aux $WINDOWS_NR "$(substring "$LAYOUT" "$start" "$(( index - start ))")" "$CMD")
+		WINDOWS_NR=$?
+
+		if ! test -z "$index_new_tab"
+		then
+			CMD="$CMD | $(enable_diff_mode $WINDOWS_NR)"
+			WINDOWS_NR=1
+		fi
+
 		CMD="$CMD | $after"
-		CMD=$(gen_cmd_aux "$(substring "$LAYOUT" "$(( index + 1 ))" "$(( ${#LAYOUT} - index ))")" "$CMD")
+		CMD=$(gen_cmd_aux $WINDOWS_NR "$(substring "$LAYOUT" "$(( index + 1 ))" "$(( ${#LAYOUT} - index ))")" "$CMD")
+		WINDOWS_NR=$?
+
 		echo "$CMD"
-		return
+		return $WINDOWS_NR
 	fi
 
 
@@ -280,9 +320,8 @@ gen_cmd_aux () {
 	fi
 
 	echo "$CMD"
-	return
+	return $WINDOWS_NR
 }
-
 
 gen_cmd () {
 	# This function returns (in global variable FINAL_CMD) the string that
@@ -333,25 +372,15 @@ gen_cmd () {
 
 	# Obtain the first part of vim "-c" option to obtain the desired layout
 
-	CMD=$(gen_cmd_aux "$LAYOUT")
-
-
-	# Adjust the just obtained script depending on whether more than one
-	# windows are visible or not
-
-	if echo "$LAYOUT" | grep ",\|/" >/dev/null
-	then
-		CMD="$CMD | tabdo windo diffthis"
-	else
-		CMD="$CMD | bufdo diffthis"
-	fi
+	CMD=$(gen_cmd_aux 1 "$LAYOUT")
+	CMD="$CMD | $(enable_diff_mode $?)"
 
 
 	# Add an extra "-c" option to move to the first tab (notice that we
 	# can't simply append the command to the previous "-c" string as
 	# explained here: https://github.com/vim/vim/issues/9076
 
-	FINAL_CMD="-c \"$CMD\" -c \"tabfirst\""
+	FINAL_CMD="-c \"set hidden diffopt-=hiddenoff diffopt-=closeoff\" -c \"$CMD\" -c \"tabfirst\""
 }
 
 
@@ -555,22 +584,22 @@ run_unit_tests () {
 	TEST_CASE_15="  ((  (LOCAL , BASE , REMOTE) / MERGED))   +(BASE)   , LOCAL+ BASE , REMOTE+ (((LOCAL / BASE / REMOTE)) ,    MERGED   )  "
 	TEST_CASE_16="LOCAL,BASE,REMOTE / MERGED + BASE,LOCAL + BASE,REMOTE + (LOCAL / BASE / REMOTE),MERGED"
 
-	EXPECTED_CMD_01="-c \"echo | leftabove split | leftabove vertical split | 1b | wincmd l | leftabove vertical split | 2b | wincmd l | 3b | wincmd j | 4b | tabdo windo diffthis\" -c \"tabfirst\""
-	EXPECTED_CMD_02="-c \"echo | leftabove vertical split | 1b | wincmd l | 3b | tabdo windo diffthis\" -c \"tabfirst\""
-	EXPECTED_CMD_03="-c \"echo | leftabove vertical split | 1b | wincmd l | leftabove vertical split | 4b | wincmd l | 3b | tabdo windo diffthis\" -c \"tabfirst\""
-	EXPECTED_CMD_04="-c \"echo | 4b | bufdo diffthis\" -c \"tabfirst\""
-	EXPECTED_CMD_05="-c \"echo | leftabove split | 1b | wincmd j | leftabove split | 4b | wincmd j | 3b | tabdo windo diffthis\" -c \"tabfirst\""
-	EXPECTED_CMD_06="-c \"echo | leftabove vertical split | leftabove split | 1b | wincmd j | 3b | wincmd l | 4b | tabdo windo diffthis\" -c \"tabfirst\""
-	EXPECTED_CMD_07="-c \"echo | leftabove vertical split | 4b | wincmd l | leftabove split | 1b | wincmd j | 3b | tabdo windo diffthis\" -c \"tabfirst\""
-	EXPECTED_CMD_08="-c \"echo | leftabove split | leftabove vertical split | 1b | wincmd l | 3b | wincmd j | 4b | tabdo windo diffthis\" -c \"tabfirst\""
-	EXPECTED_CMD_09="-c \"echo | leftabove split | 4b | wincmd j | leftabove vertical split | 1b | wincmd l | 3b | tabdo windo diffthis\" -c \"tabfirst\""
-	EXPECTED_CMD_10="-c \"echo | leftabove vertical split | leftabove split | 1b | wincmd j | leftabove split | 2b | wincmd j | 3b | wincmd l | 4b | tabdo windo diffthis\" -c \"tabfirst\""
-	EXPECTED_CMD_11="-c \"echo | -tabnew | leftabove split | leftabove vertical split | 1b | wincmd l | leftabove vertical split | 2b | wincmd l | 3b | wincmd j | 4b | tabnext | -tabnew | leftabove vertical split | 2b | wincmd l | 1b | tabnext | -tabnew | leftabove vertical split | 2b | wincmd l | 3b | tabnext | leftabove vertical split | leftabove split | 1b | wincmd j | leftabove split | 2b | wincmd j | 3b | wincmd l | 4b | tabdo windo diffthis\" -c \"tabfirst\""
-	EXPECTED_CMD_12="-c \"echo | leftabove vertical split | leftabove split | leftabove vertical split | 1b | wincmd l | 3b | wincmd j | 2b | wincmd l | 4b | tabdo windo diffthis\" -c \"tabfirst\""
-	EXPECTED_CMD_13="-c \"echo | leftabove vertical split | leftabove split | leftabove vertical split | 1b | wincmd l | 3b | wincmd j | 2b | wincmd l | leftabove vertical split | leftabove split | 1b | wincmd j | 3b | wincmd l | 4b | tabdo windo diffthis\" -c \"tabfirst\""
-	EXPECTED_CMD_14="-c \"echo | -tabnew | leftabove vertical split | 2b | wincmd l | 3b | tabnext | leftabove vertical split | 2b | wincmd l | 1b | tabdo windo diffthis\" -c \"tabfirst\""
-	EXPECTED_CMD_15="-c \"echo | -tabnew | leftabove split | leftabove vertical split | 1b | wincmd l | leftabove vertical split | 2b | wincmd l | 3b | wincmd j | 4b | tabnext | -tabnew | leftabove vertical split | 2b | wincmd l | 1b | tabnext | -tabnew | leftabove vertical split | 2b | wincmd l | 3b | tabnext | leftabove vertical split | leftabove split | 1b | wincmd j | leftabove split | 2b | wincmd j | 3b | wincmd l | 4b | tabdo windo diffthis\" -c \"tabfirst\""
-	EXPECTED_CMD_16="-c \"echo | -tabnew | leftabove split | leftabove vertical split | 1b | wincmd l | leftabove vertical split | 2b | wincmd l | 3b | wincmd j | 4b | tabnext | -tabnew | leftabove vertical split | 2b | wincmd l | 1b | tabnext | -tabnew | leftabove vertical split | 2b | wincmd l | 3b | tabnext | leftabove vertical split | leftabove split | 1b | wincmd j | leftabove split | 2b | wincmd j | 3b | wincmd l | 4b | tabdo windo diffthis\" -c \"tabfirst\""
+	EXPECTED_CMD_01="-c \"set hidden diffopt-=hiddenoff diffopt-=closeoff\" -c \"echo | leftabove split | leftabove vertical split | 1b | wincmd l | leftabove vertical split | 2b | wincmd l | 3b | wincmd j | 4b | execute 'windo diffthis'\" -c \"tabfirst\""
+	EXPECTED_CMD_02="-c \"set hidden diffopt-=hiddenoff diffopt-=closeoff\" -c \"echo | leftabove vertical split | 1b | wincmd l | 3b | execute 'windo diffthis'\" -c \"tabfirst\""
+	EXPECTED_CMD_03="-c \"set hidden diffopt-=hiddenoff diffopt-=closeoff\" -c \"echo | leftabove vertical split | 1b | wincmd l | leftabove vertical split | 4b | wincmd l | 3b | execute 'windo diffthis'\" -c \"tabfirst\""
+	EXPECTED_CMD_04="-c \"set hidden diffopt-=hiddenoff diffopt-=closeoff\" -c \"echo | 4b | let tmp=bufnr('%') | execute 'silent 1,4bufdo diffthis' | execute 'buffer '.tmp\" -c \"tabfirst\""
+	EXPECTED_CMD_05="-c \"set hidden diffopt-=hiddenoff diffopt-=closeoff\" -c \"echo | leftabove split | 1b | wincmd j | leftabove split | 4b | wincmd j | 3b | execute 'windo diffthis'\" -c \"tabfirst\""
+	EXPECTED_CMD_06="-c \"set hidden diffopt-=hiddenoff diffopt-=closeoff\" -c \"echo | leftabove vertical split | leftabove split | 1b | wincmd j | 3b | wincmd l | 4b | execute 'windo diffthis'\" -c \"tabfirst\""
+	EXPECTED_CMD_07="-c \"set hidden diffopt-=hiddenoff diffopt-=closeoff\" -c \"echo | leftabove vertical split | 4b | wincmd l | leftabove split | 1b | wincmd j | 3b | execute 'windo diffthis'\" -c \"tabfirst\""
+	EXPECTED_CMD_08="-c \"set hidden diffopt-=hiddenoff diffopt-=closeoff\" -c \"echo | leftabove split | leftabove vertical split | 1b | wincmd l | 3b | wincmd j | 4b | execute 'windo diffthis'\" -c \"tabfirst\""
+	EXPECTED_CMD_09="-c \"set hidden diffopt-=hiddenoff diffopt-=closeoff\" -c \"echo | leftabove split | 4b | wincmd j | leftabove vertical split | 1b | wincmd l | 3b | execute 'windo diffthis'\" -c \"tabfirst\""
+	EXPECTED_CMD_10="-c \"set hidden diffopt-=hiddenoff diffopt-=closeoff\" -c \"echo | leftabove vertical split | leftabove split | 1b | wincmd j | leftabove split | 2b | wincmd j | 3b | wincmd l | 4b | execute 'windo diffthis'\" -c \"tabfirst\""
+	EXPECTED_CMD_11="-c \"set hidden diffopt-=hiddenoff diffopt-=closeoff\" -c \"echo | -tabnew | leftabove split | leftabove vertical split | 1b | wincmd l | leftabove vertical split | 2b | wincmd l | 3b | wincmd j | 4b | execute 'windo diffthis' | tabnext | -tabnew | leftabove vertical split | 2b | wincmd l | 1b | execute 'windo diffthis' | tabnext | -tabnew | leftabove vertical split | 2b | wincmd l | 3b | execute 'windo diffthis' | tabnext | leftabove vertical split | leftabove split | 1b | wincmd j | leftabove split | 2b | wincmd j | 3b | wincmd l | 4b | execute 'windo diffthis'\" -c \"tabfirst\""
+	EXPECTED_CMD_12="-c \"set hidden diffopt-=hiddenoff diffopt-=closeoff\" -c \"echo | leftabove vertical split | leftabove split | leftabove vertical split | 1b | wincmd l | 3b | wincmd j | 2b | wincmd l | 4b | execute 'windo diffthis'\" -c \"tabfirst\""
+	EXPECTED_CMD_13="-c \"set hidden diffopt-=hiddenoff diffopt-=closeoff\" -c \"echo | leftabove vertical split | leftabove split | leftabove vertical split | 1b | wincmd l | 3b | wincmd j | 2b | wincmd l | leftabove vertical split | leftabove split | 1b | wincmd j | 3b | wincmd l | 4b | execute 'windo diffthis'\" -c \"tabfirst\""
+	EXPECTED_CMD_14="-c \"set hidden diffopt-=hiddenoff diffopt-=closeoff\" -c \"echo | -tabnew | leftabove vertical split | 2b | wincmd l | 3b | execute 'windo diffthis' | tabnext | leftabove vertical split | 2b | wincmd l | 1b | execute 'windo diffthis'\" -c \"tabfirst\""
+	EXPECTED_CMD_15="-c \"set hidden diffopt-=hiddenoff diffopt-=closeoff\" -c \"echo | -tabnew | leftabove split | leftabove vertical split | 1b | wincmd l | leftabove vertical split | 2b | wincmd l | 3b | wincmd j | 4b | execute 'windo diffthis' | tabnext | -tabnew | leftabove vertical split | 2b | wincmd l | 1b | execute 'windo diffthis' | tabnext | -tabnew | leftabove vertical split | 2b | wincmd l | 3b | execute 'windo diffthis' | tabnext | leftabove vertical split | leftabove split | 1b | wincmd j | leftabove split | 2b | wincmd j | 3b | wincmd l | 4b | execute 'windo diffthis'\" -c \"tabfirst\""
+	EXPECTED_CMD_16="-c \"set hidden diffopt-=hiddenoff diffopt-=closeoff\" -c \"echo | -tabnew | leftabove split | leftabove vertical split | 1b | wincmd l | leftabove vertical split | 2b | wincmd l | 3b | wincmd j | 4b | execute 'windo diffthis' | tabnext | -tabnew | leftabove vertical split | 2b | wincmd l | 1b | execute 'windo diffthis' | tabnext | -tabnew | leftabove vertical split | 2b | wincmd l | 3b | execute 'windo diffthis' | tabnext | leftabove vertical split | leftabove split | 1b | wincmd j | leftabove split | 2b | wincmd j | 3b | wincmd l | 4b | execute 'windo diffthis'\" -c \"tabfirst\""
 
 	EXPECTED_TARGET_01="MERGED"
 	EXPECTED_TARGET_02="LOCAL"
@@ -635,7 +664,9 @@ run_unit_tests () {
 	cat >expect <<-\EOF
 	-f
 	-c
-	echo | leftabove split | leftabove vertical split | 1b | wincmd l | leftabove vertical split | quit | wincmd l | 2b | wincmd j | 3b | tabdo windo diffthis
+	set hidden diffopt-=hiddenoff diffopt-=closeoff
+	-c
+	echo | leftabove split | leftabove vertical split | 1b | wincmd l | leftabove vertical split | quit | wincmd l | 2b | wincmd j | 3b | execute 'windo diffthis'
 	-c
 	tabfirst
 	lo cal
