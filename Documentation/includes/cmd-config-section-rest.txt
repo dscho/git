@@ -1,0 +1,3 @@
+The discussion above this line is unique to this documentation, but
+everything below is included from section(s) in linkgit:git-config[1]
+aplicable to this command:
