@@ -10,7 +10,7 @@ SYNOPSIS
 [verse]
 'git show-ref' [-q|--quiet] [--verify] [--head] [-d|--dereference]
 	     [-s|--hash[=<n>]] [--abbrev[=<n>]] [--tags]
-	     [--heads] [--] [<pattern>...]
+	     [--heads] [--count=<n>] [--] [<pattern>...]
 'git show-ref' --exclude-existing[=<pattern>]
 
 DESCRIPTION
@@ -84,6 +84,11 @@ OPTIONS
 	(4) ignore if refname is a ref that exists in the local repository;
 	(5) otherwise output the line.
 
+--count::
+
+	Do not print more than `<n>` matching references, or print all
+	references if `<n>` is 0. Incompatible with `--exclude-existing`
+	and `--verify`.
 
 <pattern>...::
 

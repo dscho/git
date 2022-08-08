@@ -196,4 +196,25 @@ test_expect_success 'show-ref --verify with dangling ref' '
 	)
 '
 
+test_expect_success 'show-ref --count limits relevant output' '
+	git show-ref --heads --count=1 >out &&
+	test_line_count = 1 out
+'
+
+test_expect_success 'show-ref --count rejects invalid input' '
+	test_must_fail git show-ref --count=-1 2>err &&
+	grep "invalid ..count argument: (.-1. < 0)" err
+'
+
+test_expect_success 'show-ref --count incompatible with --verify' '
+	test_must_fail git show-ref --count=1 --verify HEAD 2>err &&
+	grep "..count is incompatible with ..verify" err
+'
+
+test_expect_success 'show-ref --count incompatible with --exclude-existing' '
+	echo "refs/heads/main" >in &&
+	test_must_fail git show-ref --count=1 --exclude-existing <in 2>err &&
+	grep "..count is incompatible with ..exclude.existing" err
+'
+
 test_done
