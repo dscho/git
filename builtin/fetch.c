@@ -1131,7 +1131,7 @@ static int store_updated_refs(const char *raw_url, const char *remote_name,
 
 		rm = ref_map;
 		if (check_connected(iterate_ref_map, &rm, &opt)) {
-			rc = error(_("%s did not send all necessary objects\n"), url);
+			rc = error(_("connectivity check failed after fetching from %s\n"), url);
 			goto abort;
 		}
 	}

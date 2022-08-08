@@ -2069,7 +2069,7 @@ struct ref *fetch_pack(struct fetch_pack_args *args,
 		if (args->deepen)
 			opt.is_deepening_fetch = 1;
 		if (check_connected(iterate_ref_map, &iterator, &opt)) {
-			error(_("remote did not send all necessary objects"));
+			error(_("connectivity check failed after fetching from remote"));
 			free_refs(ref_cpy);
 			ref_cpy = NULL;
 			rollback_shallow_file(the_repository, &shallow_lock);
