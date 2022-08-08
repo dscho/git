@@ -202,6 +202,77 @@ test_expect_success 'one of gc.reflogExpire{Unreachable,}=never does not skip "e
 	grep -E "^trace: (built-in|exec|run_command): git reflog expire --" trace.out
 '
 
+test_expect_success 'gc --cruft generates a cruft pack' '
+	git init crufts &&
+	test_when_finished "rm -fr crufts" &&
+	(
+		cd crufts &&
+		test_commit base &&
+
+		test_commit --no-tag foo &&
+		test_commit --no-tag bar &&
+		git reset HEAD^^ &&
+
+		git gc --cruft &&
+
+		cruft=$(basename $(ls .git/objects/pack/pack-*.mtimes) .mtimes) &&
+		test_path_is_file .git/objects/pack/$cruft.pack
+	)
+'
+
+test_expect_success 'gc.cruftPacks=true generates a cruft pack' '
+	git init crufts &&
+	test_when_finished "rm -fr crufts" &&
+	(
+		cd crufts &&
+		test_commit base &&
+
+		test_commit --no-tag foo &&
+		test_commit --no-tag bar &&
+		git reset HEAD^^ &&
+
+		git -c gc.cruftPacks=true gc &&
+
+		cruft=$(basename $(ls .git/objects/pack/pack-*.mtimes) .mtimes) &&
+		test_path_is_file .git/objects/pack/$cruft.pack
+	)
+'
+
+test_expect_success 'feature.experimental=true generates a cruft pack' '
+	git init crufts &&
+	test_when_finished "rm -fr crufts" &&
+	(
+		cd crufts &&
+		test_commit base &&
+
+		test_commit --no-tag foo &&
+		test_commit --no-tag bar &&
+		git reset HEAD^^ &&
+
+		git -c feature.experimental=true gc &&
+
+		cruft=$(basename $(ls .git/objects/pack/pack-*.mtimes) .mtimes) &&
+		test_path_is_file .git/objects/pack/$cruft.pack
+	)
+'
+
+test_expect_success 'feature.experimental=false allows explicit cruft packs' '
+	git init crufts &&
+	test_when_finished "rm -fr crufts" &&
+	(
+		cd crufts &&
+		test_commit base &&
+
+		test_commit --no-tag foo &&
+		test_commit --no-tag bar &&
+		git reset HEAD^^ &&
+
+		git -c gc.cruftPacks=true -c feature.experimental=false gc &&
+		cruft=$(basename $(ls .git/objects/pack/pack-*.mtimes) .mtimes) &&
+		test_path_is_file .git/objects/pack/$cruft.pack
+	)
+'
+
 run_and_wait_for_auto_gc () {
 	# We read stdout from gc for the side effect of waiting until the
 	# background gc process exits, closing its fd 9.  Furthermore, the
