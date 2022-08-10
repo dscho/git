@@ -438,7 +438,10 @@ midx_bitmap_partial_tests () {
 
 	test_expect_success 'setup partial bitmaps' '
 		test_commit packed &&
+ls -l .git/objects/pack/ &&
 		git repack &&
+git multi-pack-index write --bitmap &&
+ls -l .git/objects/pack/ &&
 		test_commit loose &&
 		git multi-pack-index write --bitmap 2>err &&
 		test_path_is_file $midx &&

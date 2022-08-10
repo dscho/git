@@ -347,7 +347,11 @@ test_midx_bitmap_cases () {
 	'
 }
 
-test_midx_bitmap_cases
+# test_midx_bitmap_cases
+
+GIT_COMMITTER_DATE='1112928553 -0700'
+GIT_AUTHOR_DATE='1112928553 -0700'
+test_tick='1112928553'
 
 test_midx_bitmap_cases "pack.writeBitmapLookupTable"
 
