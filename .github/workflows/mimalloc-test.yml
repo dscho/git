@@ -1,6 +1,6 @@
 name: mimalloc-test
 
-on: release
+on: push
 
 jobs:
   prereqs:
