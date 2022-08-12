@@ -670,8 +670,14 @@ static void handle_builtin(int argc, const char **argv)
 	}
 
 	builtin = get_builtin(cmd);
-	if (builtin)
-		exit(run_builtin(builtin, argc, argv));
+	if (builtin) {
+		int ret = run_builtin(builtin, argc, argv);
+#ifdef USE_MIMALLOC
+		fflush(stdout);
+		mi_process_done();
+#endif
+		exit(ret);
+	}
 	argv_array_clear(&args);
 }
 
