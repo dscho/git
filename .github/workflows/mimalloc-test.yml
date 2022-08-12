@@ -1,6 +1,6 @@
 name: mimalloc-test
 
-on: [push, pull_request]
+on: release
 
 jobs:
   prereqs:
