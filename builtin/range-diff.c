@@ -21,7 +21,7 @@ int cmd_range_diff(int argc, const char **argv, const char *prefix)
 		.diffopt = &diffopt,
 		.other_arg = &other_arg
 	};
-	int simple_color = -1, left_only = 0, right_only = 0;
+	int simple_color = -1, left_only = 0, right_only = 0, diff_first_parent = 0;
 	struct option range_diff_options[] = {
 		OPT_INTEGER(0, "creation-factor",
 			    &range_diff_opts.creation_factor,
@@ -35,6 +35,8 @@ int cmd_range_diff(int argc, const char **argv, const char *prefix)
 			 N_("only emit output related to the first range")),
 		OPT_BOOL(0, "right-only", &right_only,
 			 N_("only emit output related to the second range")),
+		OPT_BOOL(0, "merges", &diff_first_parent,
+			 N_("compare merge commits by diffing against their first parents")),
 		OPT_END()
 	};
 	struct option *options;
@@ -54,6 +56,13 @@ int cmd_range_diff(int argc, const char **argv, const char *prefix)
 	/* force color when --dual-color was used */
 	if (!simple_color)
 		diffopt.use_color = 1;
+
+	if (diff_first_parent)
+		strvec_pushl(&other_arg,
+			     "--no-max-parents",
+			     "--min-parents=2",
+			     "--diff-merges=first-parent",
+			     NULL);
 
 	if (argc == 2) {
 		if (!is_range_diff_range(argv[0]))
