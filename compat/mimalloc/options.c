@@ -173,7 +173,7 @@ void mi_option_disable(mi_option_t option) {
 static void mi_out_stderr(const char* msg, void* arg) {
   MI_UNUSED(arg);
   if (msg == NULL) return;
-  #ifdef _WIN32
+  #if 0 // defined(_WIN32)
   // on windows with redirection, the C runtime cannot handle locale dependent output
   // after the main thread closes so we use direct console output.
   if (!_mi_preloading()) { 
