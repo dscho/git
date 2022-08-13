@@ -106,6 +106,40 @@ jobs:
           make -j3 &&
           make -j3 strip &&
           make -j3 DESTDIR=${{ env.MINGIT_NAME }} gitexecdir=bin install
+      - name: debug using tmate
+        if: failure()
+        shell: bash
+        run: |
+          (
+            cd / &&
+            G4W=/c/Program\ Files/Git &&
+            cp "$G4W"/usr/bin/{ssh-keygen.exe,msys-crypto-1.1.dll,msys-z.dll} usr/bin/ &&
+
+            CURL="$G4W"/mingw64/bin/curl.exe &&
+            "$CURL" -Lo /tmp/tmate.tar.zst https://repo.msys2.org/msys/x86_64/tmate-2.4.0-1-x86_64.pkg.tar.zst &&
+            tar xvf /tmp/tmate.tar.zst usr/bin/tmate.exe &&
+            "$CURL" -Lo /tmp/libevent.tar.zst https://repo.msys2.org/msys/x86_64/libevent-2.1.12-2-x86_64.pkg.tar.zst &&
+            tar xvf /tmp/libevent.tar.zst usr/bin/msys-event-2-1-7.dll &&
+            "$CURL" -Lo /tmp/msgpack-c.tar.zst https://repo.msys2.org/msys/x86_64/msgpack-c-4.0.0-1-x86_64.pkg.tar.zst &&
+            tar xvf /tmp/msgpack-c.tar.zst usr/bin/msys-msgpackc-2.dll &&
+            "$CURL" -Lo /tmp/libssh.tar.zst https://repo.msys2.org/msys/x86_64/libssh-0.9.6-1-x86_64.pkg.tar.zst &&
+            tar xvf /tmp/libssh.tar.zst usr/bin/msys-ssh-4.dll
+          ) &&
+
+          # Generate an SSH key (needed for tmate)
+          echo -e 'y\n' | ssh-keygen -q -t rsa -N '' -f ~/.ssh/id_rsa &&
+
+          # Start tmate session
+          export CHERE_INVOKING=1 &&
+          tmate -S /tmp/tmate.sock new-session -d &&
+          tmate -S /tmp/tmate.sock wait tmate-ready &&
+
+          # Print SSH invocation every 5 seconds, until tmate session has terminated
+          while test -e /tmp/tmate.sock
+          do
+            tmate -S /tmp/tmate.sock display -p '#{tmate_ssh}'
+            sleep 5
+          done
       - name: upload ${{ env.MINGIT_NAME }}
         uses: actions/upload-artifact@v2
         with:
