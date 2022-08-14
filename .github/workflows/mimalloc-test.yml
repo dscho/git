@@ -3,7 +3,7 @@ name: mimalloc-test
 on: push
 
 env:
-  REUSE_ARTIFACTS_OF_PREVIOUS_RUN: 2857346255
+  REUSE_ARTIFACTS_OF_PREVIOUS_RUN:
 
 jobs:
   prereqs:
