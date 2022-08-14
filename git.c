@@ -675,6 +675,11 @@ static void handle_builtin(int argc, const char **argv)
 #ifdef USE_MIMALLOC
 		fflush(stdout);
 		mi_process_done();
+#elif defined(USE_NED_ALLOCATOR)
+		if (git_env_bool("NEDMALLOC_SHOW_STATS", 0)) {
+			fflush(stdout);
+			nedmalloc_stats();
+		}
 #endif
 		exit(ret);
 	}
