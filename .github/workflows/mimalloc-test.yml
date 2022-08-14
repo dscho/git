@@ -218,13 +218,15 @@ jobs:
           compiler=${{ matrix.compiler }} &&
           for run in 1 2 3 4 5
           do
-            for allocator in mimalloc mimalloc-eager system-allocator nedmalloc
+            for allocator in mimalloc mimalloc-alt system-allocator nedmalloc
             do
               echo "$compiler-$allocator"
               extra= &&
-              if test mimalloc-eager = $allocator
+              if test mimalloc-alt = $allocator
               then
-                extra=--mimalloc-eager-commit &&
+                export MIMALLOC_RESET_DELAY=1 &&
+                export MIMALLOC_EAGER_COMMIT=0 &&
+                export MIMALLOC_RESET_DECOMMITS=1 &&
                 allocator=mimalloc
               fi &&
 
