@@ -2,12 +2,16 @@ name: mimalloc-test
 
 on: push
 
+env:
+  REUSE_ARTIFACTS_OF_PREVIOUS_RUN: 2857346255
+
 jobs:
   prereqs:
     name: Some prerequisites
     runs-on: windows-latest
     steps:
       - name: initialize MinGit
+        if: env.REUSE_ARTIFACTS_OF_PREVIOUS_RUN == ''
         shell: bash
         run: |
           curl -Lo MinGit.zip https://github.com/git-for-windows/git/releases/download/v2.37.2.windows.2/MinGit-2.37.2.2-64-bit.zip &&
@@ -15,6 +19,7 @@ jobs:
           unzip MinGit.zip -d MinGit &&
           cp /etc/profile MinGit/etc/
       - name: upload MinGit
+        if: env.REUSE_ARTIFACTS_OF_PREVIOUS_RUN == ''
         uses: actions/upload-artifact@v2
         with:
           name: MinGit
@@ -32,25 +37,29 @@ jobs:
       MINGIT_NAME: MinGit-${{ matrix.compiler }}-${{ matrix.allocator }}
     steps:
       - uses: actions/checkout@v2
+        if: env.REUSE_ARTIFACTS_OF_PREVIOUS_RUN == ''
       - uses: git-for-windows/setup-git-for-windows-sdk@v1
+        if: env.REUSE_ARTIFACTS_OF_PREVIOUS_RUN == ''
       - name: initialize vcpkg
-        if: matrix.compiler == 'msvc'
+        if: env.REUSE_ARTIFACTS_OF_PREVIOUS_RUN == '' && matrix.compiler == 'msvc'
         uses: actions/checkout@v2
         with:
           repository: 'microsoft/vcpkg'
           path: 'compat/vcbuild/vcpkg'
       - name: download vcpkg artifacts
-        if: matrix.compiler == 'msvc'
+        if: env.REUSE_ARTIFACTS_OF_PREVIOUS_RUN == '' && matrix.compiler == 'msvc'
         uses: git-for-windows/get-azure-pipelines-artifact@v0
         with:
           repository: git/git
           definitionId: 9
       - name: download MinGit
+        if: env.REUSE_ARTIFACTS_OF_PREVIOUS_RUN == ''
         uses: actions/download-artifact@v2
         with:
           name: MinGit
           path: ${{ github.workspace }}/${{ env.MINGIT_NAME }}
       - name: provide minimal /bin/install
+        if: env.REUSE_ARTIFACTS_OF_PREVIOUS_RUN == ''
         shell: bash
         run: |
           # Provide a minimal /bin/install for use by Git's `make install`
@@ -82,21 +91,23 @@ jobs:
           fi
           EOF
       - name: skip dashed built-ins
+        if: env.REUSE_ARTIFACTS_OF_PREVIOUS_RUN == ''
         shell: bash
         run: echo SKIP_DASHED_BUILT_INS=1 >>config.mak
       - name: compile using MSVC
-        if: matrix.compiler != 'gcc'
+        if: env.REUSE_ARTIFACTS_OF_PREVIOUS_RUN == '' && matrix.compiler != 'gcc'
         shell: bash
         run: echo MAKEFLAGS=MSVC=Yep >>$GITHUB_ENV
       - name: use mimalloc
-        if: matrix.allocator == 'mimalloc'
+        if: env.REUSE_ARTIFACTS_OF_PREVIOUS_RUN == '' && matrix.allocator == 'mimalloc'
         shell: bash
         run: echo USE_MIMALLOC=YesPlease >>config.mak
       - name: use nedmalloc
-        if: matrix.allocator == 'nedmalloc'
+        if: env.REUSE_ARTIFACTS_OF_PREVIOUS_RUN == '' && matrix.allocator == 'nedmalloc'
         shell: bash
         run: echo USE_NED_ALLOCATOR=YesPlease >>config.mak
       - name: build ${{ env.MINGIT_NAME }}
+        if: env.REUSE_ARTIFACTS_OF_PREVIOUS_RUN == ''
         shell: bash
         env:
           NDEBUG: 1
@@ -141,6 +152,7 @@ jobs:
             sleep 5
           done
       - name: upload ${{ env.MINGIT_NAME }}
+        if: env.REUSE_ARTIFACTS_OF_PREVIOUS_RUN == ''
         uses: actions/upload-artifact@v2
         with:
           name: ${{ env.MINGIT_NAME }}
@@ -155,6 +167,21 @@ jobs:
       matrix:
         compiler: [gcc, msvc]
     steps:
+      - name: reuse earlier workflow run's MinGit artifacts
+        if: env.REUSE_ARTIFACTS_OF_PREVIOUS_RUN != ''
+        shell: bash
+        run: |
+          curl -L https://api.github.com/repos/dscho/git/actions/runs/${{ env.REUSE_ARTIFACTS_OF_PREVIOUS_RUN }}/artifacts |
+          jq -r '.artifacts[] | select(.name | test("MinGit-${{ matrix.compiler }}")) | [.name, .archive_download_url] | @tsv' |
+          tr -d '\r' |
+          while read name url
+          do
+            echo "$name"
+            curl -H "Authorization: token ${{secrets.GITHUB_TOKEN}}" \
+              -#sLo /tmp/"$name".zip "$url" &&
+            mkdir "$name" &&
+            unzip -q -d "$name" /tmp/"$name".zip
+          done
       - name: initialize bare repo
         shell: bash
         run: |
@@ -163,16 +190,19 @@ jobs:
           # git -C bare-repo.git fetch https://github.com/git/git refs/tags/v2.0.0:refs/tags/v2.0.0 &&
           git -C bare-repo.git fetch https://github.com/torvalds/linux/ v2.6.21
       - name: download MinGit-${{ matrix.compiler }}-system-allocator
+        if: env.REUSE_ARTIFACTS_OF_PREVIOUS_RUN == ''
         uses: actions/download-artifact@v2
         with:
           name: MinGit-${{ matrix.compiler }}-system-allocator
           path: ${{ github.workspace }}/MinGit-${{ matrix.compiler }}-system-allocator
       - name: download MinGit-${{ matrix.compiler }}-nedmalloc
+        if: env.REUSE_ARTIFACTS_OF_PREVIOUS_RUN == ''
         uses: actions/download-artifact@v2
         with:
           name: MinGit-${{ matrix.compiler }}-nedmalloc
           path: ${{ github.workspace }}/MinGit-${{ matrix.compiler }}-nedmalloc
       - name: download MinGit-${{ matrix.compiler }}-mimalloc
+        if: env.REUSE_ARTIFACTS_OF_PREVIOUS_RUN == ''
         uses: actions/download-artifact@v2
         with:
           name: MinGit-${{ matrix.compiler }}-mimalloc
