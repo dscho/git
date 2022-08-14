@@ -716,8 +716,16 @@ static void handle_builtin(int argc, const char **argv)
 	}
 
 	builtin = get_builtin(cmd);
-	if (builtin)
-		exit(run_builtin(builtin, argc, argv));
+	if (builtin) {
+		int ret = run_builtin(builtin, argc, argv);
+#if defined(USE_NED_ALLOCATOR)
+		if (git_env_bool("NEDMALLOC_SHOW_STATS", 0)) {
+			fflush(stdout);
+			nedmalloc_stats();
+		}
+#endif
+		exit(ret);
+	}
 	strvec_clear(&args);
 }
 
