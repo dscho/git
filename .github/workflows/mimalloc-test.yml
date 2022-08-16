@@ -31,7 +31,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        compiler: [gcc, msvc]
+        compiler: [gcc]
         allocator: [system-allocator, nedmalloc, mimalloc]
     env:
       MINGIT_NAME: MinGit-${{ matrix.compiler }}-${{ matrix.allocator }}
@@ -165,7 +165,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        compiler: [gcc, msvc]
+        compiler: [gcc]
     steps:
       - name: reuse earlier workflow run's MinGit artifacts
         if: env.REUSE_ARTIFACTS_OF_PREVIOUS_RUN != ''
