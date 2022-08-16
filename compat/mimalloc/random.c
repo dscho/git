@@ -191,7 +191,7 @@ static bool os_random_buf(void* buf, size_t buf_len) {
 #endif
 
 static bool os_random_buf(void* buf, size_t buf_len) {
-  DECLARE_PROC_ADDR(bcrypt, LONG, NTAPI, BCryptGenRandom, HANDLE, PUCHAR, ULONG, ULONG);
+  DECLARE_PROC_ADDR(bcrypt, LONG, BCryptGenRandom, HANDLE, PUCHAR, ULONG, ULONG);
   if (!INIT_PROC_ADDR(BCryptGenRandom))
     return 0;
   return (BCryptGenRandom(NULL, (PUCHAR)buf, (ULONG)buf_len, BCRYPT_USE_SYSTEM_PREFERRED_RNG) >= 0);
