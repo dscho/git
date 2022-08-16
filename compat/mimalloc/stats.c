@@ -480,7 +480,7 @@ static void mi_stat_process_info(mi_msecs_t* elapsed, mi_msecs_t* utime, mi_msec
   *utime = filetime_msecs(&ut);
   *stime = filetime_msecs(&st);
   PROCESS_MEMORY_COUNTERS info;
-  DECLARE_PROC_ADDR(psapi, BOOL, WINAPI, GetProcessMemoryInfo, HANDLE, PPROCESS_MEMORY_COUNTERS, DWORD);
+  DECLARE_PROC_ADDR(psapi, BOOL, GetProcessMemoryInfo, HANDLE, PPROCESS_MEMORY_COUNTERS, DWORD);
   if (INIT_PROC_ADDR(GetProcessMemoryInfo)) {
     GetProcessMemoryInfo(GetCurrentProcess(), &info, sizeof(info));
     *current_rss    = (size_t)info.WorkingSetSize;
