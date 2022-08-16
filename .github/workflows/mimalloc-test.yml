@@ -216,7 +216,7 @@ jobs:
         run: |
           set -x &&
           compiler=${{ matrix.compiler }} &&
-          for run in 1 2 3 4 5
+          for run in 1 2 3
           do
             for allocator in mimalloc mimalloc-alt system-allocator nedmalloc
             do
