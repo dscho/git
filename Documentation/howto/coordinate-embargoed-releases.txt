@@ -4,7 +4,7 @@ Abstract: When a vulnerability is reported, we follow these guidelines to
  security releases.
 
 The `git-security` mailing list
-===============================
+-------------------------------
 
 Responsible disclosures of vulnerabilities, analysis, proposed fixes as
 well as the orchestration of coordinated embargoed releases all happen on the
@@ -17,7 +17,7 @@ otherwise be made aware of attack vectors that could be exploited. "Lifting the
 embargo" refers to publishing the version that fixes the vulnerabilities.
 
 Audience of the `git-security` mailing list
--------------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Anybody may contact the `git-security` mailing list by sending an email
 to <git-security@googlegroups.com>, though the archive is closed to the
@@ -34,7 +34,7 @@ the timeline of the disclosure as well as aligning priorities and
 requirements.
 
 Communications
---------------
+~~~~~~~~~~~~~~
 
 If you are a stakeholder, it is a good idea to pay close attention to the
 discussions, as pertinent information may be buried in the middle of a lively
@@ -46,7 +46,7 @@ mail threads are not usually structured specifically to communicate
 agreements, assessments or timelines.
 
 A bug's life: Typical timeline
-==============================
+------------------------------
 
 - A bug is reported to the `git-security` mailing list.
 
@@ -118,7 +118,7 @@ Note: The Git project makes no guarantees about timelines, but aims to keep
 embargoes reasonably short in the interest of keeping Git's users safe.
 
 How we coordinate embargoed releases
-====================================
+------------------------------------
 
 To protect Git users from critical vulnerabilities, we do not just release
 fixed versions like regular maintenance releases. Instead, we coordinate
@@ -127,7 +127,7 @@ date. That way, users will have a chance to upgrade on that date, no matter
 what Operating System or distribution they run.
 
 Open a Security Advisory draft
-------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The first step is to https://github.com/git/git/security/advisories/new[open
 an advisory]. Technically, this is not necessary. However, it is the most
@@ -135,7 +135,7 @@ convenient way to obtain the CVE number and it give us a private repository
 associated with it that can be used to collaborate on a fix.
 
 Notifying the Linux distributions
----------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 At most two weeks before release date, we need to send a notification to
 <distros@vs.openwall.org>, preferably less than 7 days before the release date.
@@ -166,7 +166,7 @@ created using a command like this:
 	tar cJvf cve-xxx.bundle.tar.xz cve-xxx.bundle
 
 Example mail to distros@vs.openwall.org
----------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ....
 To: distros@vs.openwall.org
@@ -202,7 +202,7 @@ Thanks,
 ....
 
 Example mail to oss-security@lists.openwall.com
------------------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ....
 To: oss-security@lists.openwall.com
