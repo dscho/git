@@ -1057,7 +1057,7 @@ test_expect_success EXPENSIVE 'add -i with a lot of files' '
 		git add -N $name &&
 		y="${y}y$LF" &&
 		i=$(($i+1)) ||
-		break
+		exit 1
 	done &&
 	echo "$y" | git add -p -- . &&
 	git diff --cached >staged &&
