@@ -116,7 +116,7 @@ test_expect_success MINGW 'no unnecessary opendir() with fscache' '
 		do
 			sha1=$(echo $f | git hash-object -w --stdin) &&
 			git update-index --add \
-				--cacheinfo 100644,$sha1,excluded/$f || break
+				--cacheinfo 100644,$sha1,excluded/$f || exit 1
 		done &&
 		test_tick &&
 		git commit -m excluded &&
