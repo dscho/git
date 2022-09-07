@@ -72,7 +72,7 @@ test_expect_success '1a: setup--config worktree' '
 test_expect_success '1b: pre-add all' '
 	(
 	cd test1 &&
-	local parent_dir="$(pwd)" &&
+	parent_dir="$(pwd)" &&
 	git -C repo ls-files -o --exclude-standard "$parent_dir" >actual-all-unsorted &&
 	sort actual-all-unsorted >actual-all &&
 	sort expect-all-unsorted >expect-all &&
@@ -83,7 +83,7 @@ test_expect_success '1b: pre-add all' '
 test_expect_success '1c: pre-add dir all' '
 	(
 	cd test1 &&
-	local parent_dir="$(pwd)" &&
+	parent_dir="$(pwd)" &&
 	git -C repo ls-files -o --directory --exclude-standard "$parent_dir" >actual-all-dir-unsorted &&
 	sort actual-all-dir-unsorted >actual-all &&
 	sort expect-all-dir-unsorted >expect-all &&
@@ -94,7 +94,7 @@ test_expect_success '1c: pre-add dir all' '
 test_expect_success '1d: post-add tracked' '
 	(
 	cd test1 &&
-	local parent_dir="$(pwd)" &&
+	parent_dir="$(pwd)" &&
 	(
 		cd repo &&
 		git add file-tracked &&
@@ -112,7 +112,7 @@ test_expect_success '1d: post-add tracked' '
 test_expect_success '1e: post-add untracked' '
 	(
 	cd test1 &&
-	local parent_dir="$(pwd)" &&
+	parent_dir="$(pwd)" &&
 	git -C repo ls-files -o --exclude-standard "$parent_dir" >actual-untracked-unsorted &&
 	sort actual-untracked-unsorted >actual-untracked &&
 	sort expect-untracked-unsorted >expect-untracked &&
