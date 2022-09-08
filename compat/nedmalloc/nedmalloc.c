@@ -149,11 +149,11 @@ size_t nedblksize(void *mem) THROWSPEC
 }
 
 void nedsetvalue(void *v) THROWSPEC					{ nedpsetvalue(0, v); }
-void * nedmalloc(size_t size) THROWSPEC				{ return nedpmalloc(0, size); }
-void * nedcalloc(size_t no, size_t size) THROWSPEC	{ return nedpcalloc(0, no, size); }
-void * nedrealloc(void *mem, size_t size) THROWSPEC	{ return nedprealloc(0, mem, size); }
+MALLOCATTR void * nedmalloc(size_t size) THROWSPEC				{ return nedpmalloc(0, size); }
+MALLOCATTR void * nedcalloc(size_t no, size_t size) THROWSPEC	{ return nedpcalloc(0, no, size); }
+MALLOCATTR void * nedrealloc(void *mem, size_t size) THROWSPEC	{ return nedprealloc(0, mem, size); }
 void   nedfree(void *mem) THROWSPEC					{ nedpfree(0, mem); }
-void * nedmemalign(size_t alignment, size_t bytes) THROWSPEC { return nedpmemalign(0, alignment, bytes); }
+MALLOCATTR void * nedmemalign(size_t alignment, size_t bytes) THROWSPEC { return nedpmemalign(0, alignment, bytes); }
 #if !NO_MALLINFO
 struct mallinfo nedmallinfo(void) THROWSPEC			{ return nedpmallinfo(0); }
 #endif
@@ -161,8 +161,8 @@ int    nedmallopt(int parno, int value) THROWSPEC	{ return nedpmallopt(0, parno,
 int    nedmalloc_trim(size_t pad) THROWSPEC			{ return nedpmalloc_trim(0, pad); }
 void   nedmalloc_stats(void) THROWSPEC					{ nedpmalloc_stats(0); }
 size_t nedmalloc_footprint(void) THROWSPEC				{ return nedpmalloc_footprint(0); }
-void **nedindependent_calloc(size_t elemsno, size_t elemsize, void **chunks) THROWSPEC	{ return nedpindependent_calloc(0, elemsno, elemsize, chunks); }
-void **nedindependent_comalloc(size_t elems, size_t *sizes, void **chunks) THROWSPEC	{ return nedpindependent_comalloc(0, elems, sizes, chunks); }
+MALLOCATTR void **nedindependent_calloc(size_t elemsno, size_t elemsize, void **chunks) THROWSPEC	{ return nedpindependent_calloc(0, elemsno, elemsize, chunks); }
+MALLOCATTR void **nedindependent_comalloc(size_t elems, size_t *sizes, void **chunks) THROWSPEC	{ return nedpindependent_comalloc(0, elems, sizes, chunks); }
 
 struct threadcacheblk_t;
 typedef struct threadcacheblk_t threadcacheblk;
@@ -627,7 +627,7 @@ found:
 	return p->m[n];
 }
 
-nedpool *nedcreatepool(size_t capacity, int threads) THROWSPEC
+MALLOCATTR nedpool *nedcreatepool(size_t capacity, int threads) THROWSPEC
 {
 	nedpool *ret;
 	if(!(ret=(nedpool *) nedpcalloc(0, 1, sizeof(nedpool)))) return 0;
@@ -770,7 +770,7 @@ static FORCEINLINE void GetThreadCache(nedpool **p, threadcache **tc, int *mymsp
 #endif
 }
 
-void * nedpmalloc(nedpool *p, size_t size) THROWSPEC
+MALLOCATTR void * nedpmalloc(nedpool *p, size_t size) THROWSPEC
 {
 	void *ret=0;
 	threadcache *tc;
@@ -789,7 +789,7 @@ void * nedpmalloc(nedpool *p, size_t size) THROWSPEC
 	}
 	return ret;
 }
-void * nedpcalloc(nedpool *p, size_t no, size_t size) THROWSPEC
+MALLOCATTR void * nedpcalloc(nedpool *p, size_t no, size_t size) THROWSPEC
 {
 	size_t rsize=size*no;
 	void *ret=0;
@@ -810,7 +810,7 @@ void * nedpcalloc(nedpool *p, size_t no, size_t size) THROWSPEC
 	}
 	return ret;
 }
-void * nedprealloc(nedpool *p, void *mem, size_t size) THROWSPEC
+MALLOCATTR void * nedprealloc(nedpool *p, void *mem, size_t size) THROWSPEC
 {
 	void *ret=0;
 	threadcache *tc;
@@ -856,7 +856,7 @@ void   nedpfree(nedpool *p, void *mem) THROWSPEC
 #endif
 		mspace_free(0, mem);
 }
-void * nedpmemalign(nedpool *p, size_t alignment, size_t bytes) THROWSPEC
+MALLOCATTR void * nedpmemalign(nedpool *p, size_t alignment, size_t bytes) THROWSPEC
 {
 	void *ret;
 	threadcache *tc;
@@ -922,7 +922,7 @@ size_t nedpmalloc_footprint(nedpool *p) THROWSPEC
 	}
 	return ret;
 }
-void **nedpindependent_calloc(nedpool *p, size_t elemsno, size_t elemsize, void **chunks) THROWSPEC
+MALLOCATTR void **nedpindependent_calloc(nedpool *p, size_t elemsno, size_t elemsize, void **chunks) THROWSPEC
 {
 	void **ret;
 	threadcache *tc;
@@ -932,7 +932,7 @@ void **nedpindependent_calloc(nedpool *p, size_t elemsno, size_t elemsize, void 
 	      ret=mspace_independent_calloc(m, elemsno, elemsize, chunks));
 	return ret;
 }
-void **nedpindependent_comalloc(nedpool *p, size_t elems, size_t *sizes, void **chunks) THROWSPEC
+MALLOCATTR void **nedpindependent_comalloc(nedpool *p, size_t elems, size_t *sizes, void **chunks) THROWSPEC
 {
 	void **ret;
 	threadcache *tc;

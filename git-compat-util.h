@@ -302,6 +302,14 @@ typedef unsigned long uintptr_t;
 #define _ALL_SOURCE 1
 #endif
 
+#ifdef USE_NED_ALLOCATOR
+#include "compat/nedmalloc/nedmalloc.h"
+#define malloc nedmalloc
+#define calloc nedcalloc
+#define realloc nedrealloc
+#define free nedfree
+#endif
+
 /* used on Mac OS X */
 #ifdef PRECOMPOSE_UNICODE
 #include "compat/precompose_utf8.h"
