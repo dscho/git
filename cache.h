@@ -673,6 +673,7 @@ const char *setup_git_directory_gently(int *);
 const char *setup_git_directory(void);
 char *prefix_path(const char *prefix, int len, const char *path);
 char *prefix_path_gently(const char *prefix, int len, int *remaining, const char *path);
+const char *setup_scalar_enlistment(struct strbuf *enlistment_root);
 
 /*
  * Concatenate "prefix" (if len is non-zero) and "path", with no

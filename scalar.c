@@ -26,10 +26,6 @@ static void setup_enlistment_directory(int argc, const char **argv,
 				       const struct option *options,
 				       struct strbuf *enlistment_root)
 {
-	struct strbuf path = STRBUF_INIT;
-	int enlistment_is_repo_parent = 0;
-	size_t len;
-
 	if (startup_info->have_repository)
 		BUG("gitdir already set up?!?");
 
@@ -37,43 +33,20 @@ static void setup_enlistment_directory(int argc, const char **argv,
 		usage_with_options(usagestr, options);
 
 	/* find the worktree, determine its corresponding root */
-	if (argc == 1) {
-		strbuf_add_absolute_path(&path, argv[0]);
-		if (!is_directory(path.buf))
-			die(_("'%s' does not exist"), path.buf);
-		if (chdir(path.buf) < 0)
-			die_errno(_("could not switch to '%s'"), path.buf);
-	} else if (strbuf_getcwd(&path) < 0)
-		die(_("need a working directory"));
+	if (argc == 1 && chdir(argv[0]) < 0)
+		die_errno(_("could not switch to '%s'"), argv[0]);
 
-	strbuf_trim_trailing_dir_sep(&path);
-#ifdef GIT_WINDOWS_NATIVE
-	convert_slashes(path.buf);
-#endif
-
-	/* check if currently in enlistment root with src/ workdir */
-	len = path.len;
-	strbuf_addstr(&path, "/src");
-	if (is_nonbare_repository_dir(&path)) {
-		enlistment_is_repo_parent = 1;
-		if (chdir(path.buf) < 0)
-			die_errno(_("could not switch to '%s'"), path.buf);
-	}
-	strbuf_setlen(&path, len);
-
-	setup_git_directory();
+	setup_scalar_enlistment(enlistment_root);
 
 	if (!the_repository->worktree)
 		die(_("Scalar enlistments require a worktree"));
 
-	if (enlistment_root) {
-		if (enlistment_is_repo_parent)
-			strbuf_addbuf(enlistment_root, &path);
-		else
-			strbuf_addstr(enlistment_root, the_repository->worktree);
-	}
+	if (!is_absolute_path(the_repository->gitdir)) {
+		char *absolute = absolute_pathdup(the_repository->gitdir);
 
-	strbuf_release(&path);
+		free(the_repository->gitdir);
+		the_repository->gitdir = absolute;
+	}
 }
 
 static int git_retries = 3;
@@ -94,7 +67,8 @@ static int run_git(const char *arg, ...)
 	for (attempts = 0, res = 1;
 	     res && attempts < git_retries;
 	     attempts++)
-		res = run_command_v_opt(argv.v, RUN_GIT_CMD);
+		res = run_command_v_opt_cd_env(argv.v, RUN_GIT_CMD,
+					       the_repository->worktree, NULL);
 
 	strvec_clear(&argv);
 	return res;

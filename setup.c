@@ -1008,7 +1008,8 @@ static const char *setup_discovered_git_dir(const char *gitdir,
 	}
 
 	/* #0, #1, #5, #8, #9, #12, #13 */
-	set_git_work_tree(".");
+	set_git_work_tree(!strcmp(gitdir, "src/" DEFAULT_GIT_DIR_ENVIRONMENT) ?
+				  "src" : ".");
 	if (strcmp(gitdir, DEFAULT_GIT_DIR_ENVIRONMENT))
 		set_git_dir(gitdir, 0);
 	inside_git_dir = 0;
@@ -1220,6 +1221,7 @@ static const char *allowed_bare_repo_to_string(
  */
 static enum discovery_result setup_git_directory_gently_1(struct strbuf *dir,
 							  struct strbuf *gitdir,
+							  struct strbuf *enlistment_root,
 							  struct strbuf *report,
 							  int die_on_error)
 {
@@ -1238,6 +1240,8 @@ static enum discovery_result setup_git_directory_gently_1(struct strbuf *dir,
 	gitdirenv = getenv(GIT_DIR_ENVIRONMENT);
 	if (gitdirenv) {
 		strbuf_addstr(gitdir, gitdirenv);
+		if (enlistment_root)
+			strbuf_addbuf(enlistment_root, gitdir);
 		return GIT_DIR_EXPLICIT;
 	}
 
@@ -1291,11 +1295,30 @@ static enum discovery_result setup_git_directory_gently_1(struct strbuf *dir,
 				if (is_git_directory(dir->buf)) {
 					gitdirenv = DEFAULT_GIT_DIR_ENVIRONMENT;
 					gitdir_path = xstrdup(dir->buf);
+					if (enlistment_root)
+						strbuf_add(enlistment_root,
+							   dir->buf, offset);
+				} else if (enlistment_root) {
+					strbuf_setlen(dir,
+						      offset + (offset > min_offset));
+					strbuf_addstr(dir, "src/"
+						      DEFAULT_GIT_DIR_ENVIRONMENT);
+					if (is_git_directory(dir->buf)) {
+						gitdirenv = "src/"
+							DEFAULT_GIT_DIR_ENVIRONMENT;
+						gitdir_path = xstrdup(dir->buf);
+						strbuf_add(enlistment_root,
+							   dir->buf, offset);
+					}
 				}
 			} else if (error_code != READ_GITFILE_ERR_STAT_FAILED)
 				return GIT_DIR_INVALID_GITFILE;
-		} else
+		} else {
 			gitfile = xstrdup(dir->buf);
+			if (enlistment_root)
+				strbuf_add(enlistment_root, dir->buf, offset);
+		}
+
 		/*
 		 * Earlier, we tentatively added DEFAULT_GIT_DIR_ENVIRONMENT
 		 * to check that directory for a repository.
@@ -1332,7 +1355,7 @@ static enum discovery_result setup_git_directory_gently_1(struct strbuf *dir,
 		}
 
 		if (is_git_directory(dir->buf)) {
-			if (get_allowed_bare_repo() == ALLOWED_BARE_REPO_EXPLICIT)
+			if (get_allowed_bare_repo() == ALLOWED_BARE_REPO_EXPLICIT || enlistment_root)
 				return GIT_DIR_DISALLOWED_BARE;
 			if (!ensure_valid_ownership(NULL, NULL, dir->buf, report))
 				return GIT_DIR_INVALID_OWNERSHIP;
@@ -1368,7 +1391,7 @@ enum discovery_result discover_git_directory_reason(struct strbuf *commondir,
 		return GIT_DIR_CWD_FAILURE;
 
 	cwd_len = dir.len;
-	if ((result = setup_git_directory_gently_1(&dir, gitdir, NULL, 0)) <= 0) {
+	if ((result = setup_git_directory_gently_1(&dir, gitdir, NULL, NULL, 0)) <= 0) {
 		strbuf_release(&dir);
 		return result;
 	}
@@ -1412,7 +1435,9 @@ enum discovery_result discover_git_directory_reason(struct strbuf *commondir,
 	return result;
 }
 
-const char *setup_git_directory_gently(int *nongit_ok)
+static const char *
+setup_git_directory_or_scalar_enlistment(int *nongit_ok,
+					 struct strbuf *enlistment_root)
 {
 	static struct strbuf cwd = STRBUF_INIT;
 	struct strbuf dir = STRBUF_INIT, gitdir = STRBUF_INIT, report = STRBUF_INIT;
@@ -1440,7 +1465,8 @@ const char *setup_git_directory_gently(int *nongit_ok)
 		die_errno(_("Unable to read current working directory"));
 	strbuf_addbuf(&dir, &cwd);
 
-	switch (setup_git_directory_gently_1(&dir, &gitdir, &report, 1)) {
+	switch (setup_git_directory_gently_1(&dir, &gitdir, enlistment_root,
+					     &report, 1)) {
 	case GIT_DIR_EXPLICIT:
 		prefix = setup_explicit_git_dir(gitdir.buf, &cwd, &repo_fmt, nongit_ok);
 		break;
@@ -1581,6 +1607,21 @@ const char *setup_git_directory_gently(int *nongit_ok)
 	clear_repository_format(&repo_fmt);
 
 	return prefix;
+}
+
+const char *setup_git_directory_gently(int *nongit_ok)
+{
+	return setup_git_directory_or_scalar_enlistment(nongit_ok, NULL);
+}
+
+const char *setup_scalar_enlistment(struct strbuf *enlistment_root)
+{
+	struct strbuf buf = STRBUF_INIT;
+	struct strbuf *s = enlistment_root ? enlistment_root : &buf;
+	const char *ret = setup_git_directory_or_scalar_enlistment(NULL, s);
+
+	strbuf_release(&buf);
+	return ret;
 }
 
 int git_config_perm(const char *var, const char *value)

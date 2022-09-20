@@ -298,13 +298,21 @@ test_expect_success '`scalar clone` with GVFS-enabled server' '
 	)
 '
 
-test_expect_success '`scalar register` parallel to worktree is unsupported' '
+test_expect_success '`scalar register` parallel to worktree is supported' '
 	git init test-repo/src &&
 	mkdir -p test-repo/out &&
 
-	: parallel to worktree is unsupported &&
-	test_must_fail env GIT_CEILING_DIRECTORIES="$(pwd)" \
+	: parallel to worktree is supported &&
+	# GIT_CEILING_DIRECTORIES="$(pwd)" \
+debug \
 		scalar register test-repo/out &&
+	git config --get --global --fixed-value \
+		maintenance.repo "$(pwd)/test-repo/src" &&
+	scalar list >scalar.repos &&
+	grep -F "$(pwd)/test-repo/src" scalar.repos &&
+
+	: scalar unregister properly unregisters enlistment &&
+	scalar unregister test-repo/out &&
 	test_must_fail git config --get --global --fixed-value \
 		maintenance.repo "$(pwd)/test-repo/src" &&
 	scalar list >scalar.repos &&
