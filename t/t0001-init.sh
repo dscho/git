@@ -2,8 +2,7 @@
 
 test_description='git init'
 
-# Drop this leak check because it doesn't work on every platform.
-# TEST_PASSES_SANITIZE_LEAK=true
+TEST_PASSES_SANITIZE_LEAK=true
 . ./test-lib.sh
 
 check_config () {
