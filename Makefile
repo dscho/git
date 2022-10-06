@@ -1500,6 +1500,8 @@ else
 	endif
 	BASIC_CFLAGS += $(CURL_CFLAGS)
 
+	TEST_PROGRAMS_NEED_X += test-http-server
+
 	REMOTE_CURL_PRIMARY = git-remote-http$X
 	REMOTE_CURL_ALIASES = git-remote-https$X git-remote-ftp$X git-remote-ftps$X
 	REMOTE_CURL_NAMES = $(REMOTE_CURL_PRIMARY) $(REMOTE_CURL_ALIASES)

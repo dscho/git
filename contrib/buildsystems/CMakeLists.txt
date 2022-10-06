@@ -989,6 +989,19 @@ set(wrapper_scripts
 set(wrapper_test_scripts
 	test-fake-ssh test-tool)
 
+if(CURL_FOUND)
+       list(APPEND wrapper_test_scripts test-http-server)
+
+       add_executable(test-http-server ${CMAKE_SOURCE_DIR}/t/helper/test-http-server.c)
+       target_link_libraries(test-http-server common-main)
+
+       if(MSVC)
+               set_target_properties(test-http-server
+                                       PROPERTIES RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/t/helper)
+               set_target_properties(test-http-server
+                                       PROPERTIES RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/t/helper)
+       endif()
+endif()
 
 foreach(script ${wrapper_scripts})
 	file(STRINGS ${CMAKE_SOURCE_DIR}/wrap-for-bin.sh content NEWLINE_CONSUME)
