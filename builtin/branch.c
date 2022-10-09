@@ -792,6 +792,7 @@ int cmd_branch(int argc, const char **argv, const char *prefix)
 		const char *branch_name;
 		struct strbuf branch_ref = STRBUF_INIT;
 		struct strbuf buf = STRBUF_INIT;
+		int ret = 1; /* assume failure */
 
 		if (!argc) {
 			if (filter.detached)
@@ -800,29 +801,23 @@ int cmd_branch(int argc, const char **argv, const char *prefix)
 		} else if (argc == 1) {
 			strbuf_branchname(&buf, argv[0], INTERPRET_BRANCH_LOCAL);
 			branch_name = buf.buf;
-		}
-		else
+		} else {
 			die(_("cannot edit description of more than one branch"));
+		}
 
 		strbuf_addf(&branch_ref, "refs/heads/%s", branch_name);
-		if (!ref_exists(branch_ref.buf)) {
-			strbuf_release(&branch_ref);
-			strbuf_release(&buf);
+		if (!ref_exists(branch_ref.buf))
+			error(!argc
+			      ? _("No commit on branch '%s' yet.")
+			      : _("No branch named '%s'."),
+			      branch_name);
+		else if (!edit_branch_description(branch_name))
+			ret = 0; /* happy */
 
-			if (!argc)
-				return error(_("No commit on branch '%s' yet."),
-					     branch_name);
-			else
-				return error(_("No branch named '%s'."),
-					     branch_name);
-		}
 		strbuf_release(&branch_ref);
-
-		if (edit_branch_description(branch_name)) {
-			strbuf_release(&buf);
-			return 1;
-		}
 		strbuf_release(&buf);
+
+		return ret;
 	} else if (copy) {
 		if (!argc)
 			die(_("branch name required"));
