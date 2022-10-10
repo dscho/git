@@ -373,7 +373,7 @@ static void fetch_alternates(struct walker *walker, const char *base)
 	 * Use a callback to process the result, since another request
 	 * may fail and need to have alternates loaded before continuing
 	 */
-	slot = get_active_slot();
+	slot = get_active_slot(0);
 	slot->callback_func = process_alternates_response;
 	alt_req.walker = walker;
 	slot->callback_data = &alt_req;

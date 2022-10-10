@@ -22,6 +22,7 @@ struct slot_results {
 struct active_request_slot {
 	CURL *curl;
 	int in_use;
+	struct curl_slist *headers;
 	CURLcode curl_result;
 	long http_code;
 	int *finished;
@@ -43,7 +44,7 @@ size_t fwrite_null(char *ptr, size_t eltsize, size_t nmemb, void *strbuf);
 curlioerr ioctl_buffer(CURL *handle, int cmd, void *clientp);
 
 /* Slot lifecycle functions */
-struct active_request_slot *get_active_slot(void);
+struct active_request_slot *get_active_slot(int no_pragma_header);
 int start_active_slot(struct active_request_slot *slot);
 void run_active_slot(struct active_request_slot *slot);
 void finish_all_active_slots(void);
@@ -64,7 +65,6 @@ void step_active_slots(void);
 void http_init(struct remote *remote, const char *url,
 	       int proactive_auth);
 void http_cleanup(void);
-struct curl_slist *http_copy_default_headers(void);
 
 extern long int git_curl_ipresolve;
 extern int active_requests;

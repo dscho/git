@@ -126,4 +126,11 @@
 #define GIT_CURL_HAVE_CURLSSLSET_NO_BACKENDS
 #endif
 
+/**
+ * CURLAUTH_BEARER was added in 7.61.0, released in July 2018.
+ */
+#if LIBCURL_VERSION_NUM >= 0x073D00
+#define GIT_CURL_HAVE_CURLAUTH_BEARER
+#endif
+
 #endif

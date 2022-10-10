@@ -211,29 +211,29 @@ static void curl_setup_http(CURL *curl, const char *url,
 	curl_easy_setopt(curl, CURLOPT_UPLOAD, 1);
 }
 
-static struct curl_slist *get_dav_token_headers(struct remote_lock *lock, enum dav_header_flag options)
+static struct curl_slist *append_dav_token_headers(struct curl_slist *headers,
+	struct remote_lock *lock, enum dav_header_flag options)
 {
 	struct strbuf buf = STRBUF_INIT;
-	struct curl_slist *dav_headers = http_copy_default_headers();
 
 	if (options & DAV_HEADER_IF) {
 		strbuf_addf(&buf, "If: (<%s>)", lock->token);
-		dav_headers = curl_slist_append(dav_headers, buf.buf);
+		headers = curl_slist_append(headers, buf.buf);
 		strbuf_reset(&buf);
 	}
 	if (options & DAV_HEADER_LOCK) {
 		strbuf_addf(&buf, "Lock-Token: <%s>", lock->token);
-		dav_headers = curl_slist_append(dav_headers, buf.buf);
+		headers = curl_slist_append(headers, buf.buf);
 		strbuf_reset(&buf);
 	}
 	if (options & DAV_HEADER_TIMEOUT) {
 		strbuf_addf(&buf, "Timeout: Second-%ld", lock->timeout);
-		dav_headers = curl_slist_append(dav_headers, buf.buf);
+		headers = curl_slist_append(headers, buf.buf);
 		strbuf_reset(&buf);
 	}
 	strbuf_release(&buf);
 
-	return dav_headers;
+	return headers;
 }
 
 static void finish_request(struct transfer_request *request);
@@ -281,7 +281,7 @@ static void start_mkcol(struct transfer_request *request)
 
 	request->url = get_remote_object_url(repo->url, hex, 1);
 
-	slot = get_active_slot();
+	slot = get_active_slot(0);
 	slot->callback_func = process_response;
 	slot->callback_data = request;
 	curl_setup_http_get(slot->curl, request->url, DAV_MKCOL);
@@ -399,7 +399,7 @@ static void start_put(struct transfer_request *request)
 	strbuf_add(&buf, request->lock->tmpfile_suffix, the_hash_algo->hexsz + 1);
 	request->url = strbuf_detach(&buf, NULL);
 
-	slot = get_active_slot();
+	slot = get_active_slot(0);
 	slot->callback_func = process_response;
 	slot->callback_data = request;
 	curl_setup_http(slot->curl, request->url, DAV_PUT,
@@ -417,15 +417,13 @@ static void start_put(struct transfer_request *request)
 static void start_move(struct transfer_request *request)
 {
 	struct active_request_slot *slot;
-	struct curl_slist *dav_headers = http_copy_default_headers();
 
-	slot = get_active_slot();
+	slot = get_active_slot(0);
 	slot->callback_func = process_response;
 	slot->callback_data = request;
 	curl_setup_http_get(slot->curl, request->url, DAV_MOVE);
-	dav_headers = curl_slist_append(dav_headers, request->dest);
-	dav_headers = curl_slist_append(dav_headers, "Overwrite: T");
-	curl_easy_setopt(slot->curl, CURLOPT_HTTPHEADER, dav_headers);
+	slot->headers = curl_slist_append(slot->headers, request->dest);
+	slot->headers = curl_slist_append(slot->headers, "Overwrite: T");
 
 	if (start_active_slot(slot)) {
 		request->slot = slot;
@@ -440,17 +438,16 @@ static int refresh_lock(struct remote_lock *lock)
 {
 	struct active_request_slot *slot;
 	struct slot_results results;
-	struct curl_slist *dav_headers;
 	int rc = 0;
 
 	lock->refreshing = 1;
 
-	dav_headers = get_dav_token_headers(lock, DAV_HEADER_IF | DAV_HEADER_TIMEOUT);
-
-	slot = get_active_slot();
+	slot = get_active_slot(0);
 	slot->results = &results;
+	slot->headers = append_dav_token_headers(slot->headers, lock,
+		DAV_HEADER_IF | DAV_HEADER_TIMEOUT);
+
 	curl_setup_http_get(slot->curl, lock->url, DAV_LOCK);
-	curl_easy_setopt(slot->curl, CURLOPT_HTTPHEADER, dav_headers);
 
 	if (start_active_slot(slot)) {
 		run_active_slot(slot);
@@ -464,7 +461,6 @@ static int refresh_lock(struct remote_lock *lock)
 	}
 
 	lock->refreshing = 0;
-	curl_slist_free_all(dav_headers);
 
 	return rc;
 }
@@ -838,7 +834,6 @@ static struct remote_lock *lock_remote(const char *path, long timeout)
 	char *ep;
 	char timeout_header[25];
 	struct remote_lock *lock = NULL;
-	struct curl_slist *dav_headers = http_copy_default_headers();
 	struct xml_ctx ctx;
 	char *escaped;
 
@@ -849,7 +844,7 @@ static struct remote_lock *lock_remote(const char *path, long timeout)
 	while (ep) {
 		char saved_character = ep[1];
 		ep[1] = '\0';
-		slot = get_active_slot();
+		slot = get_active_slot(0);
 		slot->results = &results;
 		curl_setup_http_get(slot->curl, url, DAV_MKCOL);
 		if (start_active_slot(slot)) {
@@ -875,14 +870,15 @@ static struct remote_lock *lock_remote(const char *path, long timeout)
 	strbuf_addf(&out_buffer.buf, LOCK_REQUEST, escaped);
 	free(escaped);
 
-	xsnprintf(timeout_header, sizeof(timeout_header), "Timeout: Second-%ld", timeout);
-	dav_headers = curl_slist_append(dav_headers, timeout_header);
-	dav_headers = curl_slist_append(dav_headers, "Content-Type: text/xml");
-
-	slot = get_active_slot();
+	slot = get_active_slot(0);
 	slot->results = &results;
+
+	xsnprintf(timeout_header, sizeof(timeout_header), "Timeout: Second-%ld", timeout);
+	slot->headers = curl_slist_append(slot->headers, timeout_header);
+	slot->headers = curl_slist_append(slot->headers,
+		"Content-Type: text/xml");
+
 	curl_setup_http(slot->curl, url, DAV_LOCK, &out_buffer, fwrite_buffer);
-	curl_easy_setopt(slot->curl, CURLOPT_HTTPHEADER, dav_headers);
 	curl_easy_setopt(slot->curl, CURLOPT_WRITEDATA, &in_buffer);
 
 	CALLOC_ARRAY(lock, 1);
@@ -921,7 +917,6 @@ static struct remote_lock *lock_remote(const char *path, long timeout)
 		fprintf(stderr, "Unable to start LOCK request\n");
 	}
 
-	curl_slist_free_all(dav_headers);
 	strbuf_release(&out_buffer.buf);
 	strbuf_release(&in_buffer);
 
@@ -945,15 +940,14 @@ static int unlock_remote(struct remote_lock *lock)
 	struct active_request_slot *slot;
 	struct slot_results results;
 	struct remote_lock *prev = repo->locks;
-	struct curl_slist *dav_headers;
 	int rc = 0;
 
-	dav_headers = get_dav_token_headers(lock, DAV_HEADER_LOCK);
-
-	slot = get_active_slot();
+	slot = get_active_slot(0);
 	slot->results = &results;
+	slot->headers = append_dav_token_headers(slot->headers, lock,
+		DAV_HEADER_LOCK);
+
 	curl_setup_http_get(slot->curl, lock->url, DAV_UNLOCK);
-	curl_easy_setopt(slot->curl, CURLOPT_HTTPHEADER, dav_headers);
 
 	if (start_active_slot(slot)) {
 		run_active_slot(slot);
@@ -965,8 +959,6 @@ static int unlock_remote(struct remote_lock *lock)
 	} else {
 		fprintf(stderr, "Unable to start UNLOCK request\n");
 	}
-
-	curl_slist_free_all(dav_headers);
 
 	if (repo->locks == lock) {
 		repo->locks = lock->next;
@@ -1121,7 +1113,6 @@ static void remote_ls(const char *path, int flags,
 	struct slot_results results;
 	struct strbuf in_buffer = STRBUF_INIT;
 	struct buffer out_buffer = { STRBUF_INIT, 0 };
-	struct curl_slist *dav_headers = http_copy_default_headers();
 	struct xml_ctx ctx;
 	struct remote_ls_ctx ls;
 
@@ -1134,14 +1125,14 @@ static void remote_ls(const char *path, int flags,
 
 	strbuf_addstr(&out_buffer.buf, PROPFIND_ALL_REQUEST);
 
-	dav_headers = curl_slist_append(dav_headers, "Depth: 1");
-	dav_headers = curl_slist_append(dav_headers, "Content-Type: text/xml");
-
-	slot = get_active_slot();
+	slot = get_active_slot(0);
 	slot->results = &results;
+	slot->headers = curl_slist_append(slot->headers, "Depth: 1");
+	slot->headers = curl_slist_append(slot->headers,
+		"Content-Type: text/xml");
+
 	curl_setup_http(slot->curl, url, DAV_PROPFIND,
 			&out_buffer, fwrite_buffer);
-	curl_easy_setopt(slot->curl, CURLOPT_HTTPHEADER, dav_headers);
 	curl_easy_setopt(slot->curl, CURLOPT_WRITEDATA, &in_buffer);
 
 	if (start_active_slot(slot)) {
@@ -1177,7 +1168,6 @@ static void remote_ls(const char *path, int flags,
 	free(url);
 	strbuf_release(&out_buffer.buf);
 	strbuf_release(&in_buffer);
-	curl_slist_free_all(dav_headers);
 }
 
 static void get_remote_object_list(unsigned char parent)
@@ -1199,7 +1189,6 @@ static int locking_available(void)
 	struct slot_results results;
 	struct strbuf in_buffer = STRBUF_INIT;
 	struct buffer out_buffer = { STRBUF_INIT, 0 };
-	struct curl_slist *dav_headers = http_copy_default_headers();
 	struct xml_ctx ctx;
 	int lock_flags = 0;
 	char *escaped;
@@ -1208,14 +1197,14 @@ static int locking_available(void)
 	strbuf_addf(&out_buffer.buf, PROPFIND_SUPPORTEDLOCK_REQUEST, escaped);
 	free(escaped);
 
-	dav_headers = curl_slist_append(dav_headers, "Depth: 0");
-	dav_headers = curl_slist_append(dav_headers, "Content-Type: text/xml");
-
-	slot = get_active_slot();
+	slot = get_active_slot(0);
 	slot->results = &results;
+	slot->headers = curl_slist_append(slot->headers, "Depth: 0");
+	slot->headers = curl_slist_append(slot->headers,
+		"Content-Type: text/xml");
+
 	curl_setup_http(slot->curl, repo->url, DAV_PROPFIND,
 			&out_buffer, fwrite_buffer);
-	curl_easy_setopt(slot->curl, CURLOPT_HTTPHEADER, dav_headers);
 	curl_easy_setopt(slot->curl, CURLOPT_WRITEDATA, &in_buffer);
 
 	if (start_active_slot(slot)) {
@@ -1257,7 +1246,6 @@ static int locking_available(void)
 
 	strbuf_release(&out_buffer.buf);
 	strbuf_release(&in_buffer);
-	curl_slist_free_all(dav_headers);
 
 	return lock_flags;
 }
@@ -1374,17 +1362,16 @@ static int update_remote(const struct object_id *oid, struct remote_lock *lock)
 	struct active_request_slot *slot;
 	struct slot_results results;
 	struct buffer out_buffer = { STRBUF_INIT, 0 };
-	struct curl_slist *dav_headers;
-
-	dav_headers = get_dav_token_headers(lock, DAV_HEADER_IF);
 
 	strbuf_addf(&out_buffer.buf, "%s\n", oid_to_hex(oid));
 
-	slot = get_active_slot();
+	slot = get_active_slot(0);
 	slot->results = &results;
+	slot->headers = append_dav_token_headers(slot->headers, lock,
+		DAV_HEADER_IF);
+
 	curl_setup_http(slot->curl, lock->url, DAV_PUT,
 			&out_buffer, fwrite_null);
-	curl_easy_setopt(slot->curl, CURLOPT_HTTPHEADER, dav_headers);
 
 	if (start_active_slot(slot)) {
 		run_active_slot(slot);
@@ -1486,18 +1473,18 @@ static void update_remote_info_refs(struct remote_lock *lock)
 	struct buffer buffer = { STRBUF_INIT, 0 };
 	struct active_request_slot *slot;
 	struct slot_results results;
-	struct curl_slist *dav_headers;
 
 	remote_ls("refs/", (PROCESS_FILES | RECURSIVE),
 		  add_remote_info_ref, &buffer.buf);
 	if (!aborted) {
-		dav_headers = get_dav_token_headers(lock, DAV_HEADER_IF);
 
-		slot = get_active_slot();
+		slot = get_active_slot(0);
 		slot->results = &results;
+		slot->headers = append_dav_token_headers(slot->headers, lock,
+			DAV_HEADER_IF);
+
 		curl_setup_http(slot->curl, lock->url, DAV_PUT,
 				&buffer, fwrite_null);
-		curl_easy_setopt(slot->curl, CURLOPT_HTTPHEADER, dav_headers);
 
 		if (start_active_slot(slot)) {
 			run_active_slot(slot);
@@ -1652,7 +1639,7 @@ static int delete_remote_branch(const char *pattern, int force)
 	if (dry_run)
 		return 0;
 	url = xstrfmt("%s%s", repo->url, remote_ref->name);
-	slot = get_active_slot();
+	slot = get_active_slot(0);
 	slot->results = &results;
 	curl_setup_http_get(slot->curl, url, DAV_DELETE);
 	if (start_active_slot(slot)) {

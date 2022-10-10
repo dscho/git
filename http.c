@@ -124,8 +124,6 @@ static unsigned long empty_auth_useless =
 	| CURLAUTH_DIGEST_IE
 	| CURLAUTH_DIGEST;
 
-static struct curl_slist *pragma_header;
-static struct curl_slist *no_pragma_header;
 static struct string_list extra_http_headers = STRING_LIST_INIT_DUP;
 
 static struct curl_slist *host_resolutions;
@@ -181,6 +179,81 @@ size_t fwrite_buffer(char *ptr, size_t eltsize, size_t nmemb, void *buffer_)
 
 	strbuf_add(buffer, ptr, size);
 	return nmemb;
+}
+
+static size_t fwrite_wwwauth(char *ptr, size_t eltsize, size_t nmemb, void *p)
+{
+	size_t size = eltsize * nmemb;
+	struct strvec *values = &http_auth.wwwauth_headers;
+	struct strbuf buf = STRBUF_INIT;
+	const char *val;
+	const char *z = NULL;
+
+	/*
+	 * Header lines may not come NULL-terminated from libcurl so we must
+	 * limit all scans to the maximum length of the header line, or leverage
+	 * strbufs for all operations.
+	 *
+	 * In addition, it is possible that header values can be split over
+	 * multiple lines as per RFC 2616 (even though this has since been
+	 * deprecated in RFC 7230). A continuation header field value is
+	 * identified as starting with a space or horizontal tab.
+	 *
+	 * The formal definition of a header field as given in RFC 2616 is:
+	 *
+	 *   message-header = field-name ":" [ field-value ]
+	 *   field-name     = token
+	 *   field-value    = *( field-content | LWS )
+	 *   field-content  = <the OCTETs making up the field-value
+	 *                    and consisting of either *TEXT or combinations
+	 *                    of token, separators, and quoted-string>
+	 */
+
+	strbuf_add(&buf, ptr, size);
+
+	/* Strip the CRLF that should be present at the end of each field */
+	strbuf_trim_trailing_newline(&buf);
+
+	/* Start of a new WWW-Authenticate header */
+	if (skip_iprefix(buf.buf, "www-authenticate:", &val)) {
+		while (isspace(*val)) val++;
+
+		strvec_push(values, val);
+		http_auth.header_is_last_match = 1;
+		goto exit;
+	}
+
+	/*
+	 * This line could be a continuation of the previously matched header
+	 * field. If this is the case then we should append this value to the
+	 * end of the previously consumed value.
+	 */
+	if (http_auth.header_is_last_match && isspace(*buf.buf)) {
+		const char **v = values->v + values->nr - 1;
+		char *append = xstrfmt("%s%.*s", *v, (int)(size - 1), ptr + 1);
+
+		free((void*)*v);
+		*v = append;
+
+		goto exit;
+	}
+
+	/* This is the start of a new header we don't care about */
+	http_auth.header_is_last_match = 0;
+
+	/*
+	 * If this is a HTTP status line and not a header field, this signals
+	 * a different HTTP response. libcurl writes all the output of all
+	 * response headers of all responses, including redirects.
+	 * We only care about the last HTTP request response's headers so clear
+	 * the existing array.
+	 */
+	if (skip_iprefix(buf.buf, "http/", &z))
+		strvec_clear(values);
+
+exit:
+	strbuf_release(&buf);
+	return size;
 }
 
 size_t fwrite_null(char *ptr, size_t eltsize, size_t nmemb, void *strbuf)
@@ -441,18 +514,36 @@ static int curl_empty_auth_enabled(void)
 	return 0;
 }
 
-static void init_curl_http_auth(CURL *result)
+static void init_curl_http_auth(struct active_request_slot *slot)
 {
-	if (!http_auth.username || !*http_auth.username) {
+	if (!http_auth.authtype &&
+		(!http_auth.username || !*http_auth.username)) {
 		if (curl_empty_auth_enabled())
-			curl_easy_setopt(result, CURLOPT_USERPWD, ":");
+			curl_easy_setopt(slot->curl, CURLOPT_USERPWD, ":");
 		return;
 	}
 
 	credential_fill(&http_auth);
 
-	curl_easy_setopt(result, CURLOPT_USERNAME, http_auth.username);
-	curl_easy_setopt(result, CURLOPT_PASSWORD, http_auth.password);
+	if (!http_auth.authtype || !strcasecmp(http_auth.authtype, "basic")
+				|| !strcasecmp(http_auth.authtype, "digest")) {
+		curl_easy_setopt(slot->curl, CURLOPT_USERNAME,
+			http_auth.username);
+		curl_easy_setopt(slot->curl, CURLOPT_PASSWORD,
+			http_auth.password);
+#ifdef GIT_CURL_HAVE_CURLAUTH_BEARER
+	} else if (!strcasecmp(http_auth.authtype, "bearer")) {
+		curl_easy_setopt(slot->curl, CURLOPT_HTTPAUTH, CURLAUTH_BEARER);
+		curl_easy_setopt(slot->curl, CURLOPT_XOAUTH2_BEARER,
+			http_auth.password);
+#endif
+	} else {
+		struct strbuf auth = STRBUF_INIT;
+		strbuf_addf(&auth, "Authorization: %s %s",
+			http_auth.authtype, http_auth.password);
+		slot->headers = curl_slist_append(slot->headers, auth.buf);
+		strbuf_release(&auth);
+	}
 }
 
 /* *var must be free-able */
@@ -827,9 +918,6 @@ static CURL *get_curl_handle(void)
 #endif
 	}
 
-	if (http_proactive_auth)
-		init_curl_http_auth(result);
-
 	if (getenv("GIT_SSL_VERSION"))
 		ssl_version = getenv("GIT_SSL_VERSION");
 	if (ssl_version && *ssl_version) {
@@ -1057,11 +1145,6 @@ void http_init(struct remote *remote, const char *url, int proactive_auth)
 	if (remote)
 		var_override(&http_proxy_authmethod, remote->http_proxy_authmethod);
 
-	pragma_header = curl_slist_append(http_copy_default_headers(),
-		"Pragma: no-cache");
-	no_pragma_header = curl_slist_append(http_copy_default_headers(),
-		"Pragma:");
-
 	{
 		char *http_max_requests = getenv("GIT_HTTP_MAX_REQUESTS");
 		if (http_max_requests)
@@ -1123,6 +1206,8 @@ void http_cleanup(void)
 
 	while (slot != NULL) {
 		struct active_request_slot *next = slot->next;
+		if (slot->headers)
+			curl_slist_free_all(slot->headers);
 		if (slot->curl) {
 			xmulti_remove_handle(slot);
 			curl_easy_cleanup(slot->curl);
@@ -1138,12 +1223,6 @@ void http_cleanup(void)
 	curl_global_cleanup();
 
 	string_list_clear(&extra_http_headers, 0);
-
-	curl_slist_free_all(pragma_header);
-	pragma_header = NULL;
-
-	curl_slist_free_all(no_pragma_header);
-	no_pragma_header = NULL;
 
 	curl_slist_free_all(host_resolutions);
 	host_resolutions = NULL;
@@ -1179,11 +1258,23 @@ void http_cleanup(void)
 	FREE_AND_NULL(cached_accept_language);
 }
 
-struct active_request_slot *get_active_slot(void)
+static struct curl_slist *http_copy_default_headers(void)
+{
+	struct curl_slist *headers = NULL;
+	const struct string_list_item *item;
+
+	for_each_string_list_item(item, &extra_http_headers)
+		headers = curl_slist_append(headers, item->string);
+
+	return headers;
+}
+
+struct active_request_slot *get_active_slot(int no_pragma_header)
 {
 	struct active_request_slot *slot = active_queue_head;
 	struct active_request_slot *newslot;
 
+	int proactive_auth = 0;
 	int num_transfers;
 
 	/* Wait for a slot to open up if the queue is full */
@@ -1201,10 +1292,14 @@ struct active_request_slot *get_active_slot(void)
 		newslot->curl = NULL;
 		newslot->in_use = 0;
 		newslot->next = NULL;
+		newslot->headers = NULL;
 
 		slot = active_queue_head;
 		if (!slot) {
 			active_queue_head = newslot;
+
+			/* Auth first slot if asked for proactive auth */
+			proactive_auth = http_proactive_auth;
 		} else {
 			while (slot->next != NULL)
 				slot = slot->next;
@@ -1218,6 +1313,15 @@ struct active_request_slot *get_active_slot(void)
 		curl_session_count++;
 	}
 
+	if (slot->headers)
+		curl_slist_free_all(slot->headers);
+
+	slot->headers = http_copy_default_headers();
+
+	if (!no_pragma_header)
+		slot->headers = curl_slist_append(slot->headers,
+			"Pragma: no-cache");
+
 	active_requests++;
 	slot->in_use = 1;
 	slot->results = NULL;
@@ -1227,7 +1331,6 @@ struct active_request_slot *get_active_slot(void)
 	curl_easy_setopt(slot->curl, CURLOPT_COOKIEFILE, curl_cookie_file);
 	if (curl_save_cookies)
 		curl_easy_setopt(slot->curl, CURLOPT_COOKIEJAR, curl_cookie_file);
-	curl_easy_setopt(slot->curl, CURLOPT_HTTPHEADER, pragma_header);
 	curl_easy_setopt(slot->curl, CURLOPT_RESOLVE, host_resolutions);
 	curl_easy_setopt(slot->curl, CURLOPT_ERRORBUFFER, curl_errorstr);
 	curl_easy_setopt(slot->curl, CURLOPT_CUSTOMREQUEST, NULL);
@@ -1251,16 +1354,20 @@ struct active_request_slot *get_active_slot(void)
 
 	curl_easy_setopt(slot->curl, CURLOPT_IPRESOLVE, git_curl_ipresolve);
 	curl_easy_setopt(slot->curl, CURLOPT_HTTPAUTH, http_auth_methods);
-	if (http_auth.password || curl_empty_auth_enabled())
-		init_curl_http_auth(slot->curl);
+
+	if (http_auth.password || curl_empty_auth_enabled() || proactive_auth)
+		init_curl_http_auth(slot);
 
 	return slot;
 }
 
 int start_active_slot(struct active_request_slot *slot)
 {
-	CURLMcode curlm_result = curl_multi_add_handle(curlm, slot->curl);
+	CURLMcode curlm_result;
 	int num_transfers;
+
+	curl_easy_setopt(slot->curl, CURLOPT_HTTPHEADER, slot->headers);
+	curlm_result = curl_multi_add_handle(curlm, slot->curl);
 
 	if (curlm_result != CURLM_OK &&
 	    curlm_result != CURLM_CALL_MULTI_PERFORM) {
@@ -1576,17 +1683,6 @@ int run_one_slot(struct active_request_slot *slot,
 	return handle_curl_result(results);
 }
 
-struct curl_slist *http_copy_default_headers(void)
-{
-	struct curl_slist *headers = NULL;
-	const struct string_list_item *item;
-
-	for_each_string_list_item(item, &extra_http_headers)
-		headers = curl_slist_append(headers, item->string);
-
-	return headers;
-}
-
 static CURLcode curlinfo_strbuf(CURL *curl, CURLINFO info, struct strbuf *buf)
 {
 	char *ptr;
@@ -1804,12 +1900,11 @@ static int http_request(const char *url,
 {
 	struct active_request_slot *slot;
 	struct slot_results results;
-	struct curl_slist *headers = http_copy_default_headers();
-	struct strbuf buf = STRBUF_INIT;
+	int no_cache = options && options->no_cache;
 	const char *accept_language;
 	int ret;
 
-	slot = get_active_slot();
+	slot = get_active_slot(!no_cache);
 	curl_easy_setopt(slot->curl, CURLOPT_HTTPGET, 1);
 
 	if (!result) {
@@ -1829,30 +1924,28 @@ static int http_request(const char *url,
 					 fwrite_buffer);
 	}
 
+	curl_easy_setopt(slot->curl, CURLOPT_HEADERFUNCTION, fwrite_wwwauth);
+
 	accept_language = http_get_accept_language_header();
 
 	if (accept_language)
-		headers = curl_slist_append(headers, accept_language);
+		slot->headers = curl_slist_append(slot->headers,
+			accept_language);
 
-	strbuf_addstr(&buf, "Pragma:");
-	if (options && options->no_cache)
-		strbuf_addstr(&buf, " no-cache");
 	if (options && options->initial_request &&
 	    http_follow_config == HTTP_FOLLOW_INITIAL)
 		curl_easy_setopt(slot->curl, CURLOPT_FOLLOWLOCATION, 1);
-
-	headers = curl_slist_append(headers, buf.buf);
 
 	/* Add additional headers here */
 	if (options && options->extra_headers) {
 		const struct string_list_item *item;
 		for_each_string_list_item(item, options->extra_headers) {
-			headers = curl_slist_append(headers, item->string);
+			slot->headers = curl_slist_append(slot->headers,
+				item->string);
 		}
 	}
 
 	curl_easy_setopt(slot->curl, CURLOPT_URL, url);
-	curl_easy_setopt(slot->curl, CURLOPT_HTTPHEADER, headers);
 	curl_easy_setopt(slot->curl, CURLOPT_ENCODING, "");
 	curl_easy_setopt(slot->curl, CURLOPT_FAILONERROR, 0);
 
@@ -1869,9 +1962,6 @@ static int http_request(const char *url,
 	if (options && options->effective_url)
 		curlinfo_strbuf(slot->curl, CURLINFO_EFFECTIVE_URL,
 				options->effective_url);
-
-	curl_slist_free_all(headers);
-	strbuf_release(&buf);
 
 	return ret;
 }
@@ -2233,12 +2323,10 @@ struct http_pack_request *new_direct_http_pack_request(
 		goto abort;
 	}
 
-	preq->slot = get_active_slot();
+	preq->slot = get_active_slot(1);
 	curl_easy_setopt(preq->slot->curl, CURLOPT_WRITEDATA, preq->packfile);
 	curl_easy_setopt(preq->slot->curl, CURLOPT_WRITEFUNCTION, fwrite);
 	curl_easy_setopt(preq->slot->curl, CURLOPT_URL, preq->url);
-	curl_easy_setopt(preq->slot->curl, CURLOPT_HTTPHEADER,
-		no_pragma_header);
 
 	/*
 	 * If there is data present from a previous transfer attempt,
@@ -2403,14 +2491,13 @@ struct http_object_request *new_http_object_request(const char *base_url,
 		}
 	}
 
-	freq->slot = get_active_slot();
+	freq->slot = get_active_slot(1);
 
 	curl_easy_setopt(freq->slot->curl, CURLOPT_WRITEDATA, freq);
 	curl_easy_setopt(freq->slot->curl, CURLOPT_FAILONERROR, 0);
 	curl_easy_setopt(freq->slot->curl, CURLOPT_WRITEFUNCTION, fwrite_sha1_file);
 	curl_easy_setopt(freq->slot->curl, CURLOPT_ERRORBUFFER, freq->errorstr);
 	curl_easy_setopt(freq->slot->curl, CURLOPT_URL, freq->url);
-	curl_easy_setopt(freq->slot->curl, CURLOPT_HTTPHEADER, no_pragma_header);
 
 	/*
 	 * If we have successfully processed data from a previous fetch

@@ -847,14 +847,13 @@ static int run_slot(struct active_request_slot *slot,
 static int probe_rpc(struct rpc_state *rpc, struct slot_results *results)
 {
 	struct active_request_slot *slot;
-	struct curl_slist *headers = http_copy_default_headers();
 	struct strbuf buf = STRBUF_INIT;
 	int err;
 
-	slot = get_active_slot();
+	slot = get_active_slot(0);
 
-	headers = curl_slist_append(headers, rpc->hdr_content_type);
-	headers = curl_slist_append(headers, rpc->hdr_accept);
+	slot->headers = curl_slist_append(slot->headers, rpc->hdr_content_type);
+	slot->headers = curl_slist_append(slot->headers, rpc->hdr_accept);
 
 	curl_easy_setopt(slot->curl, CURLOPT_NOBODY, 0);
 	curl_easy_setopt(slot->curl, CURLOPT_POST, 1);
@@ -862,13 +861,11 @@ static int probe_rpc(struct rpc_state *rpc, struct slot_results *results)
 	curl_easy_setopt(slot->curl, CURLOPT_ENCODING, NULL);
 	curl_easy_setopt(slot->curl, CURLOPT_POSTFIELDS, "0000");
 	curl_easy_setopt(slot->curl, CURLOPT_POSTFIELDSIZE, 4);
-	curl_easy_setopt(slot->curl, CURLOPT_HTTPHEADER, headers);
 	curl_easy_setopt(slot->curl, CURLOPT_WRITEFUNCTION, fwrite_buffer);
 	curl_easy_setopt(slot->curl, CURLOPT_WRITEDATA, &buf);
 
 	err = run_slot(slot, results);
 
-	curl_slist_free_all(headers);
 	strbuf_release(&buf);
 	return err;
 }
@@ -888,7 +885,6 @@ static curl_off_t xcurl_off_t(size_t len)
 static int post_rpc(struct rpc_state *rpc, int stateless_connect, int flush_received)
 {
 	struct active_request_slot *slot;
-	struct curl_slist *headers = http_copy_default_headers();
 	int use_gzip = rpc->gzip_request;
 	char *gzip_body = NULL;
 	size_t gzip_size = 0;
@@ -930,21 +926,23 @@ static int post_rpc(struct rpc_state *rpc, int stateless_connect, int flush_rece
 			needs_100_continue = 1;
 	}
 
-	headers = curl_slist_append(headers, rpc->hdr_content_type);
-	headers = curl_slist_append(headers, rpc->hdr_accept);
-	headers = curl_slist_append(headers, needs_100_continue ?
+retry:
+	slot = get_active_slot(0);
+
+	slot->headers = curl_slist_append(slot->headers, rpc->hdr_content_type);
+	slot->headers = curl_slist_append(slot->headers, rpc->hdr_accept);
+	slot->headers = curl_slist_append(slot->headers, needs_100_continue ?
 		"Expect: 100-continue" : "Expect:");
 
 	/* Add Accept-Language header */
 	if (rpc->hdr_accept_language)
-		headers = curl_slist_append(headers, rpc->hdr_accept_language);
+		slot->headers = curl_slist_append(slot->headers,
+			rpc->hdr_accept_language);
 
 	/* Add the extra Git-Protocol header */
 	if (rpc->protocol_header)
-		headers = curl_slist_append(headers, rpc->protocol_header);
-
-retry:
-	slot = get_active_slot();
+		slot->headers = curl_slist_append(slot->headers,
+			rpc->protocol_header);
 
 	curl_easy_setopt(slot->curl, CURLOPT_NOBODY, 0);
 	curl_easy_setopt(slot->curl, CURLOPT_POST, 1);
@@ -955,7 +953,8 @@ retry:
 		/* The request body is large and the size cannot be predicted.
 		 * We must use chunked encoding to send it.
 		 */
-		headers = curl_slist_append(headers, "Transfer-Encoding: chunked");
+		slot->headers = curl_slist_append(slot->headers,
+			"Transfer-Encoding: chunked");
 		rpc->initial_buffer = 1;
 		curl_easy_setopt(slot->curl, CURLOPT_READFUNCTION, rpc_out);
 		curl_easy_setopt(slot->curl, CURLOPT_INFILE, rpc);
@@ -1002,7 +1001,8 @@ retry:
 
 		gzip_size = stream.total_out;
 
-		headers = curl_slist_append(headers, "Content-Encoding: gzip");
+		slot->headers = curl_slist_append(slot->headers,
+			"Content-Encoding: gzip");
 		curl_easy_setopt(slot->curl, CURLOPT_POSTFIELDS, gzip_body);
 		curl_easy_setopt(slot->curl, CURLOPT_POSTFIELDSIZE_LARGE, xcurl_off_t(gzip_size));
 
@@ -1025,7 +1025,6 @@ retry:
 		}
 	}
 
-	curl_easy_setopt(slot->curl, CURLOPT_HTTPHEADER, headers);
 	curl_easy_setopt(slot->curl, CURLOPT_WRITEFUNCTION, rpc_in);
 	rpc_in_data.rpc = rpc;
 	rpc_in_data.slot = slot;
@@ -1055,7 +1054,6 @@ retry:
 	if (stateless_connect)
 		packet_response_end(rpc->in);
 
-	curl_slist_free_all(headers);
 	free(gzip_body);
 	return err;
 }

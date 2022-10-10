@@ -564,6 +564,52 @@ test_expect_success 'http auth forgets bogus credentials' '
 	expect_askpass both user@host
 '
 
+test_expect_success 'http auth sends www-auth headers to credential helper' '
+	write_script git-credential-tee <<-\EOF &&
+		cmd=$1
+		teefile=credential-$cmd
+		if [ -f "$teefile" ]; then
+			rm $teefile
+		fi
+		(
+			while read line;
+			do
+				if [ -z "$line" ]; then
+					exit 0
+				fi
+				echo "$line" >> $teefile
+				echo $line
+			done
+		) | git credential-store $cmd
+	EOF
+
+	cat >expected-get <<-EOF &&
+	protocol=http
+	host=127.0.0.1:5551
+	wwwauth[0]=Bearer authority=https://login.example.com
+	wwwauth[1]=FooAuth foo=bar baz=1
+	wwwauth[2]=Basic realm="git-auth"
+	EOF
+
+	cat >expected-store <<-EOF &&
+	protocol=http
+	host=127.0.0.1:5551
+	username=user@host
+	password=pass@host
+	EOF
+
+	rm -f .git-credentials &&
+	test_config credential.helper tee &&
+	set_askpass user@host pass@host &&
+	(
+		PATH="$PWD:$PATH" &&
+		git ls-remote "$HTTPD_URL/auth-wwwauth/smart/repo.git"
+	) &&
+	expect_askpass both user@host &&
+	test_cmp expected-get credential-get &&
+	test_cmp expected-store credential-store
+'
+
 test_expect_success 'client falls back from v2 to v0 to match server' '
 	GIT_TRACE_PACKET=$PWD/trace \
 	GIT_TEST_PROTOCOL_VERSION=2 \
