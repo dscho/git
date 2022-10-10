@@ -136,6 +136,7 @@ static int gc_config_is_timestamp_never(const char *var)
 static void gc_config(void)
 {
 	const char *value;
+	int experimental = 0;
 
 	if (!git_config_get_value("gc.packrefs", &value)) {
 		if (value && !strcmp(value, "notbare"))
@@ -147,6 +148,11 @@ static void gc_config(void)
 	if (gc_config_is_timestamp_never("gc.reflogexpire") &&
 	    gc_config_is_timestamp_never("gc.reflogexpireunreachable"))
 		prune_reflogs = 0;
+
+	/* feature.experimental implies gc.cruftPacks=true */
+	git_config_get_bool("feature.experimental", &experimental);
+	if (experimental)
+		cruft_packs = 1;
 
 	git_config_get_int("gc.aggressivewindow", &aggressive_window);
 	git_config_get_int("gc.aggressivedepth", &aggressive_depth);
