@@ -1,0 +1,234 @@
+#!/bin/sh
+#
+# spatchcache: a poor-man's "ccache"-alike for "spatch" in git.git
+#
+# This caching command relies on the peculiarities of the Makefile
+# driving "spatch" in git.git, in particular if we invoke:
+#
+#	make
+#	make coccicheck SPATCH_FLAGS=--very-quiet
+#
+# We can with COMPUTE_HEADER_DEPENDENCIES (auto-detected as true with
+# "gcc" and "clang") write e.g. a .depend/grep.o.d for grep.c, when we
+# compile grep.o.
+#
+# The .depend/grep.o.d will have the full header dependency tree of
+# grep.c, and we can thus cache the output of "spatch" by:
+#
+#	1. Hashing all of those files
+#	2. Hashing our source file, and the *.cocci rule we're
+#	   applying
+#	3. Running spatch, if suggests no changes (by far the common
+#	   case) we invoke "spatchCache.getCmd" and
+#	   "spatchCache.setCmd" with a hash SHA-256 to ask "does this
+#	   ID have no changes" or "say that ID had no changes>
+#	4. If no "spatchCache.{set,get}Cmd" is specified we'll use
+#	   "redis-cli" and maintain a SET called "spatch-cache". Set
+#	   appropriate redis memory policies to keep it from growing
+#	   out of control.
+#
+# This along with the general incremental "make" support for
+# "contrib/coccinelle" makes it viable to (re-)run coccicheck
+# e.g. when merging integration branches.
+#
+# Note that the "--very-quiet" flag is currently critical. The cache
+# will refuse to cache anything that has output on STDERR (which might
+# be errors from spatch). The STDERR (and exit code) could in
+# principle be cached (as with ccache), but then the simple structure
+# in the Redis cache would need to change, so just supply
+# "--very-quiet" for now.
+#
+# To use this, simply set SPATCH to
+# contrib/coccinelle/spatchcache. Then optionally set:
+#
+#	[spatchCache]
+#		# Optional: path to a custom spatch
+#		spatch = ~/g/coccicheck/spatch.opt
+#
+# As well as this trace config (debug implies trace):
+#
+#		trace = false
+#		debug = false
+#
+# Setting "trace" to "true" allows for seeing when we have a cache HIT
+# or MISS. To debug whether the cache is working do that, and run e.g.:
+#
+#	redis-cli FLUSHALL
+#	<make && make coccicheck, as above>
+#	grep -hore HIT -e MISS -e SET -e NOCACHE -e CANTCACHE .build/contrib/coccinelle | sort | uniq -c
+#	    600 CANTCACHE
+#	   7365 MISS
+#	   7365 SET
+#
+# A subsequent "make cocciclean && make coccicheck" should then have
+# all "HIT"'s and "CANTCACHE"'s.
+
+set -e
+
+## Our own configuration & options
+debug=$(git config --bool "spatchCache.debug")
+if test "$debug" != "true"
+then
+	debug=
+fi
+if test -n "$debug"
+then
+	set -x
+fi
+
+trace=$(git config --bool "spatchCache.trace")
+if test "$trace" != "true"
+then
+	trace=
+fi
+if test -n "$debug"
+then
+	# debug implies trace
+	trace=true
+fi
+
+trace_it () {
+	if test -z "$trace"
+	then
+		return
+	fi
+	echo "$@" >&2
+}
+
+spatch=$(git config --path "spatchCache.spatch" || :)
+if test -n "$spatch"
+then
+	if test -n "$debug"
+	then
+		trace_it "custom spatchCache.spatch='$spatch'"
+	fi
+else
+	spatch=spatch
+fi
+
+set=$(git config spatchCache.setCmd || :)
+get=$(git config spatchCache.getCmd || :)
+
+## Parse spatch()-like command-line for caching info
+arg_sp=
+arg_file=
+args="$@"
+spatch_opts() {
+	while test $# != 0
+	do
+		arg_file="$1"
+		case "$1" in
+		--sp-file)
+			arg_sp="$2"
+			;;
+		esac
+		shift
+	done
+}
+spatch_opts "$@"
+if ! test -f "$arg_file"
+then
+	arg_file=
+fi
+
+hash_for_cache() {
+	# Parameters that should affect the cache
+	echo "spatch=$spatch"
+	echo "args=$args"
+	echo
+
+	# Our target file and its dependencies
+	git hash-object "$1" "$2" $(grep -E -o '^[^:]+:$' "$3" | tr -d ':')
+}
+
+# Sanity checks
+if ! test -f "$arg_sp" && ! test -f "$arg_file"
+then
+	echo $0: no idea how to cache "$@" >&2
+	exit 128
+fi
+
+# Main logic
+d=$(dirname "$arg_file")
+b=$(basename "$arg_file")
+bwoext="${b%.c}"
+dep="$d/.depend/$bwoext.o.d"
+
+if ! test -f "$dep"
+then
+	trace_it "$0: CANTCACHE have no '$dep' for '$arg_file'!"
+	exec "$spatch" "$@"
+fi
+
+if test -n "$debug"
+then
+	trace_it "$0: The full cache input for '$arg_sp' '$arg_file' '$dep'"
+	hash_for_cache "$arg_sp" "$arg_file" "$dep" >&2
+fi
+sum=$(hash_for_cache "$arg_sp" "$arg_file" "$dep" | git hash-object --stdin)
+
+trace_it "$0: processing '$arg_file' with '$arg_sp' rule, and got hash '$sum' for it + '$dep'"
+
+getret=
+if test -z "$get"
+then
+	if test $(redis-cli SISMEMBER spatch-cache "$sum") = 1
+	then
+		getret=0
+	else
+		getret=1
+	fi
+else
+	$set "$sum"
+	getret=$?
+fi
+
+if test "$getret" = 0
+then
+	trace_it "$0: HIT for '$arg_file' with '$arg_sp'"
+	exit 0
+else
+	trace_it "$0: MISS: for '$arg_file' with '$arg_sp'"
+fi
+
+out="$(mktemp)"
+err="$(mktemp)"
+
+set +e
+"$spatch" "$@" >"$out" 2>"$err"
+ret=$?
+set -e
+
+if test $ret = 0 && ! test -s "$out" && ! test  -s "$err"
+then
+	rm -f "$out" "$err"
+
+	trace_it "$0: SET: for '$arg_file' with '$arg_sp'"
+
+	setret=
+	if test -z "$set"
+	then
+		if test $(redis-cli SADD spatch-cache "$sum") = 1
+		then
+			setret=0
+		else
+			setret=1
+		fi
+	else
+		"$set" "$sum"
+		setret=$?
+	fi
+
+	if test "$setret" != 0
+	then
+		echo "FAILED to set '$sum' in cache!" >&2
+		exit 128
+	fi
+else
+	trace_it "$0: NOCACHE (have changes): for '$arg_file' with '$arg_sp'"
+	cat "$out"
+	cat "$err" >&2
+	rm -f "$out" "$err"
+	exit "$ret"
+fi
+rm -f "$out" "$err"
