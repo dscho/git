@@ -281,17 +281,20 @@ jobs:
         vector:
         - jobname: linux-musl
           image: alpine
+          checkout_version: 3
         - jobname: linux32
           os: ubuntu32
           image: daald/ubuntu32:xenial
+          checkout_version: 2
         - jobname: pedantic
           image: fedora
+          checkout_version: 3
     env:
       jobname: ${{matrix.vector.jobname}}
     runs-on: ubuntu-latest
     container: ${{matrix.vector.image}}
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@${{matrix.vector.checkout_version}}
     - run: ci/install-docker-dependencies.sh
     - run: ci/run-build-and-tests.sh
     - name: print test failures
