@@ -65,11 +65,11 @@ This is known to `range-diff` as "dual coloring". Use `--no-dual-color`
 to revert to color all lines according to the outer diff markers
 (and completely ignore the inner diff when it comes to color).
 
---creation-factor=<percent>::
-	Set the creation/deletion cost fudge factor to `<percent>`.
+--creation-factor=<factor>::
+	Set the creation/deletion cost fudge factor to `<factor>`.
 	Defaults to 60. Try a larger value if `git range-diff` erroneously
 	considers a large change a total rewrite (deletion of one commit
-	and addition of another), and a smaller one in the reverse case.
+	and addition of another), and a smaller value in the reverse case.
 	See the ``Algorithm`` section below for an explanation why this is
 	needed.
 
