@@ -309,7 +309,7 @@ static int unbundle_from_file(struct repository *r, const char *file)
 	 * the prerequisite commits.
 	 */
 	if ((result = unbundle(r, &header, bundle_fd, NULL,
-			       VERIFY_BUNDLE_SKIP_REACHABLE)))
+			       VERIFY_BUNDLE_SKIP_REACHABLE | VERIFY_BUNDLE_QUIET)))
 		return 1;
 
 	/*
