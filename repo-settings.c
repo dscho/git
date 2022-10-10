@@ -60,16 +60,17 @@ void prepare_repo_settings(struct repository *r)
 	repo_cfg_bool(r, "pack.usesparse", &r->settings.pack_use_sparse, 1);
 	repo_cfg_bool(r, "core.multipackindex", &r->settings.core_multi_pack_index, 1);
 	repo_cfg_bool(r, "index.sparse", &r->settings.sparse_index, 0);
+	repo_cfg_bool(r, "submodule.propagateBranches", &r->settings.submodule_propagate_branches, 0);
 
 	/*
-	 * The GIT_TEST_MULTI_PACK_INDEX variable is special in that
-	 * either it *or* the config sets
-	 * r->settings.core_multi_pack_index if true. We don't take
-	 * the environment variable if it exists (even if false) over
-	 * any config, as in most other cases.
+	 * Boolean settings from config and environment variables. Only
+	 * take the environment variable if it is true, otherwise, use
+	 * the config.
 	 */
 	if (git_env_bool(GIT_TEST_MULTI_PACK_INDEX, 0))
 		r->settings.core_multi_pack_index = 1;
+	if (git_env_bool(GIT_SUBMODULE_PROPAGATE_BRANCHES_ENVIRONMENT, 0))
+		r->settings.submodule_propagate_branches = 1;
 
 	/*
 	 * Non-boolean config

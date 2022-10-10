@@ -1692,6 +1692,9 @@ static int clone_submodule(const struct module_clone_data *clone_data,
 			strvec_push(&cp.args, clone_data->single_branch ?
 				    "--single-branch" :
 				    "--no-single-branch");
+		if (the_repository->settings.submodule_propagate_branches)
+			strvec_push(&cp.args, "--detach");
+
 
 		strvec_push(&cp.args, "--");
 		strvec_push(&cp.args, clone_data->url);
@@ -1732,6 +1735,9 @@ static int clone_submodule(const struct module_clone_data *clone_data,
 	if (error_strategy)
 		git_config_set_in_file(p, "submodule.alternateErrorStrategy",
 				       error_strategy);
+	if (the_repository->settings.submodule_propagate_branches)
+		git_config_set_in_file(p, "submodule.propagateBranches",
+				       "true");
 
 	free(sm_alternate);
 	free(error_strategy);
@@ -1791,6 +1797,7 @@ static int module_clone(int argc, const char **argv, const char *prefix)
 
 	argc = parse_options(argc, argv, prefix, module_clone_options,
 			     git_submodule_helper_usage, 0);
+	prepare_repo_settings(the_repository);
 
 	clone_data.dissociate = !!dissociate;
 	clone_data.quiet = !!quiet;
@@ -1884,6 +1891,7 @@ static void submodule_update_clone_release(struct submodule_update_clone *suc)
 struct update_data {
 	const char *prefix;
 	char *displaypath;
+	const char *super_branch;
 	enum submodule_update_type update_default;
 	struct object_id suboid;
 	struct string_list references;
@@ -2231,6 +2239,8 @@ static int run_update_command(const struct update_data *ud, int subforce)
 		strvec_pushl(&cp.args, "checkout", "-q", NULL);
 		if (subforce)
 			strvec_push(&cp.args, "-f");
+		if (ud->super_branch)
+			strvec_pushl(&cp.args, "-b", ud->super_branch, NULL);
 		break;
 	case SM_UPDATE_REBASE:
 		cp.git_cmd = 1;
@@ -2489,6 +2499,8 @@ static void update_data_to_args(const struct update_data *update_data,
 static int update_submodule(struct update_data *update_data)
 {
 	int ret;
+	int submodule_up_to_date;
+	const char *submodule_head = NULL;
 
 	ret = determine_submodule_update_strategy(the_repository,
 						  update_data->just_cloned,
@@ -2500,9 +2512,10 @@ static int update_submodule(struct update_data *update_data)
 
 	if (update_data->just_cloned)
 		oidcpy(&update_data->suboid, null_oid());
-	else if (resolve_gitlink_ref(update_data->sm_path, "HEAD", &update_data->suboid))
+	else if (resolve_gitlink_ref(update_data->sm_path, "HEAD",
+				     &update_data->suboid, &submodule_head))
 		return die_message(_("Unable to find current revision in submodule path '%s'"),
-				   update_data->displaypath);
+			update_data->displaypath);
 
 	if (update_data->remote) {
 		char *remote_name;
@@ -2527,14 +2540,22 @@ static int update_submodule(struct update_data *update_data)
 						   update_data->sm_path);
 		}
 
-		if (resolve_gitlink_ref(update_data->sm_path, remote_ref, &update_data->oid))
+		if (resolve_gitlink_ref(update_data->sm_path, remote_ref,
+					&update_data->oid, NULL))
 			return die_message(_("Unable to find %s revision in submodule path '%s'"),
-					   remote_ref, update_data->sm_path);
+			    remote_ref, update_data->sm_path);
 
 		free(remote_ref);
 	}
 
-	if (!oideq(&update_data->oid, &update_data->suboid) || update_data->force) {
+	if (update_data->super_branch &&
+	    submodule_head &&
+	    !skip_prefix(submodule_head, "refs/heads/", &submodule_head))
+		submodule_up_to_date = !strcmp(update_data->super_branch, submodule_head);
+	else
+		submodule_up_to_date = oideq(&update_data->oid, &update_data->suboid);
+
+	if (!submodule_up_to_date || update_data->force) {
 		ret = run_update_procedure(update_data);
 		if (ret)
 			return ret;
@@ -2593,6 +2614,12 @@ static int update_submodules(struct update_data *update_data)
 	if (suc.quickstop) {
 		ret = 1;
 		goto cleanup;
+	}
+
+	if (the_repository->settings.submodule_propagate_branches) {
+		struct branch *current_branch = branch_get(NULL);
+		if (current_branch)
+			update_data->super_branch = current_branch->name;
 	}
 
 	for (i = 0; i < suc.update_clone_nr; i++) {
@@ -2691,6 +2718,7 @@ static int module_update(int argc, const char **argv, const char *prefix)
 
 	argc = parse_options(argc, argv, prefix, module_update_options,
 			     git_submodule_helper_usage, 0);
+	prepare_repo_settings(the_repository);
 
 	if (opt.require_init)
 		opt.init = 1;
@@ -3280,7 +3308,7 @@ static void die_on_repo_without_commits(const char *path)
 	strbuf_addstr(&sb, path);
 	if (is_nonbare_repository_dir(&sb)) {
 		struct object_id oid;
-		if (resolve_gitlink_ref(path, "HEAD", &oid) < 0)
+		if (resolve_gitlink_ref(path, "HEAD", &oid, NULL) < 0)
 			die(_("'%s' does not have a commit checked out"), path);
 	}
 	strbuf_release(&sb);

@@ -79,6 +79,7 @@ static int config_filter_submodules = -1;    /* unspecified */
 static struct string_list server_options = STRING_LIST_INIT_NODUP;
 static int option_remote_submodules;
 static const char *bundle_uri;
+static int option_detach;
 
 static int recurse_submodules_cb(const struct option *opt,
 				 const char *arg, int unset)
@@ -164,6 +165,8 @@ static struct option builtin_clone_options[] = {
 		    N_("initialize sparse-checkout file to include only files at root")),
 	OPT_STRING(0, "bundle-uri", &bundle_uri,
 		   N_("uri"), N_("a URI for downloading bundles before fetching from origin remote")),
+	OPT_BOOL(0, "detach", &option_detach,
+		 N_("detach HEAD and don't create branch")),
 	OPT_END()
 };
 
@@ -611,10 +614,12 @@ static void update_remote_refs(const struct ref *refs,
 }
 
 static void update_head(const struct ref *our, const struct ref *remote,
-			const char *unborn, const char *msg)
+			const char *unborn, int should_detach,
+			const char *msg)
 {
 	const char *head;
-	if (our && skip_prefix(our->name, "refs/heads/", &head)) {
+	if (our && !should_detach &&
+	    skip_prefix(our->name, "refs/heads/", &head)) {
 		/* Local default branch link */
 		if (create_symref("HEAD", our->name, NULL) < 0)
 			die(_("unable to update HEAD"));
@@ -1355,7 +1360,8 @@ int cmd_clone(int argc, const char **argv, const char *prefix)
 			   branch_top.buf, reflog_msg.buf, transport,
 			   !is_local);
 
-	update_head(our_head_points_at, remote_head, unborn_head, reflog_msg.buf);
+	update_head(our_head_points_at, remote_head, unborn_head,
+		    option_detach, reflog_msg.buf);
 
 	/*
 	 * We want to show progress for recursive submodule clones iff

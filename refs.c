@@ -1904,19 +1904,21 @@ const char *resolve_ref_unsafe(const char *refname, int resolve_flags,
 }
 
 int resolve_gitlink_ref(const char *submodule, const char *refname,
-			struct object_id *oid)
+			struct object_id *oid, const char **referent_out)
 {
 	struct ref_store *refs;
 	int flags;
+	const char *referent;
 
 	refs = get_submodule_ref_store(submodule);
 
 	if (!refs)
 		return -1;
-
-	if (!refs_resolve_ref_unsafe(refs, refname, 0, oid, &flags) ||
-	    is_null_oid(oid))
+	referent = refs_resolve_ref_unsafe(refs, refname, 0, oid, &flags);
+	if (!referent || is_null_oid(oid))
 		return -1;
+	if (referent_out)
+		*referent_out = referent;
 	return 0;
 }
 

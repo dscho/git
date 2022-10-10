@@ -1178,4 +1178,26 @@ test_expect_success 'submodule update --recursive skip submodules with strategy=
 	test_cmp expect.err actual.err
 '
 
+test_expect_success 'submodule update with submodule.propagateBranches checks out branches' '
+	test_when_finished "rm -fr top-cloned" &&
+	cp -r top-clean top-cloned &&
+
+	# Create a new upstream submodule
+	git init middle2 &&
+	test_commit -C middle2 "middle2" &&
+	git -C top submodule add ../middle2 middle2 &&
+	git -C top commit -m "add middle2" &&
+
+	git -C top-cloned checkout -b "new-branch" &&
+	git -C top-cloned pull origin main &&
+	test_config -C top-cloned submodule.propagateBranches true &&
+	git -C top-cloned submodule update --recursive &&
+
+	for REPO in "top-cloned/middle2" "top-cloned/middle" "top-cloned/middle/bottom"
+	do
+	    HEAD_BRANCH=$(git -C $REPO symbolic-ref HEAD) &&
+	    test $HEAD_BRANCH = "refs/heads/new-branch" || return 1
+	done
+'
+
 test_done
