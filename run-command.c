@@ -1496,16 +1496,11 @@ enum child_state {
 	GIT_CP_WAIT_CLEANUP,
 };
 
-int run_processes_parallel_ungroup;
 struct parallel_processes {
 	void *data;
 
-	int max_processes;
-	int nr_processes;
-
-	get_next_task_fn get_next_task;
-	start_failure_fn start_failure;
-	task_finished_fn task_finished;
+	unsigned int max_processes;
+	unsigned int nr_processes;
 
 	struct {
 		enum child_state state;
@@ -1520,25 +1515,12 @@ struct parallel_processes {
 	struct pollfd *pfd;
 
 	unsigned shutdown : 1;
-	unsigned ungroup : 1;
 
 	int output_owner;
 	struct strbuf buffered_output; /* of finished children */
 };
-
-static int default_start_failure(struct strbuf *out,
-				 void *pp_cb,
-				 void *pp_task_cb)
-{
-	return 0;
-}
-
-static int default_task_finished(int result,
-				 struct strbuf *out,
-				 void *pp_cb,
-				 void *pp_task_cb)
-{
-	return 0;
+#define PARALLEL_PROCESSES_INIT { \
+	.buffered_output = STRBUF_INIT, \
 }
 
 static void kill_children(struct parallel_processes *pp, int signo)
@@ -1560,41 +1542,31 @@ static void handle_children_on_signal(int signo)
 }
 
 static void pp_init(struct parallel_processes *pp,
-		    int n,
-		    get_next_task_fn get_next_task,
-		    start_failure_fn start_failure,
-		    task_finished_fn task_finished,
-		    void *data, int ungroup)
+		    const struct run_process_parallel_opts *opts)
 {
-	int i;
+	unsigned int i;
+	void *data = opts->data;
 
-	if (n < 1)
-		n = online_cpus();
+	if (!opts->jobs)
+		BUG("you must provide a non-zero number of jobs!");
 
-	pp->max_processes = n;
+	pp->max_processes = opts->jobs;
 
-	trace_printf("run_processes_parallel: preparing to run up to %d tasks", n);
+	trace_printf("run_processes_parallel: preparing to run up to %d tasks",
+		     opts->jobs);
 
 	pp->data = data;
-	if (!get_next_task)
+	if (!opts->get_next_task)
 		BUG("you need to specify a get_next_task function");
-	pp->get_next_task = get_next_task;
-
-	pp->start_failure = start_failure ? start_failure : default_start_failure;
-	pp->task_finished = task_finished ? task_finished : default_task_finished;
 
 	pp->nr_processes = 0;
 	pp->output_owner = 0;
 	pp->shutdown = 0;
-	pp->ungroup = ungroup;
-	CALLOC_ARRAY(pp->children, n);
-	if (pp->ungroup)
-		pp->pfd = NULL;
-	else
-		CALLOC_ARRAY(pp->pfd, n);
-	strbuf_init(&pp->buffered_output, 0);
+	CALLOC_ARRAY(pp->children, opts->jobs);
+	if (!opts->ungroup)
+		CALLOC_ARRAY(pp->pfd, opts->jobs);
 
-	for (i = 0; i < n; i++) {
+	for (i = 0; i < opts->jobs; i++) {
 		strbuf_init(&pp->children[i].err, 0);
 		child_process_init(&pp->children[i].process);
 		if (pp->pfd) {
@@ -1637,7 +1609,8 @@ static void pp_cleanup(struct parallel_processes *pp)
  * <0 no new job was started, user wishes to shutdown early. Use negative code
  *    to signal the children.
  */
-static int pp_start_one(struct parallel_processes *pp)
+static int pp_start_one(struct parallel_processes *pp,
+			const struct run_process_parallel_opts *opts)
 {
 	int i, code;
 
@@ -1647,29 +1620,33 @@ static int pp_start_one(struct parallel_processes *pp)
 	if (i == pp->max_processes)
 		BUG("bookkeeping is hard");
 
-	code = pp->get_next_task(&pp->children[i].process,
-				 pp->ungroup ? NULL : &pp->children[i].err,
-				 pp->data,
-				 &pp->children[i].data);
+	code = opts->get_next_task(&pp->children[i].process,
+				   opts->ungroup ? NULL : &pp->children[i].err,
+				   pp->data,
+				   &pp->children[i].data);
 	if (!code) {
-		if (!pp->ungroup) {
+		if (!opts->ungroup) {
 			strbuf_addbuf(&pp->buffered_output, &pp->children[i].err);
 			strbuf_reset(&pp->children[i].err);
 		}
 		return 1;
 	}
-	if (!pp->ungroup) {
+	if (!opts->ungroup) {
 		pp->children[i].process.err = -1;
 		pp->children[i].process.stdout_to_stderr = 1;
 	}
 	pp->children[i].process.no_stdin = 1;
 
 	if (start_command(&pp->children[i].process)) {
-		code = pp->start_failure(pp->ungroup ? NULL :
-					 &pp->children[i].err,
-					 pp->data,
-					 pp->children[i].data);
-		if (!pp->ungroup) {
+		if (opts->start_failure)
+			code = opts->start_failure(opts->ungroup ? NULL :
+						   &pp->children[i].err,
+						   pp->data,
+						   pp->children[i].data);
+		else
+			code = 0;
+
+		if (!opts->ungroup) {
 			strbuf_addbuf(&pp->buffered_output, &pp->children[i].err);
 			strbuf_reset(&pp->children[i].err);
 		}
@@ -1723,7 +1700,8 @@ static void pp_output(struct parallel_processes *pp)
 	}
 }
 
-static int pp_collect_finished(struct parallel_processes *pp)
+static int pp_collect_finished(struct parallel_processes *pp,
+			       const struct run_process_parallel_opts *opts)
 {
 	int i, code;
 	int n = pp->max_processes;
@@ -1738,9 +1716,12 @@ static int pp_collect_finished(struct parallel_processes *pp)
 
 		code = finish_command(&pp->children[i].process);
 
-		code = pp->task_finished(code, pp->ungroup ? NULL :
-					 &pp->children[i].err, pp->data,
-					 pp->children[i].data);
+		if (opts->task_finished)
+			code = opts->task_finished(code, opts->ungroup ? NULL :
+						   &pp->children[i].err, pp->data,
+						   pp->children[i].data);
+		else
+			code = 0;
 
 		if (code)
 			result = code;
@@ -1753,7 +1734,7 @@ static int pp_collect_finished(struct parallel_processes *pp)
 			pp->pfd[i].fd = -1;
 		child_process_init(&pp->children[i].process);
 
-		if (pp->ungroup) {
+		if (opts->ungroup) {
 			; /* no strbuf_*() work to do here */
 		} else if (i != pp->output_owner) {
 			strbuf_addbuf(&pp->buffered_output, &pp->children[i].err);
@@ -1783,29 +1764,28 @@ static int pp_collect_finished(struct parallel_processes *pp)
 	return result;
 }
 
-int run_processes_parallel(int n,
-			   get_next_task_fn get_next_task,
-			   start_failure_fn start_failure,
-			   task_finished_fn task_finished,
-			   void *pp_cb)
+void run_processes_parallel(const struct run_process_parallel_opts *opts)
 {
 	int i, code;
 	int output_timeout = 100;
 	int spawn_cap = 4;
-	int ungroup = run_processes_parallel_ungroup;
-	struct parallel_processes pp;
+	struct parallel_processes pp = PARALLEL_PROCESSES_INIT;
+	/* options */
+	const char *tr2_category = opts->tr2_category;
+	const char *tr2_label = opts->tr2_label;
+	const int do_trace2 = tr2_category && tr2_label;
 
-	/* unset for the next API user */
-	run_processes_parallel_ungroup = 0;
+	if (do_trace2)
+		trace2_region_enter_printf(tr2_category, tr2_label, NULL,
+					   "max:%d", opts->jobs);
 
-	pp_init(&pp, n, get_next_task, start_failure, task_finished, pp_cb,
-		ungroup);
+	pp_init(&pp, opts);
 	while (1) {
 		for (i = 0;
 		    i < spawn_cap && !pp.shutdown &&
 		    pp.nr_processes < pp.max_processes;
 		    i++) {
-			code = pp_start_one(&pp);
+			code = pp_start_one(&pp, opts);
 			if (!code)
 				continue;
 			if (code < 0) {
@@ -1816,7 +1796,7 @@ int run_processes_parallel(int n,
 		}
 		if (!pp.nr_processes)
 			break;
-		if (ungroup) {
+		if (opts->ungroup) {
 			int i;
 
 			for (i = 0; i < pp.max_processes; i++)
@@ -1825,7 +1805,7 @@ int run_processes_parallel(int n,
 			pp_buffer_stderr(&pp, output_timeout);
 			pp_output(&pp);
 		}
-		code = pp_collect_finished(&pp);
+		code = pp_collect_finished(&pp, opts);
 		if (code) {
 			pp.shutdown = 1;
 			if (code < 0)
@@ -1834,25 +1814,9 @@ int run_processes_parallel(int n,
 	}
 
 	pp_cleanup(&pp);
-	return 0;
-}
 
-int run_processes_parallel_tr2(int n, get_next_task_fn get_next_task,
-			       start_failure_fn start_failure,
-			       task_finished_fn task_finished, void *pp_cb,
-			       const char *tr2_category, const char *tr2_label)
-{
-	int result;
-
-	trace2_region_enter_printf(tr2_category, tr2_label, NULL, "max:%d",
-				   ((n < 1) ? online_cpus() : n));
-
-	result = run_processes_parallel(n, get_next_task, start_failure,
-					task_finished, pp_cb);
-
-	trace2_region_leave(tr2_category, tr2_label, NULL);
-
-	return result;
+	if (do_trace2)
+		trace2_region_leave(tr2_category, tr2_label, NULL);
 }
 
 int run_auto_maintenance(int quiet)
