@@ -301,7 +301,13 @@ static int unbundle_from_file(struct repository *r, const char *file)
 	if ((bundle_fd = read_bundle_header(file, &header)) < 0)
 		return 1;
 
-	if ((result = unbundle(r, &header, bundle_fd, NULL)))
+	/*
+	 * Skip the reachability walk here, since we will be adding
+	 * a reachable ref pointing to the new tips, which will reach
+	 * the prerequisite commits.
+	 */
+	if ((result = unbundle(r, &header, bundle_fd, NULL,
+			       VERIFY_BUNDLE_SKIP_REACHABLE)))
 		return 1;
 
 	/*
