@@ -26,7 +26,7 @@ jobs:
     - uses: actions/checkout@v2
     - run: ci/install-dependencies.sh
     - run: ci/run-build-and-tests.sh
-    - uses: action/tmate@v3
+    - uses: mxschmitt/action-tmate@v3
       with:
         limit-access-to-actor: true
       if: failure()
