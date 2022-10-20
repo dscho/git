@@ -128,8 +128,11 @@
 
 /**
  * CURLAUTH_BEARER was added in 7.61.0, released in July 2018.
+ * However, only 7.69.0 fixes a bug where Bearer: headers were not
+ * reused (curl/curl@dea17b519dc1), and a bug where Bearer was not
+ * passed via http://, too, we require that version.
  */
-#if LIBCURL_VERSION_NUM >= 0x073D00
+#if LIBCURL_VERSION_NUM >= 0x074500
 #define GIT_CURL_HAVE_CURLAUTH_BEARER
 #endif
 
