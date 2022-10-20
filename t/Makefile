@@ -34,7 +34,7 @@ PERL_PATH_SQ = $(subst ','\'',$(PERL_PATH))
 TEST_RESULTS_DIRECTORY_SQ = $(subst ','\'',$(TEST_RESULTS_DIRECTORY))
 CHAINLINTTMP_SQ = $(subst ','\'',$(CHAINLINTTMP))
 
-T = $(sort $(wildcard t[0-9][0-9][0-9][0-9]-*.sh))
+T = t5556-http-auth.sh
 THELPERS = $(sort $(filter-out $(T),$(wildcard *.sh)))
 TLIBS = $(sort $(wildcard lib-*.sh)) annotate-tests.sh
 TPERF = $(sort $(wildcard perf/p[0-9][0-9][0-9][0-9]-*.sh))
