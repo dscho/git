@@ -783,48 +783,72 @@ static int is_local_named_pipe_path(const char *filename)
 		filename[9]);
 }
 
-static int mingw_open_create(wchar_t const *wfilename, int oflags, ...)
+static int _wopen_2(wchar_t const *wfilename, int oflags, ...)
 {
-	HANDLE handle;
+	va_list args;
+	unsigned mode;
 	int fd;
-	DWORD create = (oflags & O_CREAT) ? OPEN_ALWAYS : OPEN_EXISTING;
+	HANDLE handle;
+	DWORD dwDesiredAccess = 0, dwShareMode = FILE_SHARE_DELETE,
+	      dwCreationDisposition = OPEN_EXISTING,
+	      dwFlagsAndAttributes = FILE_ATTRIBUTE_NORMAL;
 
-	/* only these flags are supported */
-	if ((oflags & ~O_CREAT) != (O_WRONLY | O_APPEND))
-		return errno = ENOSYS, -1;
+	va_start(args, oflags);
+	mode = va_arg(args, int);
+	va_end(args);
 
-	/*
-	 * FILE_SHARE_WRITE is required to permit child processes
-	 * to append to the file.
-	 */
-	handle = CreateFileW(wfilename, GENERIC_WRITE | DELETE,
-			FILE_SHARE_WRITE | FILE_SHARE_READ | FILE_SHARE_DELETE,
-			NULL, create, FILE_ATTRIBUTE_NORMAL, NULL);
-	if (handle == INVALID_HANDLE_VALUE) {
-		DWORD err = GetLastError();
+	if (!(mode & S_IWRITE))
+		dwFlagsAndAttributes = FILE_ATTRIBUTE_READONLY;
 
-		/*
-		 * Some network storage solutions (e.g. Isilon) might return
-		 * ERROR_INVALID_PARAMETER instead of expected error
-		 * ERROR_PATH_NOT_FOUND, which results in an unknown error. If
-		 * so, let's turn the error to ERROR_PATH_NOT_FOUND instead.
-		 */
-		if (err == ERROR_INVALID_PARAMETER)
-			err = ERROR_PATH_NOT_FOUND;
-
-		errno = err_win_to_posix(err);
+	if ((oflags & O_RDWR) == O_RDWR) {
+		/* O_RDWR can be different from O_RDONLY | O_WRONLY */
+		dwDesiredAccess |= GENERIC_READ | GENERIC_WRITE;
+		dwShareMode |= FILE_SHARE_READ | FILE_SHARE_WRITE;
+	} else if ((oflags & O_WRONLY) == O_WRONLY) {
+		dwDesiredAccess |= GENERIC_WRITE;
+		dwShareMode |= FILE_SHARE_WRITE;
+	} else if ((oflags & O_RDONLY) == O_RDONLY) {
+		dwDesiredAccess |= GENERIC_READ;
+		dwShareMode |= FILE_SHARE_READ;
+	} else {
+		errno = EINVAL;
 		return -1;
 	}
 
-	/*
-	 * No O_APPEND here, because the CRT uses it only to reset the
-	 * file pointer to EOF before each write(); but that is not
-	 * necessary (and may lead to races) for a file created with
-	 * FILE_APPEND_DATA.
-	 */
-	fd = _open_osfhandle((intptr_t)handle, O_BINARY);
-	if (fd < 0)
-		CloseHandle(handle);
+	switch (oflags & (O_CREAT | O_EXCL | O_TRUNC)) {
+	case O_CREAT | O_EXCL:
+	case O_CREAT | O_EXCL | O_TRUNC:
+		dwCreationDisposition = CREATE_NEW;
+		dwDesiredAccess |= DELETE;
+		dwShareMode |= FILE_SHARE_DELETE;
+		break;
+	case O_CREAT:
+		dwCreationDisposition = OPEN_ALWAYS;
+		break;
+	case O_TRUNC:
+		dwCreationDisposition = TRUNCATE_EXISTING;
+		break;
+	case 0:
+		break;
+	default:
+		errno = EINVAL;
+		return -1;
+	}
+
+	handle = CreateFileW(wfilename, dwDesiredAccess, dwShareMode, NULL,
+			     dwCreationDisposition, dwFlagsAndAttributes, 0);
+	if (handle == INVALID_HANDLE_VALUE) {
+		errno = err_win_to_posix(GetLastError());
+		return -1;
+	}
+	fd = _open_osfhandle((intptr_t)handle, oflags);
+	if (oflags & O_CREAT) {
+		if (turn_off_ntfs_shortname(handle) < 0) {
+			CloseHandle(handle);
+			fd = error_errno(_("could not turn off NTFS shortname of '%ls'"),
+					 wfilename);
+		}
+	}
 	return fd;
 }
 
@@ -858,6 +882,8 @@ int mingw_open (const char *filename, int oflags, ...)
 	if (append_atomically && (oflags & O_APPEND) &&
 		!is_local_named_pipe_path(filename))
 		open_fn = mingw_open_append;
+	else if (oflags & O_CREAT)
+		open_fn = _wopen_2;
 	else
 		open_fn = _wopen;
 
@@ -887,16 +913,6 @@ int mingw_open (const char *filename, int oflags, ...)
 			fd = open_fn(wfilename, oflags & ~O_CREAT, mode);
 		if (fd >= 0 && set_hidden_flag(wfilename, 1))
 			warning("could not mark '%s' as hidden.", filename);
-	}
-	if (oflags & O_CREAT) {
-		HANDLE h = CreateFileW(wfilename, GENERIC_ALL, FILE_SHARE_WRITE, NULL,
-				       OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
-		if (turn_off_ntfs_shortname(h) < 0) {
-			close(fd);
-			fd = error_errno(_("could not turn off NTFS shortname of '%s'"),
-					 filename);
-		}
-		CloseHandle(h);
 	}
 
 	return fd;
