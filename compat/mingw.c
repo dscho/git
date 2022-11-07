@@ -662,10 +662,29 @@ static int set_hidden_flag(const wchar_t *path, int set)
 	return -1;
 }
 
+static int turn_off_ntfs_shortname(HANDLE h)
+{
+	int ret = 0;
+
+	if (h == INVALID_HANDLE_VALUE) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	if (!SetFileShortNameW(h, L"") &&
+	    GetLastError() != ERROR_NOT_SUPPORTED) {
+		errno = err_win_to_posix(GetLastError());
+		ret = -1;
+	}
+
+	return ret;
+}
+
 int mingw_mkdir(const char *path, int mode)
 {
 	int ret;
 	wchar_t wpath[MAX_LONG_PATH];
+	HANDLE h;
 
 	if (!is_valid_win32_path(path, 0)) {
 		errno = EINVAL;
@@ -680,8 +699,14 @@ int mingw_mkdir(const char *path, int mode)
 	ret = _wmkdir(wpath);
 	if (!ret)
 		process_phantom_symlinks();
-	if (!ret && needs_hiding(path))
-		return set_hidden_flag(wpath, 1);
+	if (!ret && needs_hiding(path) && set_hidden_flag(wpath, 1) < 0)
+		ret = error_errno(_("could not hide '%s'"), path);
+	h = CreateFileW(wpath, GENERIC_WRITE | DELETE,
+			FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL,
+			OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+	if (turn_off_ntfs_shortname(h) < 0)
+		ret = error_errno(_("could not turn off NTFS shortname of '%s'"), path);
+	CloseHandle(h);
 	return ret;
 }
 
@@ -713,7 +738,7 @@ static int mingw_open_append(wchar_t const *wfilename, int oflags, ...)
 	 * to append to the file.
 	 */
 	handle = CreateFileW(wfilename, FILE_APPEND_DATA,
-			FILE_SHARE_WRITE | FILE_SHARE_READ,
+			FILE_SHARE_WRITE | FILE_SHARE_READ | FILE_SHARE_DELETE,
 			NULL, create, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (handle == INVALID_HANDLE_VALUE) {
 		DWORD err = GetLastError();
@@ -756,6 +781,51 @@ static int is_local_named_pipe_path(const char *filename)
 		!strncasecmp(filename+4, "pipe", 4) &&
 		is_dir_sep(filename[8]) &&
 		filename[9]);
+}
+
+static int mingw_open_create(wchar_t const *wfilename, int oflags, ...)
+{
+	HANDLE handle;
+	int fd;
+	DWORD create = (oflags & O_CREAT) ? OPEN_ALWAYS : OPEN_EXISTING;
+
+	/* only these flags are supported */
+	if ((oflags & ~O_CREAT) != (O_WRONLY | O_APPEND))
+		return errno = ENOSYS, -1;
+
+	/*
+	 * FILE_SHARE_WRITE is required to permit child processes
+	 * to append to the file.
+	 */
+	handle = CreateFileW(wfilename, GENERIC_WRITE | DELETE,
+			FILE_SHARE_WRITE | FILE_SHARE_READ | FILE_SHARE_DELETE,
+			NULL, create, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (handle == INVALID_HANDLE_VALUE) {
+		DWORD err = GetLastError();
+
+		/*
+		 * Some network storage solutions (e.g. Isilon) might return
+		 * ERROR_INVALID_PARAMETER instead of expected error
+		 * ERROR_PATH_NOT_FOUND, which results in an unknown error. If
+		 * so, let's turn the error to ERROR_PATH_NOT_FOUND instead.
+		 */
+		if (err == ERROR_INVALID_PARAMETER)
+			err = ERROR_PATH_NOT_FOUND;
+
+		errno = err_win_to_posix(err);
+		return -1;
+	}
+
+	/*
+	 * No O_APPEND here, because the CRT uses it only to reset the
+	 * file pointer to EOF before each write(); but that is not
+	 * necessary (and may lead to races) for a file created with
+	 * FILE_APPEND_DATA.
+	 */
+	fd = _open_osfhandle((intptr_t)handle, O_BINARY);
+	if (fd < 0)
+		CloseHandle(handle);
+	return fd;
 }
 
 int mingw_open (const char *filename, int oflags, ...)
@@ -818,6 +888,17 @@ int mingw_open (const char *filename, int oflags, ...)
 		if (fd >= 0 && set_hidden_flag(wfilename, 1))
 			warning("could not mark '%s' as hidden.", filename);
 	}
+	if (oflags & O_CREAT) {
+		HANDLE h = CreateFileW(wfilename, GENERIC_ALL, FILE_SHARE_WRITE, NULL,
+				       OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+		if (turn_off_ntfs_shortname(h) < 0) {
+			close(fd);
+			fd = error_errno(_("could not turn off NTFS shortname of '%s'"),
+					 filename);
+		}
+		CloseHandle(h);
+	}
+
 	return fd;
 }
 
@@ -873,6 +954,14 @@ FILE *mingw_fopen (const char *filename, const char *otype)
 		errno = ENOENT;
 	if (file && hide && set_hidden_flag(wfilename, 1))
 		warning("could not mark '%s' as hidden.", filename);
+	if (otype && strchr(otype, 'w') &&
+	    turn_off_ntfs_shortname((HANDLE)_get_osfhandle(fileno(file))) < 0) {
+		fclose(file);
+		file = NULL;
+		error_errno(_("could not turn off NTFS shortname of '%s'"),
+			    filename);
+	}
+
 	return file;
 }
 
@@ -900,6 +989,13 @@ FILE *mingw_freopen (const char *filename, const char *otype, FILE *stream)
 	file = _wfreopen(wfilename, wotype, stream);
 	if (file && hide && set_hidden_flag(wfilename, 1))
 		warning("could not mark '%s' as hidden.", filename);
+	if (otype && strchr(otype, 'w') &&
+	    turn_off_ntfs_shortname((HANDLE)_get_osfhandle(fileno(file))) < 0) {
+		fclose(file);
+		file = NULL;
+		error_errno(_("could not turn off NTFS shortname of '%s'"),
+			    filename);
+	}
 	return file;
 }
 
