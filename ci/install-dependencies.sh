@@ -83,9 +83,9 @@ esac
 if type p4d >/dev/null 2>&1 && type p4 >/dev/null 2>&1
 then
 	echo "$(tput setaf 6)Perforce Server Version$(tput sgr0)"
-	p4d -V | grep Rev.
+	p4d -V | grep Rev. || { echo >&2 "p4d: bad version"; p4d -V; exit 1; }
 	echo "$(tput setaf 6)Perforce Client Version$(tput sgr0)"
-	p4 -V | grep Rev.
+	p4 -V | grep Rev. || { echo >&2 "p4: bad version"; p4 -V; exit 1; }
 else
 	echo >&2 "WARNING: perforce wasn't installed, see above for clues why"
 fi
