@@ -241,8 +241,10 @@ ubuntu)
 	if [ "$jobname" = linux-gcc ]
 	then
 		MAKEFLAGS="$MAKEFLAGS PYTHON_PATH=/usr/bin/python3"
+		PYTHON_PACKAGE=python3
 	else
 		MAKEFLAGS="$MAKEFLAGS PYTHON_PATH=/usr/bin/python2"
+		PYTHON_PACKAGE=python2
 	fi
 
 	export GIT_TEST_HTTPD=true
