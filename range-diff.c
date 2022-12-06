@@ -93,7 +93,6 @@ static inline int find_next_line(const char *line, size_t size)
 static int read_mbox(const char *path, struct string_list *list)
 {
 	struct strbuf buf = STRBUF_INIT, contents = STRBUF_INIT;
-	struct strbuf long_subject = STRBUF_INIT;
 	struct patch_util *util = NULL;
 	enum {
 		MBOX_BEFORE_HEADER,
@@ -152,7 +151,6 @@ fail:
 				string_list_clear(list, 1);
 				strbuf_release(&buf);
 				strbuf_release(&contents);
-				strbuf_release(&long_subject);
 				return -1;
 			}
 
@@ -247,19 +245,6 @@ fail:
 						q++;
 					subject = q;
 				}
-
-				if (len < size && line[len] == ' ') {
-					/* handle long subject */
-					strbuf_reset(&long_subject);
-					strbuf_addstr(&long_subject, subject);
-					while (len < size && line[len] == ' ') {
-						line += len;
-						size -= len;
-						len = find_next_line(line, size);
-						strbuf_addstr(&long_subject, line);
-					}
-					subject = long_subject.buf;
-				}
 			}
 		} else if (state == MBOX_IN_COMMIT_MESSAGE) {
 			if (!line[0]) {
@@ -337,7 +322,6 @@ fail:
 			free(util);
 	}
 	strbuf_release(&buf);
-	strbuf_release(&long_subject);
 	free(current_filename);
 
 	return 0;
