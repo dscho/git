@@ -40,10 +40,10 @@ terms of the MIT license. A copy of the license can be found in the file
 #if defined(__cplusplus)
 #define mi_decl_externc       extern "C"
 #else
-#define mi_decl_externc
+#define mi_decl_externc  
 #endif
 
-#if !defined(_WIN32) && !defined(__wasi__)
+#if !defined(_WIN32) && !defined(__wasi__) 
 #define  MI_USE_PTHREADS
 #include <pthread.h>
 #endif
@@ -318,7 +318,7 @@ On some platforms though we cannot use that when overriding `malloc` since the u
 TLS implementation (or the loader) will call itself `malloc` on a first access and recurse.
 We try to circumvent this in an efficient way:
 - macOSX : we use an unused TLS slot from the OS allocated slots (MI_TLS_SLOT). On OSX, the
-	   loader itself calls `malloc` even before the modules are initialized.
+           loader itself calls `malloc` even before the modules are initialized.
 - OpenBSD: we use an unused slot from the pthread block (MI_TLS_PTHREAD_SLOT_OFS).
 - DragonFly: defaults are working but seem slow compared to freeBSD (see PR #323)
 ------------------------------------------------------------------------------------------- */
@@ -329,14 +329,14 @@ mi_heap_t*  _mi_heap_main_get(void);    // statically allocated main backing hea
 
 #if defined(MI_MALLOC_OVERRIDE)
 #if defined(__APPLE__) // macOS
-#define MI_TLS_SLOT               89  // seems unused?
-// #define MI_TLS_RECURSE_GUARD 1
+#define MI_TLS_SLOT               89  // seems unused? 
+// #define MI_TLS_RECURSE_GUARD 1     
 // other possible unused ones are 9, 29, __PTK_FRAMEWORK_JAVASCRIPTCORE_KEY4 (94), __PTK_FRAMEWORK_GC_KEY9 (112) and __PTK_FRAMEWORK_OLDGC_KEY9 (89)
 // see <https://github.com/rweichler/substrate/blob/master/include/pthread_machdep.h>
 #elif defined(__OpenBSD__)
-// use end bytes of a name; goes wrong if anyone uses names > 23 characters (ptrhread specifies 16)
+// use end bytes of a name; goes wrong if anyone uses names > 23 characters (ptrhread specifies 16) 
 // see <https://github.com/openbsd/src/blob/master/lib/libc/include/thread_private.h#L371>
-#define MI_TLS_PTHREAD_SLOT_OFS   (6*sizeof(int) + 4*sizeof(void*) + 24)
+#define MI_TLS_PTHREAD_SLOT_OFS   (6*sizeof(int) + 4*sizeof(void*) + 24)  
 // #elif defined(__DragonFly__)
 // #warning "mimalloc is not working correctly on DragonFly yet."
 // #define MI_TLS_PTHREAD_SLOT_OFS   (4 + 1*sizeof(void*))  // offset `uniqueid` (also used by gdb?) <https://github.com/DragonFlyBSD/DragonFlyBSD/blob/master/lib/libthread_xu/thread/thr_private.h#L458>
@@ -376,7 +376,7 @@ static inline mi_heap_t* mi_get_default_heap(void) {
     #ifdef __GNUC__
     __asm(""); // prevent conditional load of the address of _mi_heap_empty
     #endif
-    heap = (mi_heap_t*)&_mi_heap_empty;
+    heap = (mi_heap_t*)&_mi_heap_empty;    
   }
   return heap;
 #elif defined(MI_TLS_PTHREAD_SLOT_OFS)
@@ -386,7 +386,7 @@ static inline mi_heap_t* mi_get_default_heap(void) {
   mi_heap_t* heap = (mi_unlikely(_mi_heap_default_key == (pthread_key_t)(-1)) ? _mi_heap_main_get() : (mi_heap_t*)pthread_getspecific(_mi_heap_default_key));
   return (mi_unlikely(heap == NULL) ? (mi_heap_t*)&_mi_heap_empty : heap);
 #else
-  #if defined(MI_TLS_RECURSE_GUARD)
+  #if defined(MI_TLS_RECURSE_GUARD)  
   if (mi_unlikely(!_mi_process_is_initialized)) return _mi_heap_main_get();
   #endif
   return _mi_heap_default;
@@ -446,7 +446,7 @@ static inline mi_slice_t* mi_page_to_slice(mi_page_t* p) {
 
 // Segment belonging to a page
 static inline mi_segment_t* _mi_page_segment(const mi_page_t* page) {
-  mi_segment_t* segment = _mi_ptr_segment(page);
+  mi_segment_t* segment = _mi_ptr_segment(page); 
   mi_assert_internal(segment == NULL || ((mi_slice_t*)page >= segment->slices && (mi_slice_t*)page < segment->slices + segment->slice_entries));
   return segment;
 }
@@ -737,12 +737,12 @@ size_t _mi_commit_mask_next_run(const mi_commit_mask_t* cm, size_t* idx);
 
 #define mi_commit_mask_foreach(cm,idx,count) \
   idx = 0; \
-  while ((count = _mi_commit_mask_next_run(cm,&idx)) > 0) {
-
+  while ((count = _mi_commit_mask_next_run(cm,&idx)) > 0) { 
+        
 #define mi_commit_mask_foreach_end() \
     idx += count; \
   }
-
+      
 
 
 
@@ -803,16 +803,16 @@ static inline mi_threadid_t _mi_thread_id(void) mi_attr_noexcept {
   return (uintptr_t)NtCurrentTeb();
 }
 
-// We use assembly for a fast thread id on the main platforms. The TLS layout depends on
+// We use assembly for a fast thread id on the main platforms. The TLS layout depends on 
 // both the OS and libc implementation so we use specific tests for each main platform.
 // If you test on another platform and it works please send a PR :-)
 // see also https://akkadia.org/drepper/tls.pdf for more info on the TLS register.
 #elif defined(__GNUC__) && ( \
-	   (defined(__GLIBC__)   && (defined(__x86_64__) || defined(__i386__) || defined(__arm__) || defined(__aarch64__))) \
-	|| (defined(__APPLE__)   && (defined(__x86_64__) || defined(__aarch64__))) \
-	|| (defined(__BIONIC__)  && (defined(__x86_64__) || defined(__i386__) || defined(__arm__) || defined(__aarch64__))) \
-	|| (defined(__FreeBSD__) && (defined(__x86_64__) || defined(__i386__) || defined(__aarch64__))) \
-	|| (defined(__OpenBSD__) && (defined(__x86_64__) || defined(__i386__) || defined(__aarch64__))) \
+           (defined(__GLIBC__)   && (defined(__x86_64__) || defined(__i386__) || defined(__arm__) || defined(__aarch64__))) \
+        || (defined(__APPLE__)   && (defined(__x86_64__) || defined(__aarch64__))) \
+        || (defined(__BIONIC__)  && (defined(__x86_64__) || defined(__i386__) || defined(__arm__) || defined(__aarch64__))) \
+        || (defined(__FreeBSD__) && (defined(__x86_64__) || defined(__i386__) || defined(__aarch64__))) \
+        || (defined(__OpenBSD__) && (defined(__x86_64__) || defined(__i386__) || defined(__aarch64__))) \
       )
 
 static inline void* mi_tls_slot(size_t slot) mi_attr_noexcept {
@@ -916,7 +916,7 @@ static inline size_t mi_ctz(uintptr_t x) {
 #endif
 }
 
-#elif defined(_MSC_VER)
+#elif defined(_MSC_VER) 
 
 #include <limits.h>       // LONG_MAX
 #define MI_HAVE_FAST_BITSCAN
@@ -927,7 +927,7 @@ static inline size_t mi_clz(uintptr_t x) {
   _BitScanReverse(&idx, x);
 #else
   _BitScanReverse64(&idx, x);
-#endif
+#endif  
   return ((MI_INTPTR_BITS - 1) - idx);
 }
 static inline size_t mi_ctz(uintptr_t x) {
@@ -937,7 +937,7 @@ static inline size_t mi_ctz(uintptr_t x) {
   _BitScanForward(&idx, x);
 #else
   _BitScanForward64(&idx, x);
-#endif
+#endif  
   return idx;
 }
 
@@ -967,7 +967,7 @@ static inline size_t mi_clz32(uint32_t x) {
 }
 
 static inline size_t mi_clz(uintptr_t x) {
-  if (x==0) return MI_INTPTR_BITS;
+  if (x==0) return MI_INTPTR_BITS;  
 #if (MI_INTPTR_BITS <= 32)
   return mi_clz32((uint32_t)x);
 #else
@@ -998,9 +998,9 @@ static inline size_t mi_bsr(uintptr_t x) {
 // ---------------------------------------------------------------------------------
 // Provide our own `_mi_memcpy` for potential performance optimizations.
 //
-// For now, only on Windows with msvc/clang-cl we optimize to `rep movsb` if
-// we happen to run on x86/x64 cpu's that have "fast short rep movsb" (FSRM) support
-// (AMD Zen3+ (~2020) or Intel Ice Lake+ (~2017). See also issue #201 and pr #253.
+// For now, only on Windows with msvc/clang-cl we optimize to `rep movsb` if 
+// we happen to run on x86/x64 cpu's that have "fast short rep movsb" (FSRM) support 
+// (AMD Zen3+ (~2020) or Intel Ice Lake+ (~2017). See also issue #201 and pr #253. 
 // ---------------------------------------------------------------------------------
 
 #if defined(_WIN32) && (defined(_M_IX86) || defined(_M_X64))
@@ -1024,7 +1024,7 @@ static inline void _mi_memcpy(void* dst, const void* src, size_t n) {
 
 
 // -------------------------------------------------------------------------------
-// The `_mi_memcpy_aligned` can be used if the pointers are machine-word aligned
+// The `_mi_memcpy_aligned` can be used if the pointers are machine-word aligned 
 // This is used for example in `mi_realloc`.
 // -------------------------------------------------------------------------------
 

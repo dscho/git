@@ -77,11 +77,11 @@ mi_decl_noinline void* _mi_segment_cache_pop(size_t size, mi_commit_mask_t* comm
   *memid = slot->memid;
   *is_pinned = slot->is_pinned;
   *is_zero = false;
-  *commit_mask = slot->commit_mask;
+  *commit_mask = slot->commit_mask;     
   *decommit_mask = slot->decommit_mask;
   slot->p = NULL;
   mi_atomic_storei64_release(&slot->expire,(mi_msecs_t)0);
-
+  
   // mark the slot as free again
   mi_assert_internal(_mi_bitmap_is_claimed(cache_inuse, MI_CACHE_FIELDS, 1, bitidx));
   _mi_bitmap_unclaim(cache_inuse, MI_CACHE_FIELDS, 1, bitidx);
@@ -102,7 +102,7 @@ static mi_decl_noinline void mi_commit_mask_decommit(mi_commit_mask_t* cmask, vo
     mi_assert_internal((total%MI_COMMIT_MASK_BITS)==0);
     size_t part = total/MI_COMMIT_MASK_BITS;
     size_t idx;
-    size_t count;
+    size_t count;    
     mi_commit_mask_foreach(cmask, idx, count) {
       void*  start = (uint8_t*)p + (idx*part);
       size_t size = count*part;
@@ -132,19 +132,19 @@ static mi_decl_noinline void mi_segment_cache_purge(bool force, mi_os_tld_t* tld
       purged++;
       mi_bitmap_index_t bitidx = mi_bitmap_index_create_from_bit(idx);
       if (_mi_bitmap_claim(cache_available, MI_CACHE_FIELDS, 1, bitidx, NULL)) {
-	// was available, we claimed it
-	expire = mi_atomic_loadi64_acquire(&slot->expire);
-	if (expire != 0 && (force || now >= expire)) {  // safe read
-	  // still expired, decommit it
-	  mi_atomic_storei64_relaxed(&slot->expire,(mi_msecs_t)0);
-	  mi_assert_internal(!mi_commit_mask_is_empty(&slot->commit_mask) && _mi_bitmap_is_claimed(cache_available_large, MI_CACHE_FIELDS, 1, bitidx));
-	  _mi_abandoned_await_readers();  // wait until safe to decommit
-	  // decommit committed parts
-	  // TODO: instead of decommit, we could also free to the OS?
-	  mi_commit_mask_decommit(&slot->commit_mask, slot->p, MI_SEGMENT_SIZE, tld->stats);
-	  mi_commit_mask_create_empty(&slot->decommit_mask);
-	}
-	_mi_bitmap_unclaim(cache_available, MI_CACHE_FIELDS, 1, bitidx); // make it available again for a pop
+        // was available, we claimed it
+        expire = mi_atomic_loadi64_acquire(&slot->expire);
+        if (expire != 0 && (force || now >= expire)) {  // safe read
+          // still expired, decommit it
+          mi_atomic_storei64_relaxed(&slot->expire,(mi_msecs_t)0);
+          mi_assert_internal(!mi_commit_mask_is_empty(&slot->commit_mask) && _mi_bitmap_is_claimed(cache_available_large, MI_CACHE_FIELDS, 1, bitidx));
+          _mi_abandoned_await_readers();  // wait until safe to decommit
+          // decommit committed parts
+          // TODO: instead of decommit, we could also free to the OS?
+          mi_commit_mask_decommit(&slot->commit_mask, slot->p, MI_SEGMENT_SIZE, tld->stats);
+          mi_commit_mask_create_empty(&slot->decommit_mask);
+        }
+        _mi_bitmap_unclaim(cache_available, MI_CACHE_FIELDS, 1, bitidx); // make it available again for a pop
       }
       if (!force && purged > MI_MAX_PURGE_PER_PUSH) break;  // bound to no more than N purge tries per push
     }
@@ -278,7 +278,7 @@ void _mi_segment_map_freed_at(const mi_segment_t* segment) {
 // Determine the segment belonging to a pointer or NULL if it is not in a valid segment.
 static mi_segment_t* _mi_segment_of(const void* p) {
   mi_segment_t* segment = _mi_ptr_segment(p);
-  if (segment == NULL) return NULL;
+  if (segment == NULL) return NULL; 
   size_t bitidx;
   size_t index = mi_segment_map_index_of(segment, &bitidx);
   // fast path: for any pointer to valid small/medium/large object or first MI_SEGMENT_SIZE in huge
@@ -309,8 +309,8 @@ static mi_segment_t* _mi_segment_of(const void* p) {
     uintptr_t lomask = mask;
     loindex = index;
     do {
-      loindex--;
-      lomask = mi_atomic_load_relaxed(&mi_segment_map[loindex]);
+      loindex--;  
+      lomask = mi_atomic_load_relaxed(&mi_segment_map[loindex]);      
     } while (lomask != 0 && loindex > 0);
     if (lomask == 0) return NULL;
     lobitidx = mi_bsr(lomask);    // lomask != 0

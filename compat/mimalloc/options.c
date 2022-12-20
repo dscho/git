@@ -76,7 +76,7 @@ static mi_option_desc_t options[_mi_option_last] =
   { 0, UNINIT, MI_OPTION(reserve_os_memory)     },
   { 0, UNINIT, MI_OPTION(deprecated_segment_cache) },  // cache N segments per thread
   { 0, UNINIT, MI_OPTION(page_reset) },          // reset page memory on free
-  { 0, UNINIT, MI_OPTION_LEGACY(abandoned_page_decommit, abandoned_page_reset) },// decommit free page memory when a thread terminates
+  { 0, UNINIT, MI_OPTION_LEGACY(abandoned_page_decommit, abandoned_page_reset) },// decommit free page memory when a thread terminates  
   { 0, UNINIT, MI_OPTION(deprecated_segment_reset) },
   #if defined(__NetBSD__)
   { 0, UNINIT, MI_OPTION(eager_commit_delay) },  // the first N segments per thread are not eagerly committed
@@ -86,12 +86,12 @@ static mi_option_desc_t options[_mi_option_last] =
   { 1, UNINIT, MI_OPTION(eager_commit_delay) },  // the first N segments per thread are not eagerly committed (but per page in the segment on demand)
   #endif
   { 25,   UNINIT, MI_OPTION_LEGACY(decommit_delay, reset_delay) }, // page decommit delay in milli-seconds
-  { 0,    UNINIT, MI_OPTION(use_numa_nodes) },    // 0 = use available numa nodes, otherwise use at most N nodes.
+  { 0,    UNINIT, MI_OPTION(use_numa_nodes) },    // 0 = use available numa nodes, otherwise use at most N nodes. 
   { 0,    UNINIT, MI_OPTION(limit_os_alloc) },    // 1 = do not use OS memory for allocation (but only reserved arenas)
   { 100,  UNINIT, MI_OPTION(os_tag) },            // only apple specific for now but might serve more or less related purpose
   { 16,   UNINIT, MI_OPTION(max_errors) },        // maximum errors that are output
   { 16,   UNINIT, MI_OPTION(max_warnings) },      // maximum warnings that are output
-  { 8,    UNINIT, MI_OPTION(max_segment_reclaim)},// max. number of segment reclaims from the abandoned segments per try.
+  { 8,    UNINIT, MI_OPTION(max_segment_reclaim)},// max. number of segment reclaims from the abandoned segments per try.  
   { 1,    UNINIT, MI_OPTION(allow_decommit) },    // decommit slices when no longer used (after decommit_delay milli-seconds)
   { 500,  UNINIT, MI_OPTION(segment_decommit_delay) }, // decommit delay in milli-seconds for freed segments
   { 2,    UNINIT, MI_OPTION(decommit_extend_delay) }
@@ -176,7 +176,7 @@ static void mi_out_stderr(const char* msg, void* arg) {
   #ifdef _WIN32
   // on windows with redirection, the C runtime cannot handle locale dependent output
   // after the main thread closes so we use direct console output.
-  if (!_mi_preloading()) {
+  if (!_mi_preloading()) { 
     // _cputs(msg);  // _cputs cannot be used at is aborts if it fails to lock the console
     static HANDLE hcon = INVALID_HANDLE_VALUE;
     if (hcon == INVALID_HANDLE_VALUE) {
@@ -280,7 +280,7 @@ static _Atomic(size_t) warning_count; // = 0;  // when >= max_warning_count stop
 // inside the C runtime causes another message.
 // In some cases (like on macOS) the loader already allocates which
 // calls into mimalloc; if we then access thread locals (like `recurse`)
-// this may crash as the access may call _tlv_bootstrap that tries to
+// this may crash as the access may call _tlv_bootstrap that tries to 
 // (recursively) invoke malloc again to allocate space for the thread local
 // variables on demand. This is why we use a _mi_preloading test on such
 // platforms. However, C code generator may move the initial thread local address
@@ -406,7 +406,7 @@ static _Atomic(void*) mi_error_arg;     // = NULL
 
 static void mi_error_default(int err) {
   MI_UNUSED(err);
-#if (MI_DEBUG>0)
+#if (MI_DEBUG>0) 
   if (err==EFAULT) {
     #ifdef _MSC_VER
     __debugbreak();
@@ -499,23 +499,23 @@ static bool mi_getenv(const char* name, char* result, size_t result_size) {
   return (len > 0 && len < result_size);
 }
 #elif !defined(MI_USE_ENVIRON) || (MI_USE_ENVIRON!=0)
-// On Posix systemsr use `environ` to acces environment variables
+// On Posix systemsr use `environ` to acces environment variables 
 // even before the C runtime is initialized.
 #if defined(__APPLE__) && defined(__has_include) && __has_include(<crt_externs.h>)
 #include <crt_externs.h>
 static char** mi_get_environ(void) {
   return (*_NSGetEnviron());
 }
-#else
+#else 
 extern char** environ;
 static char** mi_get_environ(void) {
   return environ;
 }
 #endif
 static bool mi_getenv(const char* name, char* result, size_t result_size) {
-  if (name==NULL) return false;
+  if (name==NULL) return false;  
   const size_t len = strlen(name);
-  if (len == 0) return false;
+  if (len == 0) return false;  
   char** env = mi_get_environ();
   if (env == NULL) return false;
   // compare up to 256 entries
@@ -529,7 +529,7 @@ static bool mi_getenv(const char* name, char* result, size_t result_size) {
   }
   return false;
 }
-#else
+#else  
 // fallback: use standard C `getenv` but this cannot be used while initializing the C runtime
 static bool mi_getenv(const char* name, char* result, size_t result_size) {
   // cannot call getenv() when still initializing the C runtime.
@@ -557,7 +557,7 @@ static bool mi_getenv(const char* name, char* result, size_t result_size) {
 #endif  // !MI_USE_ENVIRON
 #endif  // !MI_NO_GETENV
 
-static void mi_option_init(mi_option_desc_t* desc) {
+static void mi_option_init(mi_option_desc_t* desc) {  
   // Read option value from the environment
   char s[64+1];
   char buf[64+1];
@@ -570,7 +570,7 @@ static void mi_option_init(mi_option_desc_t* desc) {
     found = mi_getenv(buf,s,sizeof(s));
     if (found) {
       _mi_warning_message("environment option \"mimalloc_%s\" is deprecated -- use \"mimalloc_%s\" instead.\n", desc->legacy_name, desc->name );
-    }
+    }    
   }
 
   if (found) {
@@ -592,31 +592,31 @@ static void mi_option_init(mi_option_desc_t* desc) {
       char* end = buf;
       long value = strtol(buf, &end, 10);
       if (desc->option == mi_option_reserve_os_memory) {
-	// this option is interpreted in KiB to prevent overflow of `long`
-	if (*end == 'K') { end++; }
-	else if (*end == 'M') { value *= MI_KiB; end++; }
-	else if (*end == 'G') { value *= MI_MiB; end++; }
-	else { value = (value + MI_KiB - 1) / MI_KiB; }
-	if (end[0] == 'I' && end[1] == 'B') { end += 2; }
-	else if (*end == 'B') { end++; }
+        // this option is interpreted in KiB to prevent overflow of `long`
+        if (*end == 'K') { end++; }
+        else if (*end == 'M') { value *= MI_KiB; end++; }
+        else if (*end == 'G') { value *= MI_MiB; end++; }
+        else { value = (value + MI_KiB - 1) / MI_KiB; }
+        if (end[0] == 'I' && end[1] == 'B') { end += 2; }
+        else if (*end == 'B') { end++; }
       }
       if (*end == 0) {
-	desc->value = value;
-	desc->init = INITIALIZED;
+        desc->value = value;
+        desc->init = INITIALIZED;
       }
       else {
-	// set `init` first to avoid recursion through _mi_warning_message on mimalloc_verbose.
-	desc->init = DEFAULTED;
-	if (desc->option == mi_option_verbose && desc->value == 0) {
-	  // if the 'mimalloc_verbose' env var has a bogus value we'd never know
-	  // (since the value defaults to 'off') so in that case briefly enable verbose
-	  desc->value = 1;
-	  _mi_warning_message("environment option mimalloc_%s has an invalid value.\n", desc->name );
-	  desc->value = 0;
-	}
-	else {
-	  _mi_warning_message("environment option mimalloc_%s has an invalid value.\n", desc->name );
-	}
+        // set `init` first to avoid recursion through _mi_warning_message on mimalloc_verbose.
+        desc->init = DEFAULTED;
+        if (desc->option == mi_option_verbose && desc->value == 0) {
+          // if the 'mimalloc_verbose' env var has a bogus value we'd never know
+          // (since the value defaults to 'off') so in that case briefly enable verbose
+          desc->value = 1;
+          _mi_warning_message("environment option mimalloc_%s has an invalid value.\n", desc->name );
+          desc->value = 0;
+        }
+        else {
+          _mi_warning_message("environment option mimalloc_%s has an invalid value.\n", desc->name );
+        }
       }
     }
     mi_assert_internal(desc->init != UNINIT);

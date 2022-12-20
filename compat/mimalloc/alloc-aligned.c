@@ -61,7 +61,7 @@ static void* mi_heap_malloc_zero_aligned_at(mi_heap_t* const heap, const size_t 
     #endif
     return NULL;
   }
-  if (mi_unlikely(size > PTRDIFF_MAX)) {          // we don't allocate more than PTRDIFF_MAX (see <https://sourceware.org/ml/libc-announce/2019/msg00001.html>)
+  if (mi_unlikely(size > PTRDIFF_MAX)) {          // we don't allocate more than PTRDIFF_MAX (see <https://sourceware.org/ml/libc-announce/2019/msg00001.html>)                                                    
     #if MI_DEBUG > 0
     _mi_error_message(EOVERFLOW, "aligned allocation request is too large (size %zu, alignment %zu)\n", size, alignment);
     #endif
@@ -107,7 +107,7 @@ mi_decl_restrict void* mi_heap_malloc_aligned(mi_heap_t* heap, size_t size, size
   #else
   // with padding, we can only guarantee this for fixed alignments
   if (mi_likely((alignment == sizeof(void*) || (alignment == MI_MAX_ALIGN_SIZE && size > (MI_MAX_ALIGN_SIZE/2)))
-		&& size <= MI_SMALL_SIZE_MAX))
+                && size <= MI_SMALL_SIZE_MAX))
   #endif
   {
     // fast path for common alignment and size
@@ -182,16 +182,16 @@ static void* mi_heap_realloc_zero_aligned_at(mi_heap_t* heap, void* p, size_t ne
     void* newp = mi_heap_malloc_aligned_at(heap,newsize,alignment,offset);
     if (newp != NULL) {
       if (zero && newsize > size) {
-	const mi_page_t* page = _mi_ptr_page(newp);
-	if (page->is_zero) {
-	  // already zero initialized
-	  mi_assert_expensive(mi_mem_is_zero(newp,newsize));
-	}
-	else {
-	  // also set last word in the previous allocation to zero to ensure any padding is zero-initialized
-	  size_t start = (size >= sizeof(intptr_t) ? size - sizeof(intptr_t) : 0);
-	  memset((uint8_t*)newp + start, 0, newsize - start);
-	}
+        const mi_page_t* page = _mi_ptr_page(newp);
+        if (page->is_zero) {
+          // already zero initialized
+          mi_assert_expensive(mi_mem_is_zero(newp,newsize));
+        }
+        else {
+          // also set last word in the previous allocation to zero to ensure any padding is zero-initialized
+          size_t start = (size >= sizeof(intptr_t) ? size - sizeof(intptr_t) : 0);
+          memset((uint8_t*)newp + start, 0, newsize - start);
+        }
       }
       _mi_memcpy_aligned(newp, p, (newsize > size ? size : newsize));
       mi_free(p); // only free if successful
@@ -258,3 +258,4 @@ void* mi_recalloc_aligned_at(void* p, size_t newcount, size_t size, size_t align
 void* mi_recalloc_aligned(void* p, size_t newcount, size_t size, size_t alignment) mi_attr_noexcept {
   return mi_heap_recalloc_aligned(mi_get_default_heap(), p, newcount, size, alignment);
 }
+

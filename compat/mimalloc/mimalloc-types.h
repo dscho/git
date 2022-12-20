@@ -14,7 +14,7 @@ terms of the MIT license. A copy of the license can be found in the file
 
 #ifdef _MSC_VER
 #pragma warning(disable:4214) // bitfield is not int
-#endif
+#endif 
 
 // Minimal alignment necessary. On most platforms 16 bytes are needed
 // due to SSE registers for example. This must be at least `sizeof(void*)`
@@ -153,7 +153,7 @@ typedef int32_t  mi_ssize_t;
 
 #define MI_SMALL_OBJ_SIZE_MAX             (MI_SMALL_PAGE_SIZE/4)   // 8KiB on 64-bit
 #define MI_MEDIUM_OBJ_SIZE_MAX            (MI_MEDIUM_PAGE_SIZE/4)  // 128KiB on 64-bit
-#define MI_MEDIUM_OBJ_WSIZE_MAX           (MI_MEDIUM_OBJ_SIZE_MAX/MI_INTPTR_SIZE)
+#define MI_MEDIUM_OBJ_WSIZE_MAX           (MI_MEDIUM_OBJ_SIZE_MAX/MI_INTPTR_SIZE)   
 #define MI_LARGE_OBJ_SIZE_MAX             (MI_SEGMENT_SIZE/2)      // 32MiB on 64-bit
 #define MI_LARGE_OBJ_WSIZE_MAX            (MI_LARGE_OBJ_SIZE_MAX/MI_INTPTR_SIZE)
 
@@ -177,7 +177,7 @@ typedef int32_t  mi_ssize_t;
 #define MI_HUGE_BLOCK_SIZE                ((uint32_t)(2*MI_GiB))
 
 // blocks up to this size are always allocated aligned
-#define MI_MAX_ALIGN_GUARANTEE            (8*MI_MAX_ALIGN_SIZE)
+#define MI_MAX_ALIGN_GUARANTEE            (8*MI_MAX_ALIGN_SIZE)  
 
 
 
@@ -250,19 +250,19 @@ typedef uintptr_t mi_thread_free_t;
 // We don't count `freed` (as |free|) but use `used` to reduce
 // the number of memory accesses in the `mi_page_all_free` function(s).
 //
-// Notes:
+// Notes: 
 // - Access is optimized for `mi_free` and `mi_page_alloc` (in `alloc.c`)
 // - Using `uint16_t` does not seem to slow things down
 // - The size is 8 words on 64-bit which helps the page index calculations
-//   (and 10 words on 32-bit, and encoded free lists add 2 words. Sizes 10
+//   (and 10 words on 32-bit, and encoded free lists add 2 words. Sizes 10 
 //    and 12 are still good for address calculation)
-// - To limit the structure size, the `xblock_size` is 32-bits only; for
+// - To limit the structure size, the `xblock_size` is 32-bits only; for 
 //   blocks > MI_HUGE_BLOCK_SIZE the size is determined from the segment page size
 // - `thread_free` uses the bottom bits as a delayed-free flags to optimize
 //   concurrent frees where only the first concurrent free adds to the owning
 //   heap `thread_delayed_free` list (see `alloc.c:mi_free_block_mt`).
 //   The invariant is that no-delayed-free is only set if there is
-//   at least one block that will be added, or as already been added, to
+//   at least one block that will be added, or as already been added, to 
 //   the owning heap `thread_delayed_free` list. This guarantees that pages
 //   will be freed correctly even if only other threads free blocks.
 typedef struct mi_page_s {
@@ -285,7 +285,7 @@ typedef struct mi_page_s {
   uintptr_t             keys[2];           // two random keys to encode the free lists (see `_mi_block_next`)
   #endif
   uint32_t              used;              // number of blocks in use (including blocks in `local_free` and `thread_free`)
-  uint32_t              xblock_size;       // size available in each block (always `>0`)
+  uint32_t              xblock_size;       // size available in each block (always `>0`) 
 
   mi_block_t* local_free;                  // list of deferred free blocks by this thread (migrates to `free`)
   _Atomic(mi_thread_free_t) xthread_free;  // list of deferred free blocks freed by other threads
@@ -318,7 +318,7 @@ typedef enum mi_segment_kind_e {
 // A segment holds a commit mask where a bit is set if
 // the corresponding MI_COMMIT_SIZE area is committed.
 // The MI_COMMIT_SIZE must be a multiple of the slice
-// size. If it is equal we have the most fine grained
+// size. If it is equal we have the most fine grained 
 // decommit (but setting it higher can be more efficient).
 // The MI_MINIMAL_COMMIT_SIZE is the minimal amount that will
 // be committed in one go which can be set higher than
@@ -328,7 +328,7 @@ typedef enum mi_segment_kind_e {
 
 #define MI_MINIMAL_COMMIT_SIZE      (2*MI_MiB)
 #define MI_COMMIT_SIZE              (MI_SEGMENT_SLICE_SIZE)              // 64KiB
-#define MI_COMMIT_MASK_BITS         (MI_SEGMENT_SIZE / MI_COMMIT_SIZE)
+#define MI_COMMIT_MASK_BITS         (MI_SEGMENT_SIZE / MI_COMMIT_SIZE)  
 #define MI_COMMIT_MASK_FIELD_BITS    MI_SIZE_BITS
 #define MI_COMMIT_MASK_FIELD_COUNT  (MI_COMMIT_MASK_BITS / MI_COMMIT_MASK_FIELD_BITS)
 
@@ -349,11 +349,11 @@ typedef int64_t    mi_msecs_t;
 // contain blocks.
 typedef struct mi_segment_s {
   size_t            memid;              // memory id for arena allocation
-  bool              mem_is_pinned;      // `true` if we cannot decommit/reset/protect in this memory (i.e. when allocated using large OS pages)
+  bool              mem_is_pinned;      // `true` if we cannot decommit/reset/protect in this memory (i.e. when allocated using large OS pages)    
   bool              mem_is_large;       // in large/huge os pages?
   bool              mem_is_committed;   // `true` if the whole segment is eagerly committed
 
-  bool              allow_decommit;
+  bool              allow_decommit;     
   mi_msecs_t        decommit_expire;
   mi_commit_mask_t  decommit_mask;
   mi_commit_mask_t  commit_mask;
@@ -362,11 +362,11 @@ typedef struct mi_segment_s {
 
   // from here is zero initialized
   struct mi_segment_s* next;            // the list of freed segments in the cache (must be first field, see `segment.c:mi_segment_init`)
-
+  
   size_t            abandoned;          // abandoned pages (i.e. the original owning thread stopped) (`abandoned <= used`)
   size_t            abandoned_visits;   // count how often this segment is visited in the abandoned list (to force reclaim it it is too long)
   size_t            used;               // count of pages in use
-  uintptr_t         cookie;             // verify addresses in debug mode: `mi_ptr_cookie(segment) == segment->cookie`
+  uintptr_t         cookie;             // verify addresses in debug mode: `mi_ptr_cookie(segment) == segment->cookie`  
 
   size_t            segment_slices;      // for huge segments this may be different from `MI_SLICES_PER_SEGMENT`
   size_t            segment_info_slices; // initial slices we are using segment info and possible guard pages.

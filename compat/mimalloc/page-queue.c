@@ -232,8 +232,8 @@ static void mi_page_queue_push(mi_heap_t* heap, mi_page_queue_t* queue, mi_page_
 
   mi_assert_internal(_mi_page_segment(page)->kind != MI_SEGMENT_HUGE);
   mi_assert_internal(page->xblock_size == queue->block_size ||
-		      (page->xblock_size > MI_MEDIUM_OBJ_SIZE_MAX) ||
-			(mi_page_is_in_full(page) && mi_page_queue_is_full(queue)));
+                      (page->xblock_size > MI_MEDIUM_OBJ_SIZE_MAX) ||
+                        (mi_page_is_in_full(page) && mi_page_queue_is_full(queue)));
 
   mi_page_set_in_full(page, mi_page_queue_is_full(queue));
   // mi_atomic_store_ptr_release(mi_atomic_cast(void*, &page->heap), heap);
@@ -260,10 +260,10 @@ static void mi_page_queue_enqueue_from(mi_page_queue_t* to, mi_page_queue_t* fro
   mi_assert_expensive(!mi_page_queue_contains(to, page));
 
   mi_assert_internal((page->xblock_size == to->block_size && page->xblock_size == from->block_size) ||
-		     (page->xblock_size == to->block_size && mi_page_queue_is_full(from)) ||
-		     (page->xblock_size == from->block_size && mi_page_queue_is_full(to)) ||
-		     (page->xblock_size > MI_LARGE_OBJ_SIZE_MAX && mi_page_queue_is_huge(to)) ||
-		     (page->xblock_size > MI_LARGE_OBJ_SIZE_MAX && mi_page_queue_is_full(to)));
+                     (page->xblock_size == to->block_size && mi_page_queue_is_full(from)) ||
+                     (page->xblock_size == from->block_size && mi_page_queue_is_full(to)) ||
+                     (page->xblock_size > MI_LARGE_OBJ_SIZE_MAX && mi_page_queue_is_huge(to)) ||
+                     (page->xblock_size > MI_LARGE_OBJ_SIZE_MAX && mi_page_queue_is_full(to)));
 
   mi_heap_t* heap = mi_page_heap(page);
   if (page->prev != NULL) page->prev->next = page->next;
@@ -304,7 +304,7 @@ size_t _mi_page_queue_append(mi_heap_t* heap, mi_page_queue_t* pq, mi_page_queue
   for (mi_page_t* page = append->first; page != NULL; page = page->next) {
     // inline `mi_page_set_heap` to avoid wrong assertion during absorption;
     // in this case it is ok to be delayed freeing since both "to" and "from" heap are still alive.
-    mi_atomic_store_release(&page->xheap, (uintptr_t)heap);
+    mi_atomic_store_release(&page->xheap, (uintptr_t)heap); 
     // set the flag to delayed free (not overriding NEVER_DELAYED_FREE) which has as a
     // side effect that it spins until any DELAYED_FREEING is finished. This ensures
     // that after appending only the new heap will be used for delayed free operations.
