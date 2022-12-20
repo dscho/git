@@ -465,8 +465,6 @@ mi_msecs_t _mi_clock_end(mi_msecs_t start) {
 
 #if defined(_WIN32)
 #include <windows.h>
-#include <psapi.h>
-#pragma comment(lib,"psapi.lib")
 
 static mi_msecs_t filetime_msecs(const FILETIME* ftime) {
   ULARGE_INTEGER i;
@@ -475,6 +473,22 @@ static mi_msecs_t filetime_msecs(const FILETIME* ftime) {
   mi_msecs_t msecs = (i.QuadPart / 10000); // FILETIME is in 100 nano seconds
   return msecs;
 }
+
+typedef struct _PROCESS_MEMORY_COUNTERS {
+  DWORD cb;
+  DWORD PageFaultCount;
+  SIZE_T PeakWorkingSetSize;
+  SIZE_T WorkingSetSize;
+  SIZE_T QuotaPeakPagedPoolUsage;
+  SIZE_T QuotaPagedPoolUsage;
+  SIZE_T QuotaPeakNonPagedPoolUsage;
+  SIZE_T QuotaNonPagedPoolUsage;
+  SIZE_T PagefileUsage;
+  SIZE_T PeakPagefileUsage;
+} PROCESS_MEMORY_COUNTERS;
+typedef PROCESS_MEMORY_COUNTERS* PPROCESS_MEMORY_COUNTERS;
+typedef BOOL (WINAPI *PGetProcessMemoryInfo)(HANDLE, PPROCESS_MEMORY_COUNTERS, DWORD);
+static PGetProcessMemoryInfo pGetProcessMemoryInfo = NULL;
 
 static void mi_stat_process_info(mi_msecs_t* elapsed, mi_msecs_t* utime, mi_msecs_t* stime, size_t* current_rss, size_t* peak_rss, size_t* current_commit, size_t* peak_commit, size_t* page_faults)
 {
@@ -486,8 +500,21 @@ static void mi_stat_process_info(mi_msecs_t* elapsed, mi_msecs_t* utime, mi_msec
   GetProcessTimes(GetCurrentProcess(), &ct, &et, &st, &ut);
   *utime = filetime_msecs(&ut);
   *stime = filetime_msecs(&st);
+
+  // load psapi on demand
+  if (pGetProcessMemoryInfo == NULL) {
+    HINSTANCE hDll = LoadLibrary(TEXT("psapi.dll"));
+    if (hDll != NULL) {
+      pGetProcessMemoryInfo = (PGetProcessMemoryInfo)(void (*)(void))GetProcAddress(hDll, "GetProcessMemoryInfo");
+    }
+  }
+
+  // get process info
   PROCESS_MEMORY_COUNTERS info;
-  GetProcessMemoryInfo(GetCurrentProcess(), &info, sizeof(info));
+  memset(&info, 0, sizeof(info));
+  if (pGetProcessMemoryInfo != NULL) {
+    pGetProcessMemoryInfo(GetCurrentProcess(), &info, sizeof(info));
+  }
   *current_rss    = (size_t)info.WorkingSetSize;
   *peak_rss       = (size_t)info.PeakWorkingSetSize;
   *current_commit = (size_t)info.PagefileUsage;
