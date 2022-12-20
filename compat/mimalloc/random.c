@@ -187,27 +187,10 @@ static bool os_random_buf(void* buf, size_t buf_len) {
   return (RtlGenRandom(buf, (ULONG)buf_len) != 0);
 }
 #else
-
-#ifndef BCRYPT_USE_SYSTEM_PREFERRED_RNG
-#define BCRYPT_USE_SYSTEM_PREFERRED_RNG 0x00000002
-#endif
-
-typedef LONG (NTAPI *PBCryptGenRandom)(HANDLE, PUCHAR, ULONG, ULONG);
-static  PBCryptGenRandom pBCryptGenRandom = NULL;
-
+#pragma comment (lib,"bcrypt.lib")
+#include <bcrypt.h>
 static bool os_random_buf(void* buf, size_t buf_len) {
-  if (pBCryptGenRandom == NULL) {
-    HINSTANCE hDll = LoadLibrary(TEXT("bcrypt.dll"));
-    if (hDll != NULL) {
-      pBCryptGenRandom = (PBCryptGenRandom)(void (*)(void))GetProcAddress(hDll, "BCryptGenRandom");
-    }
-  }
-  if (pBCryptGenRandom == NULL) {
-    return false;
-  }
-  else {
-    return (pBCryptGenRandom(NULL, (PUCHAR)buf, (ULONG)buf_len, BCRYPT_USE_SYSTEM_PREFERRED_RNG) >= 0);
-  }
+  return (BCryptGenRandom(NULL, (PUCHAR)buf, (ULONG)buf_len, BCRYPT_USE_SYSTEM_PREFERRED_RNG) >= 0);
 }
 #endif
 

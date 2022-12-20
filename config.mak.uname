@@ -675,7 +675,7 @@ ifeq ($(uname_S),MINGW)
 		compat/win32/pthread.o compat/win32/syslog.o \
 		compat/win32/dirent.o compat/win32/fscache.o
 	BASIC_CFLAGS += -DWIN32
-	EXTLIBS += -lws2_32
+	EXTLIBS += -lws2_32 -lpsapi -lbcrypt
 	GITLIBS += git.res
 	PTHREAD_LIBS =
 	RC = windres -O coff

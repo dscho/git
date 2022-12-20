@@ -19,6 +19,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: git-for-windows/setup-git-for-windows-sdk@v1
+        with:
+          flavor: full
       - name: build Git
         shell: bash
         run: make -j15
