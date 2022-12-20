@@ -2,6 +2,9 @@ name: Windows Nano Server tests
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - mimalloc-and-nano-server
 
 env:
   DEVELOPER: 1
