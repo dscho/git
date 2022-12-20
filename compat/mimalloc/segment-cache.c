@@ -46,10 +46,10 @@ static bool mi_cdecl mi_segment_cache_is_suitable(mi_bitmap_index_t bitidx, void
 }
 
 mi_decl_noinline static void* mi_segment_cache_pop_ex(
-                              bool all_suitable,
-                              size_t size, mi_commit_mask_t* commit_mask, 
-                              mi_commit_mask_t* decommit_mask, bool* large, bool* is_pinned, bool* is_zero, 
-                              mi_arena_id_t _req_arena_id, size_t* memid, mi_os_tld_t* tld)
+			      bool all_suitable,
+			      size_t size, mi_commit_mask_t* commit_mask,
+			      mi_commit_mask_t* decommit_mask, bool* large, bool* is_pinned, bool* is_zero,
+			      mi_arena_id_t _req_arena_id, size_t* memid, mi_os_tld_t* tld)
 {
 #ifdef MI_CACHE_DISABLE
   return NULL;
@@ -171,7 +171,7 @@ static mi_decl_noinline void mi_segment_cache_purge(bool visit_all, bool force, 
 
 void _mi_segment_cache_collect(bool force, mi_os_tld_t* tld) {
   if (force) {
-    // called on `mi_collect(true)` but not on thread termination    
+    // called on `mi_collect(true)` but not on thread termination
     _mi_segment_cache_free_all(tld);
   }
   else {
@@ -186,18 +186,18 @@ void _mi_segment_cache_free_all(mi_os_tld_t* tld) {
   bool is_zero;
   size_t memid;
   const size_t size = MI_SEGMENT_SIZE;
-  // iterate twice: first large pages, then regular memory 
+  // iterate twice: first large pages, then regular memory
   for (int i = 0; i < 2; i++) {
     void* p;
     do {
       // keep popping and freeing the memory
-      bool large = (i == 0);  
+      bool large = (i == 0);
       p = mi_segment_cache_pop_ex(true /* all */, size, &commit_mask, &decommit_mask,
-                                  &large, &is_pinned, &is_zero, _mi_arena_id_none(), &memid, tld);
+				  &large, &is_pinned, &is_zero, _mi_arena_id_none(), &memid, tld);
       if (p != NULL) {
-        size_t csize = _mi_commit_mask_committed_size(&commit_mask, size);
-        if (csize > 0 && !is_pinned) _mi_stat_decrease(&_mi_stats_main.committed, csize);
-        _mi_arena_free(p, size, MI_SEGMENT_ALIGN, 0, memid, is_pinned /* pretend not committed to not double count decommits */, tld->stats);
+	size_t csize = _mi_commit_mask_committed_size(&commit_mask, size);
+	if (csize > 0 && !is_pinned) _mi_stat_decrease(&_mi_stats_main.committed, csize);
+	_mi_arena_free(p, size, MI_SEGMENT_ALIGN, 0, memid, is_pinned /* pretend not committed to not double count decommits */, tld->stats);
       }
     } while (p != NULL);
   }

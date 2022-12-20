@@ -113,9 +113,9 @@ bool _mi_page_is_valid(mi_page_t* page) {
 
     mi_assert_internal(!_mi_process_is_initialized || segment->thread_id==0 || segment->thread_id == mi_page_heap(page)->thread_id);
     #if MI_HUGE_PAGE_ABANDON
-    if (segment->kind != MI_SEGMENT_HUGE) 
+    if (segment->kind != MI_SEGMENT_HUGE)
     #endif
-    {    
+    {
       mi_page_queue_t* pq = mi_page_queue_of(page);
       mi_assert_internal(mi_page_queue_contains(pq, page));
       mi_assert_internal(pq->block_size==mi_page_block_size(page) || mi_page_block_size(page) > MI_MEDIUM_OBJ_SIZE_MAX || mi_page_is_in_full(page));
@@ -833,7 +833,7 @@ static mi_page_t* mi_large_huge_page_alloc(mi_heap_t* heap, size_t size, size_t 
       #if MI_HUGE_PAGE_ABANDON
       mi_assert_internal(_mi_page_segment(page)->thread_id==0); // abandoned, not in the huge queue
       mi_page_set_heap(page, NULL);
-      #endif      
+      #endif
     }
     else {
       mi_assert_internal(_mi_page_segment(page)->kind != MI_SEGMENT_HUGE);

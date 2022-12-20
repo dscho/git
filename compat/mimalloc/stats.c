@@ -21,7 +21,7 @@ terms of the MIT license. A copy of the license can be found in the file
 
 static bool mi_is_in_main(void* stat) {
   return ((uint8_t*)stat >= (uint8_t*)&_mi_stats_main
-         && (uint8_t*)stat < ((uint8_t*)&_mi_stats_main + sizeof(mi_stats_t)));
+	 && (uint8_t*)stat < ((uint8_t*)&_mi_stats_main + sizeof(mi_stats_t)));
 }
 
 static void mi_stat_update(mi_stat_count_t* stat, int64_t amount) {
@@ -500,7 +500,7 @@ static void mi_stat_process_info(mi_msecs_t* elapsed, mi_msecs_t* utime, mi_msec
   GetProcessTimes(GetCurrentProcess(), &ct, &et, &st, &ut);
   *utime = filetime_msecs(&ut);
   *stime = filetime_msecs(&st);
-  
+
   // load psapi on demand
   if (pGetProcessMemoryInfo == NULL) {
     HINSTANCE hDll = LoadLibrary(TEXT("psapi.dll"));
@@ -514,7 +514,7 @@ static void mi_stat_process_info(mi_msecs_t* elapsed, mi_msecs_t* utime, mi_msec
   memset(&info, 0, sizeof(info));
   if (pGetProcessMemoryInfo != NULL) {
     pGetProcessMemoryInfo(GetCurrentProcess(), &info, sizeof(info));
-  } 
+  }
   *current_rss    = (size_t)info.WorkingSetSize;
   *peak_rss       = (size_t)info.PeakWorkingSetSize;
   *current_commit = (size_t)info.PagefileUsage;

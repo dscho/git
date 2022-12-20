@@ -263,9 +263,9 @@ static bool mi_verify_padding(const mi_page_t* page, const mi_block_t* block, si
     mi_track_mem_defined(fill, maxpad);
     for (size_t i = 0; i < maxpad; i++) {
       if (fill[i] != MI_DEBUG_PADDING) {
-        *wrong = bsize - delta + i;
-        ok = false;
-        break;
+	*wrong = bsize - delta + i;
+	ok = false;
+	break;
       }
     }
     mi_track_mem_noaccess(fill, maxpad);
@@ -339,7 +339,7 @@ static void mi_stat_free(const mi_page_t* page, const mi_block_t* block) {
   }
   else {
     mi_heap_stat_decrease(heap, huge, bsize);
-  }  
+  }
 }
 #else
 static void mi_stat_free(const mi_page_t* page, const mi_block_t* block) {
@@ -378,7 +378,7 @@ static mi_decl_noinline void _mi_free_block_mt(mi_page_t* page, mi_block_t* bloc
   // that is safe as these are constant and the page won't be freed (as the block is not freed yet).
   mi_check_padding(page, block);
   mi_padding_shrink(page, block, sizeof(mi_block_t));       // for small size, ensure we can fit the delayed thread pointers without triggering overflow detection
-  
+
   // huge page segments are always abandoned and can be freed immediately
   mi_segment_t* segment = _mi_page_segment(page);
   if (segment->kind == MI_SEGMENT_HUGE) {
@@ -394,7 +394,7 @@ static mi_decl_noinline void _mi_free_block_mt(mi_page_t* page, mi_block_t* bloc
     _mi_segment_huge_page_reset(segment, page, block);
     #endif
   }
-  
+
   #if (MI_DEBUG!=0) && !MI_TRACK_ENABLED                    // note: when tracking, cannot use mi_usable_size with multi-threading
   if (segment->kind != MI_SEGMENT_HUGE) {                   // not for huge segments as we just reset the content
     memset(block, MI_DEBUG_FREED, mi_usable_size(block));
@@ -512,9 +512,9 @@ static inline mi_segment_t* mi_checked_ptr_segment(const void* p, const char* ms
     {
   #endif
       _mi_warning_message("%s: pointer might not point to a valid heap region: %p\n"
-        "(this may still be a valid very large allocation (over 64MiB))\n", msg, p);
+	"(this may still be a valid very large allocation (over 64MiB))\n", msg, p);
       if mi_likely(_mi_ptr_cookie(segment) == segment->cookie) {
-        _mi_warning_message("(yes, the previous pointer %p was valid after all)\n", p);
+	_mi_warning_message("(yes, the previous pointer %p was valid after all)\n", p);
       }
     }
   }
@@ -552,7 +552,7 @@ void mi_free(void* p) mi_attr_noexcept
       mi_block_set_next(page, block, page->local_free);
       page->local_free = block;
       if mi_unlikely(--page->used == 0) {   // using this expression generates better code than: page->used--; if (mi_page_all_free(page))
-        _mi_page_retire(page);
+	_mi_page_retire(page);
       }
     }
     else {
@@ -715,9 +715,9 @@ void* _mi_heap_realloc_zero(mi_heap_t* heap, void* p, size_t newsize, bool zero)
     }
     if mi_likely(p != NULL) {
       if mi_likely(_mi_is_aligned(p, sizeof(uintptr_t))) {  // a client may pass in an arbitrary pointer `p`..
-        const size_t copysize = (newsize > size ? size : newsize);
-        mi_track_mem_defined(p,copysize);  // _mi_useable_size may be too large for byte precise memory tracking..
-        _mi_memcpy_aligned(newp, p, copysize);
+	const size_t copysize = (newsize > size ? size : newsize);
+	mi_track_mem_defined(p,copysize);  // _mi_useable_size may be too large for byte precise memory tracking..
+	_mi_memcpy_aligned(newp, p, copysize);
       }
       mi_free(p); // only free the original pointer if successful
     }

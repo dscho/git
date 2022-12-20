@@ -191,15 +191,15 @@ static void mi_cdecl mi_out_stderr(const char* msg, void* arg) {
     if (len > 0 && len < UINT32_MAX) {
       DWORD written = 0;
       if (hconIsConsole) {
-        WriteConsoleA(hcon, msg, (DWORD)len, &written, NULL);
+	WriteConsoleA(hcon, msg, (DWORD)len, &written, NULL);
       }
       else if (hcon != INVALID_HANDLE_VALUE) {
-        // use direct write if stderr was redirected
-        WriteFile(hcon, msg, (DWORD)len, &written, NULL);
+	// use direct write if stderr was redirected
+	WriteFile(hcon, msg, (DWORD)len, &written, NULL);
       }
       else {
-        // finally fall back to fputs after all
-        fputs(msg, stderr);
+	// finally fall back to fputs after all
+	fputs(msg, stderr);
       }
     }
   }

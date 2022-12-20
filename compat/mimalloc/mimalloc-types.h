@@ -183,8 +183,8 @@ typedef int32_t  mi_ssize_t;
 // blocks up to this size are always allocated aligned
 #define MI_MAX_ALIGN_GUARANTEE            (8*MI_MAX_ALIGN_SIZE)  
 
-// Alignments over MI_ALIGNMENT_MAX are allocated in dedicated huge page segments 
-#define MI_ALIGNMENT_MAX                  (MI_SEGMENT_SIZE >> 1)  
+// Alignments over MI_ALIGNMENT_MAX are allocated in dedicated huge page segments
+#define MI_ALIGNMENT_MAX                  (MI_SEGMENT_SIZE >> 1)
 
 
 // ------------------------------------------------------
@@ -445,7 +445,7 @@ struct mi_heap_s {
   mi_page_queue_t       pages[MI_BIN_FULL + 1];              // queue of pages for each size class (or "bin")
   _Atomic(mi_block_t*)  thread_delayed_free;
   mi_threadid_t         thread_id;                           // thread this heap belongs too
-  mi_arena_id_t         arena_id;                            // arena id if the heap belongs to a specific arena (or 0)  
+  mi_arena_id_t         arena_id;                            // arena id if the heap belongs to a specific arena (or 0)
   uintptr_t             cookie;                              // random cookie to verify pointers (see `_mi_ptr_cookie`)
   uintptr_t             keys[2];                             // two random keys used to encode the `thread_delayed_free` list
   mi_random_ctx_t       random;                              // random number context used for secure allocation
