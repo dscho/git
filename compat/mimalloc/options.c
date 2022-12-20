@@ -179,15 +179,8 @@ static void mi_out_stderr(const char* msg, void* arg) {
   if (!_mi_preloading()) {
     // _cputs(msg);  // _cputs cannot be used at is aborts if it fails to lock the console
     static HANDLE hcon = INVALID_HANDLE_VALUE;
-    static int write_to_console;
     if (hcon == INVALID_HANDLE_VALUE) {
-      CONSOLE_SCREEN_BUFFER_INFO sbi;
       hcon = GetStdHandle(STD_ERROR_HANDLE);
-      write_to_console = GetConsoleScreenBufferInfo(hcon, &sbi) ? 1 : 0;
-    }
-    if (!write_to_console) {
-      fputs(msg, stderr);
-      return;
     }
     const size_t len = strlen(msg);
     if (hcon != INVALID_HANDLE_VALUE && len > 0 && len < UINT32_MAX) {
@@ -353,7 +346,7 @@ void _mi_fprintf( mi_output_fun* out, void* arg, const char* fmt, ... ) {
 static void mi_vfprintf_thread(mi_output_fun* out, void* arg, const char* prefix, const char* fmt, va_list args) {
   if (prefix != NULL && strlen(prefix) <= 32 && !_mi_is_main_thread()) {
     char tprefix[64];
-    snprintf(tprefix, sizeof(tprefix), "%sthread 0x%llx: ", prefix, (unsigned long long)_mi_thread_id());
+    snprintf(tprefix, sizeof(tprefix), "%sthread 0x%zx: ", prefix, _mi_thread_id());
     mi_vfprintf(out, arg, tprefix, fmt, args);
   }
   else {
