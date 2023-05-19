@@ -41,11 +41,19 @@ static int read_patches(const char *range, struct string_list *list,
 	struct child_process cp = CHILD_PROCESS_INIT;
 	struct strbuf buf = STRBUF_INIT, contents = STRBUF_INIT;
 	struct patch_util *util = NULL;
-	int in_header = 1;
+	int i, implicit_notes_arg = 1, in_header = 1;
 	char *line, *current_filename = NULL;
 	ssize_t len;
 	size_t size;
 	int ret = -1;
+
+	for (i = 0; other_arg && i < other_arg->nr; i++)
+		if (!strcmp(other_arg->v[i], "--notes") ||
+		    starts_with(other_arg->v[i], "--notes=") ||
+		    !strcmp(other_arg->v[i], "--no-notes")) {
+			implicit_notes_arg = 0;
+			break;
+		}
 
 	strvec_pushl(&cp.args, "log", "--no-color", "-p", "--no-merges",
 		     "--reverse", "--date-order", "--decorate=no",
@@ -60,8 +68,9 @@ static int read_patches(const char *range, struct string_list *list,
 		     "--output-indicator-context=#",
 		     "--no-abbrev-commit",
 		     "--pretty=medium",
-		     "--notes",
 		     NULL);
+	if (implicit_notes_arg)
+		     strvec_push(&cp.args, "--notes");
 	strvec_push(&cp.args, range);
 	if (other_arg)
 		strvec_pushv(&cp.args, other_arg->v);
