@@ -12,6 +12,7 @@
 #include "strbuf.h"
 #include "parse-options.h"
 #include "strmap.h"
+#include "hash.h"
 
 /*
  * This helper generates artificial repositories. To do so, it uses a
@@ -477,16 +478,93 @@ static int cmd__synthesize__commits(int argc, const char **argv, const char *pre
 	return 0;
 }
 
+static int generate_pack(const char *path, size_t object_count, const struct git_hash_algo *algo)
+{
+	FILE *f = fopen_for_writing(path);
+	git_hash_ctx ctx;
+	size_t i, bytes_needed = 0;
+	unsigned char *counter = (void *)&i;
+	char buf[1024];
+
+	for (i = object_count; i; i >>= 8)
+		bytes_needed++;
+
+	/* Let `counter` point at the relevant bytes of the variable `i` */
+	i = 1;
+	if (!*counter)
+		counter += sizeof(i) - bytes_needed;
+
+	algo->init_fn(&ctx);
+
+	memcpy(buf, "PACK", 4);
+	put_be32(buf + 4, 2);
+	put_be32(buf + 8, object_count);
+	fwrite(buf, 1, 12, f);
+	algo->update_fn(&ctx, buf, 12);
+
+	buf[0] = 0x30 + bytes_needed; /* always a blob */
+	/*
+	 * Uncompressed zlib always starts with 0x78 0x01 0x01, followed by two
+	 * bytes encoding the size, little endian, then two bytes with the
+	 * bitwise-complement of that size, then the payload, and then the
+	 * Adler32 checksum.
+	 */
+	buf[1] = 0x78;
+	buf[2] = 0x01;
+	buf[3] = 0x01;
+
+	buf[4] = bytes_needed & 0xff;
+	buf[5] = (bytes_needed >> 8) & 0xff;
+	buf[6] = buf[4] ^ 0xff;
+	buf[7] = buf[5] ^ 0xff;
+
+	for (i = 0; i < object_count; i++) {
+		/* write a non-compressed entry */
+		memcpy(buf + 8, counter, bytes_needed);
+		put_be32(buf + 8 + bytes_needed, adler32(1l, counter, bytes_needed));
+
+		fwrite(buf, 1, 12 + bytes_needed, f);
+		algo->update_fn(&ctx, buf, 12 + bytes_needed);
+	}
+
+	algo->final_fn((unsigned char *)buf, &ctx);
+	fwrite(buf, 1, algo->rawsz, f);
+
+	fclose(f);
+
+	return 0;
+}
+
+static int cmd__synthesize__pack(int argc, const char **argv, const char *prefix UNUSED)
+{
+	const struct git_hash_algo *algo = hash_algos + GIT_HASH_SHA1;
+	size_t object_count;
+	const char *path;
+	int ret;
+
+	if (argc != 3)
+		die("usage: test-tool synthesize pack <object-count> <filename>");
+
+	object_count = strtoumax(argv[1], NULL, 10);
+	path = argv[2];
+
+	ret = !!generate_pack(path, object_count, algo);
+
+	return ret;
+}
+
 int cmd__synthesize(int argc, const char **argv)
 {
 	const char *prefix = NULL;
 	char const * const synthesize_usage[] = {
 		"test-tool synthesize commits <options>",
+		"test-tool synthesize pack <options>",
 		NULL,
 	};
 	parse_opt_subcommand_fn *fn = NULL;
 	struct option options[] = {
 		OPT_SUBCOMMAND("commits", &fn, cmd__synthesize__commits),
+		OPT_SUBCOMMAND("pack", &fn, cmd__synthesize__pack),
 		OPT_END()
 	};
 	argc = parse_options(argc, argv, prefix, options, synthesize_usage, 0);
