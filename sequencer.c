@@ -51,6 +51,10 @@
 
 #define GIT_REFLOG_ACTION "GIT_REFLOG_ACTION"
 
+#define GIT_MAX_LABEL_LENGTH ((NAME_MAX) - (LOCK_SUFFIX_LEN))
+
+#define GIT_MIN(a, b) ((a) < (b) ? (a) : (b))
+
 static const char sign_off_header[] = "Signed-off-by: ";
 static const char cherry_picked_prefix[] = "(cherry picked from commit ";
 
@@ -3701,11 +3705,12 @@ static int do_label(struct repository *r, const char *name, int len)
 	struct strbuf msg = STRBUF_INIT;
 	int ret = 0;
 	struct object_id head_oid;
+	int len_trunc = GIT_MIN(len, GIT_MAX_LABEL_LENGTH);
 
 	if (len == 1 && *name == '#')
 		return error(_("illegal label name: '%.*s'"), len, name);
 
-	strbuf_addf(&ref_name, "refs/rewritten/%.*s", len, name);
+	strbuf_addf(&ref_name, "refs/rewritten/%.*s", len_trunc, name);
 	strbuf_addf(&msg, "rebase (label) '%.*s'", len, name);
 
 	transaction = ref_store_transaction_begin(refs, &err);
@@ -3769,11 +3774,12 @@ static const char *reflog_message(struct replay_opts *opts,
 static struct commit *lookup_label(struct repository *r, const char *label,
 				   int len, struct strbuf *buf)
 {
+	int len_trunc = GIT_MIN(len, GIT_MAX_LABEL_LENGTH);
 	struct commit *commit;
 	struct object_id oid;
 
 	strbuf_reset(buf);
-	strbuf_addf(buf, "refs/rewritten/%.*s", len, label);
+	strbuf_addf(buf, "refs/rewritten/%.*s", len_trunc, label);
 	if (!read_ref(buf->buf, &oid)) {
 		commit = lookup_commit_object(r, &oid);
 	} else {
