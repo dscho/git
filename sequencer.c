@@ -5432,6 +5432,8 @@ static const char *label_oid(struct object_id *oid, const char *label,
 
 				utf8_width(&p, NULL);
 				if (p) {
+					if (buf->len + (p - label) > max_len)
+						break;
 					strbuf_add(buf, label, p - label);
 					label = p - 1;
 				} else {
