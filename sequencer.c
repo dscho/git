@@ -5504,7 +5504,8 @@ static int make_script_with_merges(struct pretty_print_context *pp,
 	struct string_entry *entry;
 	struct oidset interesting = OIDSET_INIT, child_seen = OIDSET_INIT,
 		shown = OIDSET_INIT;
-	struct label_state state = { OIDMAP_INIT, { NULL }, STRBUF_INIT };
+	struct label_state state =
+		{ OIDMAP_INIT, { NULL }, STRBUF_INIT, GIT_MAX_LABEL_LENGTH };
 
 	int abbr = flags & TODO_LIST_ABBREVIATE_CMDS;
 	const char *cmd_pick = abbr ? "p" : "pick",
