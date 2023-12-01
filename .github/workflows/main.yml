@@ -27,12 +27,18 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - uses: git-for-windows/setup-git-for-windows-sdk@v1
+    - name: replace the MSYS2 runtime
+      shell: powershell
+      run: |
+        Invoke-WebRequest -Headers @{ Authorization = "token ${{ secrets.GITHUB_TOKEN }}" } "https://api.github.com/repos/msys2/msys2-runtime/actions/artifacts/1215171508/zip" -outfile "a1.zip"
+        Expand-Archive -Force -DestinationPath D:/git-sdk-64-minimal a1.zip
+        Remove-Item a1.zip
     - name: build
       shell: bash
       env:
         HOME: ${{runner.workspace}}
         NO_PERL: 1
-      run: . /etc/profile && ci/make-test-artifacts.sh artifacts
+      run: uname -a && . /etc/profile && ci/make-test-artifacts.sh artifacts
     - name: zip up tracked files
       run: git archive -o artifacts/tracked.tar.gz HEAD
     - name: upload tracked files and build artifacts
