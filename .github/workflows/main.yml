@@ -60,6 +60,12 @@ jobs:
       shell: bash
       run: tar xf artifacts.tar.gz && tar xf tracked.tar.gz
     - uses: git-for-windows/setup-git-for-windows-sdk@v1
+    - name: replace the MSYS2 runtime
+      shell: powershell
+      run: |
+        Invoke-WebRequest -Headers @{ Authorization = "token ${{ secrets.GITHUB_TOKEN }}" } "https://api.github.com/repos/msys2/msys2-runtime/actions/artifacts/1215171508/zip" -outfile "a1.zip"
+        Expand-Archive -Force -DestinationPath D:/git-sdk-64-minimal a1.zip
+        Remove-Item a1.zip
     - name: test
       id: test
       shell: bash
