@@ -75,7 +75,7 @@ jobs:
     - name: test
       id: test
       shell: bash
-      timeout-minutes: 20
+      timeout-minutes: 12
       run: . /etc/profile && ci/run-test-slice.sh ${{matrix.nr}} 10
     - name: handle timed-out tests
       if: failure() && steps.test.outcome == 'failure' && env.FAILED_TEST_ARTIFACTS == ''
