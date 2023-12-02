@@ -19,31 +19,9 @@ concurrency:
   group: ${{ github.sha }}
 
 jobs:
-  windows-build:
-    name: win build
-    runs-on: windows-latest
-    concurrency:
-      group: windows-build-${{ github.ref }}
-    steps:
-    - uses: actions/checkout@v3
-    - uses: git-for-windows/setup-git-for-windows-sdk@v1
-    - name: build
-      shell: bash
-      env:
-        HOME: ${{ github.workspace }}
-        NO_PERL: 1
-      run: . /etc/profile && ci/make-test-artifacts.sh artifacts
-    - name: zip up tracked files
-      run: git archive -o artifacts/tracked.tar.gz HEAD
-    - name: upload tracked files and build artifacts
-      uses: actions/upload-artifact@v3
-      with:
-        name: windows-artifacts
-        path: artifacts
   windows-test:
     name: win test
     runs-on: windows-latest
-    needs: [windows-build]
     strategy:
       fail-fast: false
       matrix:
@@ -51,14 +29,35 @@ jobs:
     concurrency:
       group: windows-test-${{ matrix.nr }}-${{ github.ref }}
     steps:
-    - name: download tracked files and build artifacts
-      uses: actions/download-artifact@v3
-      with:
-        name: windows-artifacts
-        path: ${{github.workspace}}
+    - name: reuse `windows-artifacts`
+      shell: bash
+      run: |
+        run_id=7261413995 &&
+        name=windows-artifacts &&
+
+        curl -H "Authorization: token ${{secrets.GITHUB_TOKEN}}" \
+          -L https://api.github.com/repos/${{github.repository}}/actions/runs/$run_id/artifacts |
+        jq -r '.artifacts[] | select(.name | test("'$name'")) | [.name, .archive_download_url] | @tsv' |
+        tr -d '\r' |
+        while read name url
+        do
+          echo "$name"
+          curl -H "Authorization: token ${{secrets.GITHUB_TOKEN}}" \
+            -#sLo /tmp/"$name".zip "$url" &&
+          unzip -q /tmp/"$name".zip
+        done
     - name: extract tracked files and build artifacts
       shell: bash
       run: tar xf artifacts.tar.gz && tar xf tracked.tar.gz
+    - name: do use current versions of a couple of files
+      shell: bash
+      run: |
+        # these have changed since the run whose artifacts we're reusing
+        for p in ci/lib.sh t/test-lib.sh
+        do
+          curl -Lo $p ${{ github.server_url }}/${{ github.repository }}/raw/${{ github.sha }}/$p ||
+          exit 1
+        done
     - uses: git-for-windows/setup-git-for-windows-sdk@v1
     - name: test
       id: test
