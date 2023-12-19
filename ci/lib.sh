@@ -47,7 +47,7 @@ group () {
 		"$@" 2>&1
 		echo $? >exit.status
 	) |
-	tee -a t/"$1".log |
+	tee -a "$GITHUB_WORKSPACE"/t/"$1".log |
 	sed 's/^\(\([^ ]*\):\([0-9]*\):\([0-9]*:\) \)\(error\|warning\): /::\5 file=\2,line=\3::\1/'
 	res=$(cat exit.status)
 	rm exit.status
@@ -189,7 +189,7 @@ create_failed_test_artifacts () {
 	done
 
 	mkdir -p t/failed-test-artifacts
-	cp "t/*.log" t/failed-test-artifacts/ || : ignore failure
+	cp t/*.log t/failed-test-artifacts/ || : ignore failure
 
 	for test_exit in t/test-results/*.exit
 	do
