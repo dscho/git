@@ -123,9 +123,12 @@ export GIT_TEST_DEFAULT_INITIAL_BRANCH_NAME
 
 ################################################################
 # It appears that people try to run tests without building...
-"${GIT_TEST_INSTALLED:-$GIT_BUILD_DIR}/git$X" >/dev/null
+output="$("${GIT_TEST_INSTALLED:-$GIT_BUILD_DIR}/git$X")"
 if test $? != 1
 then
+	echo >&2 "${GIT_TEST_INSTALLED:-$GIT_BUILD_DIR}/git$X failed:"
+	echo >&2 "$output"
+
 	if test -n "$GIT_TEST_INSTALLED"
 	then
 		echo >&2 "error: there is no working Git at '$GIT_TEST_INSTALLED'"
