@@ -202,11 +202,12 @@ create_failed_test_artifacts () {
 		printf "\\e[33m\\e[1m=== ${label} test: ${test_name} ===\\e[m\\n"
 		echo "The full logs are in the 'print test failures' step below."
 		echo "See also the 'failed-tests-*' artifacts attached to this run."
-		cat "t/test-results/$test_name.markup"
+		cat "t/test-results/$test_name.markup" ||
+		cat "t/test-results/$test_name.out" || : ignore failure
 
 		trash_dir="t/trash directory.$test_name"
-		cp "t/test-results/$test_name.out" t/failed-test-artifacts/
-		tar czf t/failed-test-artifacts/"$test_name".trash.tar.gz "$trash_dir"
+		cp "t/test-results/$test_name.out" t/failed-test-artifacts/ || : ignore failure
+		tar czf t/failed-test-artifacts/"$test_name".trash.tar.gz "$trash_dir" || : ignore failure
 	done
 }
 
