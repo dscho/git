@@ -2675,6 +2675,7 @@ build_range_exp (bitset_t sbcset, re_charset_t *mbcset, Idx *range_alloc,
 			    && strlen ((char *) end_elem->opr.name) > 1)))
     return REG_ECOLLATE;
 
+  {
   unsigned int
     start_ch = ((start_elem->type == SB_CHAR) ? start_elem->opr.ch
 		: ((start_elem->type == COLL_SYM) ? start_elem->opr.name[0]
@@ -2740,6 +2741,7 @@ build_range_exp (bitset_t sbcset, re_charset_t *mbcset, Idx *range_alloc,
       if (start_wc <= wc && wc <= end_wc)
 	bitset_set (sbcset, wc);
     }
+  }
 
   return REG_NOERROR;
 }

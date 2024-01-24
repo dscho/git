@@ -24,19 +24,9 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <langinfo.h>
 #include <locale.h>
 #include <wchar.h>
 #include <wctype.h>
-#include <stdckdint.h>
-#include <stdint.h>
-
-#ifndef _LIBC
-# include <dynarray.h>
-#endif
-
-#include <intprops.h>
-#include <verify.h>
 
 #if defined DEBUG && DEBUG != 0
 # include <assert.h>
@@ -817,15 +807,5 @@ re_string_elem_size_at (const re_string_t *pstr, Idx idx)
 
   return 1;
 }
-
-#ifdef _LIBC
-# if __glibc_has_attribute (__fallthrough__)
-#  define FALLTHROUGH __attribute__ ((__fallthrough__))
-# else
-#  define FALLTHROUGH ((void) 0)
-# endif
-#else
-# include "attribute.h"
-#endif
 
 #endif /*  _REGEX_INTERNAL_H */
