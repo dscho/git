@@ -1214,7 +1214,6 @@ proceed_next_node (const re_match_context_t *mctx, Idx nregs, regmatch_t *regs,
 	    return -2;
 	}
 
-      {
       /* Pick a valid destination, or return -1 if none is found.  */
       Idx dest_node = -1;
       for (Idx i = 0; i < edests->nelem; i++)
@@ -1243,7 +1242,6 @@ proceed_next_node (const re_match_context_t *mctx, Idx nregs, regmatch_t *regs,
 	    }
 	}
       return dest_node;
-      }
     }
   else
     {
@@ -1340,7 +1338,6 @@ pop_fail_stack (struct re_fail_stack_t *fs, Idx *pidx, Idx nregs,
 {
   if (fs == NULL || fs->num == 0)
     return -1;
-  {
   Idx num = --fs->num;
   *pidx = fs->stack[num].idx;
   memcpy (regs, fs->stack[num].regs, sizeof (regmatch_t) * nregs);
@@ -1350,13 +1347,13 @@ pop_fail_stack (struct re_fail_stack_t *fs, Idx *pidx, Idx nregs,
   *eps_via_nodes = fs->stack[num].eps_via_nodes;
   DEBUG_ASSERT (0 <= fs->stack[num].node);
   return fs->stack[num].node;
-  }
 }
 
 
 #define DYNARRAY_STRUCT  regmatch_list
 #define DYNARRAY_ELEMENT regmatch_t
 #define DYNARRAY_PREFIX  regmatch_list_
+#include <malloc/dynarray-skeleton.c>
 
 /* Set the positions where the subexpressions are starts/ends to registers
    PMATCH.

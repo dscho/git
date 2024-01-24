@@ -2054,6 +2054,9 @@ endif
 ifdef NO_REGEX
 	COMPAT_CFLAGS += -Icompat/regex
 	COMPAT_OBJS += compat/regex/regex.o
+
+compat/regex/%.o: COMPAT_CFLAGS += -Wno-declaration-after-statement -Wno-implicit-fallthrough -Wno-unused-function
+
 else
 ifdef USE_ENHANCED_BASIC_REGULAR_EXPRESSIONS
 	COMPAT_CFLAGS += -DUSE_ENHANCED_BASIC_REGULAR_EXPRESSIONS

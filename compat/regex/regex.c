@@ -19,32 +19,13 @@
 
 #define __STDC_WANT_IEC_60559_BFP_EXT__
 
-#include <stdint.h>
-#include <stdbool.h>
-
 #define __USE_GNU
 #define __STRICT_ANSI__
-#define assume(x)
-#define __glibc_unlikely(x) (x)
-#define __glibc_likely(x) (x)
-#define libc_hidden_def(name)
-#define weak_alias(name, aliasname)
-#define __always_inline inline
-#define nl_langinfo(x) "UTF8"
-#define FALLTHROUGH /* fallthru */
-#define uint_fast32_t uint32_t
 
-/* This imitates the `RESULT_MUST_BE_USED` macro in `git-compat-util.h` */
-/* The sentinel attribute is valid from gcc version 4.0 */
-#if defined(__GNUC__) && (__GNUC__ >= 4)
-/* warn_unused_result exists as of gcc 3.4.0, but be lazy and check 4.0 */
-#define __attribute_warn_unused_result__ __attribute__ ((warn_unused_result))
-#else
-#define __attribute_warn_unused_result__
-#endif
-
-/* True if the real type T is signed.  */
-#define TYPE_SIGNED(t) (! ((t) 0 < (t) -1))
+#include <stdint.h>
+#define bool int
+#define true 1
+#define false 0
 
 /* Make sure no one compiles this code with a C++ compiler.  */
 #if defined __cplusplus && defined _LIBC

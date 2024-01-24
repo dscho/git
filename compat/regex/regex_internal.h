@@ -808,4 +808,58 @@ re_string_elem_size_at (const re_string_t *pstr, Idx idx)
   return 1;
 }
 
+#define assume(x)
+#define __glibc_unlikely(x) (x)
+#define __glibc_likely(x) (x)
+#define libc_hidden_def(name)
+#define libc_hidden_proto(name)
+#define weak_alias(name, aliasname)
+#define __always_inline inline
+#define nl_langinfo(x) "UTF8"
+#define FALLTHROUGH /* fallthrough */
+#define uint_fast32_t uint32_t
+
+/* This imitates the `RESULT_MUST_BE_USED` macro in `git-compat-util.h` */
+/* The sentinel attribute is valid from gcc version 4.0 */
+#if defined(__GNUC__) && (__GNUC__ >= 4)
+/* warn_unused_result exists as of gcc 3.4.0, but be lazy and check 4.0 */
+#define __attribute_warn_unused_result__ __attribute__ ((warn_unused_result))
+#else
+#define __attribute_warn_unused_result__
+#endif
+
+#if defined(__HP_cc) && (__HP_cc >= 61000)
+#define _Noreturn __attribute__((noreturn))
+#define _Noreturn_PTR
+#elif defined(__GNUC__) && !defined(NO_NORETURN)
+#define _Noreturn __attribute__((__noreturn__))
+#define _Noreturn_PTR __attribute__((__noreturn__))
+#elif defined(_MSC_VER)
+#define _Noreturn __declspec(noreturn)
+#define _Noreturn_PTR
+#else
+#define _Noreturn
+#define _Noreturn_PTR
+#ifndef __GNUC__
+#ifndef __attribute__
+#define __attribute__(x)
+#endif
+#endif
+#endif
+
+# ifdef __GNUC__
+#  define ckd_add(R, A, B) __builtin_add_overflow ((A), (B), (R))
+#  define ckd_sub(R, A, B) __builtin_sub_overflow ((A), (B), (R))
+#  define ckd_mul(R, A, B) __builtin_mul_overflow ((A), (B), (R))
+# else
+#  error "we need a compiler extension for this"
+# endif
+
+#define __attribute_nonnull__(x)
+#define __attribute_maybe_unused__
+#define __attribute_noinline__
+
+/* True if the real type T is signed.  */
+#define TYPE_SIGNED(t) (! ((t) 0 < (t) -1))
+
 #endif /*  _REGEX_INTERNAL_H */
