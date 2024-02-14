@@ -340,7 +340,8 @@ static void random_commit_message(struct random_context *context,
 static int random_branch(struct repository *r,
 			 struct random_context *context,
 			 int file_count_goal,
-			 struct object_id *oid)
+			 struct object_id *oid,
+			 int show_progress)
 {
 	struct index_state istate;
 	struct commit_list *parents = NULL;
@@ -357,6 +358,9 @@ static int random_branch(struct repository *r,
 	istate.cache_tree = cache_tree();
 
 	while (istate.cache_nr < file_count_goal) {
+		if (show_progress)
+			fprintf(stderr, "#%" PRIuMAX ": %" PRIuMAX "/%" PRIuMAX "\r",
+				(uintmax_t)count, (uintmax_t)istate.cache_nr, (uintmax_t)file_count_goal);
 		if (random_work(r, context, &istate) < 0)
 			return -1;
 
@@ -389,13 +393,14 @@ static int cmd__synthesize__commits(int argc, const char **argv, const char *pre
 	struct repository *r = the_repository;
 	struct random_context context;
 	struct object_id oid;
-	int seed = 123, target_file_count = 50;
+	int seed = 123, target_file_count = 50, show_progress = isatty(2);
 	const char * const usage[] = { argv[0], NULL };
 	struct option options[] = {
 		OPT_INTEGER(0, "seed", &seed,
 			"seed number for the pseudo-random number generator"),
 		OPT_INTEGER(0, "target-file-count", &target_file_count,
 			"stop generating revisions at this number of files"),
+		OPT_BOOL(0, "progress", &show_progress, "show progress"),
 		OPT_END(),
 	};
 
@@ -406,7 +411,7 @@ static int cmd__synthesize__commits(int argc, const char **argv, const char *pre
 
 	setup_git_directory();
 	random_init(&context, seed);
-	if (random_branch(r, &context, target_file_count, &oid) < 0)
+	if (random_branch(r, &context, target_file_count, &oid, show_progress) < 0)
 		return -1;
 
 	printf("%s", oid_to_hex(&oid));
