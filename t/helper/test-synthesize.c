@@ -3,6 +3,8 @@
 #include "setup.h"
 #include "object-store-ll.h"
 #include "read-cache-ll.h"
+#include "unpack-trees.h"
+#include "object-name.h"
 #include "cache-tree.h"
 #include "blob.h"
 #include "commit.h"
@@ -339,6 +341,7 @@ static void random_commit_message(struct random_context *context,
 
 static int random_branch(struct repository *r,
 			 struct random_context *context,
+			 const char *start_revision,
 			 int file_count_goal,
 			 struct object_id *oid,
 			 int show_progress)
@@ -355,7 +358,36 @@ static int random_branch(struct repository *r,
 	setenv("GIT_COMMITTER_NAME", "C O M Mitter", 1);
 	setenv("GIT_COMMITTER_EMAIL", "committer@mitter.com", 1);
 
-	istate.cache_tree = cache_tree();
+	if (!start_revision)
+		istate.cache_tree = cache_tree();
+	else {
+		struct commit *commit;
+		struct object_id tree_oid;
+		struct tree *tree;
+		struct unpack_trees_options opts = { 0 };
+		struct tree_desc t;
+
+		if (repo_get_oid_committish(r, start_revision, oid))
+			return error("could not parse as commit '%s'", start_revision);
+
+		commit = lookup_commit(r, oid);
+		if (!commit || repo_parse_commit(r, commit) < 0)
+			return error("could not parse commit '%s'", start_revision);
+		tick = commit->date + random_value_in_range(context, 86400 * 3);
+
+		if (repo_get_oid_treeish(r, start_revision, &tree_oid))
+			return error("could not parse as tree '%s'", start_revision);
+		tree = parse_tree_indirect(&tree_oid);
+
+		opts.index_only = 1;
+		opts.head_idx = -1;
+		opts.src_index = &istate;
+		opts.dst_index = &istate;
+		opts.fn = oneway_merge;
+		init_tree_desc(&t, tree->buffer, tree->size);
+		if (unpack_trees(1, &t, &opts))
+			return error("could not read %s into index", start_revision);
+	}
 
 	while (istate.cache_nr < file_count_goal) {
 		if (show_progress)
@@ -364,7 +396,7 @@ static int random_branch(struct repository *r,
 		if (random_work(r, context, &istate) < 0)
 			return -1;
 
-		if (count > 0) {
+		if (count > 0 || start_revision) {
 			parents = NULL;
 			commit_list_insert(lookup_commit(r, oid), &parents);
 			strbuf_reset(&msg);
@@ -394,8 +426,11 @@ static int cmd__synthesize__commits(int argc, const char **argv, const char *pre
 	struct random_context context;
 	struct object_id oid;
 	int seed = 123, target_file_count = 50, show_progress = isatty(2);
+	const char *start_revision = NULL;
 	const char * const usage[] = { argv[0], NULL };
 	struct option options[] = {
+		OPT_STRING('s', "start-revision", &start_revision, "revision",
+			   "branch off at this revision (optional)"),
 		OPT_INTEGER(0, "seed", &seed,
 			"seed number for the pseudo-random number generator"),
 		OPT_INTEGER(0, "target-file-count", &target_file_count,
@@ -411,7 +446,7 @@ static int cmd__synthesize__commits(int argc, const char **argv, const char *pre
 
 	setup_git_directory();
 	random_init(&context, seed);
-	if (random_branch(r, &context, target_file_count, &oid, show_progress) < 0)
+	if (random_branch(r, &context, start_revision, target_file_count, &oid, show_progress) < 0)
 		return -1;
 
 	printf("%s", oid_to_hex(&oid));
