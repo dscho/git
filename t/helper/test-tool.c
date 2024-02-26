@@ -3,6 +3,7 @@
 #include "test-tool-utils.h"
 #include "trace2.h"
 #include "parse-options.h"
+#include "environment.h"
 
 static const char * const test_tool_usage[] = {
 	"test-tool [-C <directory>] <command [<arguments>...]]",
@@ -107,10 +108,12 @@ static NORETURN void die_usage(void)
 int cmd_main(int argc, const char **argv)
 {
 	int i;
-	const char *working_directory = NULL;
+	const char *working_directory = NULL, *git_dir = NULL;
 	struct option options[] = {
 		OPT_STRING('C', NULL, &working_directory, "directory",
 			   "change the working directory"),
+		OPT_STRING(0, "git-dir", &git_dir, "directory",
+			   "set the path to the repository (\".git\" directory)"),
 		OPT_END()
 	};
 
@@ -121,6 +124,9 @@ int cmd_main(int argc, const char **argv)
 
 	if (argc < 2)
 		die_usage();
+
+	if (git_dir)
+		setenv(GIT_DIR_ENVIRONMENT, git_dir, 1);
 
 	if (working_directory && chdir(working_directory) < 0)
 		die("Could not cd to '%s'", working_directory);
