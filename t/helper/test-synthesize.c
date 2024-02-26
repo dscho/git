@@ -343,6 +343,7 @@ static int random_branch(struct repository *r,
 			 struct random_context *context,
 			 const char *start_revision,
 			 int file_count_goal,
+			 int commit_count_goal,
 			 struct object_id *oid,
 			 int show_progress)
 {
@@ -389,10 +390,22 @@ static int random_branch(struct repository *r,
 			return error("could not read %s into index", start_revision);
 	}
 
-	while (istate.cache_nr < file_count_goal) {
-		if (show_progress)
-			fprintf(stderr, "#%" PRIuMAX ": %" PRIuMAX "/%" PRIuMAX "\r",
-				(uintmax_t)count, (uintmax_t)istate.cache_nr, (uintmax_t)file_count_goal);
+	for (;;) {
+		if (file_count_goal && istate.cache_nr >= file_count_goal)
+			break;
+
+		if (commit_count_goal && count >= commit_count_goal)
+			break;
+
+		if (show_progress) {
+			if (file_count_goal)
+				fprintf(stderr, "#%" PRIuMAX ": %" PRIuMAX "/%" PRIuMAX "\r",
+					(uintmax_t)count, (uintmax_t)istate.cache_nr, (uintmax_t)file_count_goal);
+			else
+				fprintf(stderr, "%" PRIuMAX "/%" PRIuMAX "\r",
+					(uintmax_t)count, (uintmax_t)commit_count_goal);
+		}
+
 		if (random_work(r, context, &istate) < 0)
 			return -1;
 
@@ -425,7 +438,8 @@ static int cmd__synthesize__commits(int argc, const char **argv, const char *pre
 	struct repository *r = the_repository;
 	struct random_context context;
 	struct object_id oid;
-	int seed = 123, target_file_count = 50, show_progress = isatty(2);
+	int seed = 123, target_file_count = 0, target_commit_count = 0;
+	int show_progress = isatty(2);
 	const char *start_revision = NULL;
 	const char * const usage[] = { argv[0], NULL };
 	struct option options[] = {
@@ -435,6 +449,8 @@ static int cmd__synthesize__commits(int argc, const char **argv, const char *pre
 			"seed number for the pseudo-random number generator"),
 		OPT_INTEGER(0, "target-file-count", &target_file_count,
 			"stop generating revisions at this number of files"),
+		OPT_INTEGER(0, "target-commit-count", &target_commit_count,
+			"stop generating revisions at this number of commits"),
 		OPT_BOOL(0, "progress", &show_progress, "show progress"),
 		OPT_END(),
 	};
@@ -444,9 +460,16 @@ static int cmd__synthesize__commits(int argc, const char **argv, const char *pre
 	if (argc)
 		usage_with_options(usage, options);
 
+	if (!target_file_count) {
+		if (!target_commit_count)
+			target_file_count = 50;
+	} else if (target_commit_count)
+		die("specify only one target, please");
+
 	setup_git_directory();
 	random_init(&context, seed);
-	if (random_branch(r, &context, start_revision, target_file_count, &oid, show_progress) < 0)
+	if (random_branch(r, &context, start_revision, target_file_count,
+			  target_commit_count, &oid, show_progress) < 0)
 		return -1;
 
 	printf("%s", oid_to_hex(&oid));
