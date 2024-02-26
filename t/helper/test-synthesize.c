@@ -9,6 +9,7 @@
 #include "hex.h"
 #include "strbuf.h"
 #include "parse-options.h"
+#include "strmap.h"
 
 /*
  * This helper generates artificial repositories. To do so, it uses a
@@ -238,6 +239,7 @@ static int random_work(struct repository *r,
 		       struct index_state *istate)
 {
 	int count, delete = 0, add = 0, modify;
+	struct strset touched_path;
 
 	/* Obey a totally made-up distribution how many files to remove */
 	if (istate->cache_nr > 20) {
@@ -262,9 +264,13 @@ static int random_work(struct repository *r,
 	if (modify > istate->cache_nr - delete)
 		modify = istate->cache_nr - delete;
 
+	strset_init_with_options(&touched_path, NULL, 0);
+
 	count = delete;
 	while (count--) {
 		int pos = random_value_in_range(context, istate->cache_nr);
+
+		strset_add(&touched_path, istate->cache[pos]->name);
 
 		cache_tree_invalidate_path(istate, istate->cache[pos]->name);
 		remove_index_entry_at(istate, pos);
@@ -276,6 +282,10 @@ static int random_work(struct repository *r,
 		enum object_type type;
 		unsigned long sz;
 		struct strbuf buf;
+
+		while (strset_contains(&touched_path, istate->cache[pos]->name))
+			pos = random_value_in_range(context, istate->cache_nr);
+		strset_add(&touched_path, istate->cache[pos]->name);
 
 		buf.buf = repo_read_object_file(r, &istate->cache[pos]->oid, &type, &sz);
 		buf.alloc = buf.len = sz;
@@ -294,6 +304,10 @@ static int random_work(struct repository *r,
 		const char *path = random_new_path(context, istate, &path_buf);
 		struct object_id oid;
 		struct cache_entry *ce;
+
+		while (strset_contains(&touched_path, path))
+			path = random_new_path(context, istate, &path_buf);
+		strset_add(&touched_path, path);
 
 		random_content(context, &buf);
 		write_object_file(buf.buf, buf.len, OBJ_BLOB, &oid);
