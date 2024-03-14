@@ -245,6 +245,13 @@ then
 
 	GIT_TEST_OPTS="--github-workflow-markup"
 	JOBS=10
+
+	case "$jobname,$GITHUB_JOB" in
+	linux*-leaks,*|linux*asan*|*,fuzz*)
+		# https://github.com/actions/runner-images/issues/9491
+		sudo sysctl vm.mmap_rnd_bits=28
+		;;
+	esac
 elif test true = "$GITLAB_CI"
 then
 	CI_TYPE=gitlab-ci
