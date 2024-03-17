@@ -251,6 +251,7 @@ then
 		# https://github.com/actions/runner-images/issues/9491
 		sudo sysctl vm.mmap_rnd_bits=28
 		;;
+*) echo "::warning::not setting vm.mmap_rnd_bits for '$GITHUB_JOB'" >&2; env;;
 	esac
 elif test true = "$GITLAB_CI"
 then
