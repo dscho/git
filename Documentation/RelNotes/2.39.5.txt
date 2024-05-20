@@ -1,0 +1,25 @@
+Git 2.39.5 Release Notes
+========================
+
+Relative to Git 2.39.5, this release has fixes for regressions that
+were introduced in 2.39.4, most notably the error message shown when
+cloning Git LFS-enabled repositories. It also contains a fix for the
+`osx-gcc` CI job.
+
+Fixes since Git 2.39.4
+----------------------
+
+ * Some clone protections introduced in v2.39.4 broke Git LFS-enabled
+   clones and have therefore been dropped.
+
+ * The `core.hooksPath` setting is allowed in repository-local
+   configs again; The benefits of making it protected were
+   outweighed by the cost.
+
+ * Fix a memory leak.
+
+ * CI fix.
+
+ * Adjust to newer Term::ReadLine to prevent it from breaking
+   the interactive prompt code in send-email.
+   (merge c016726c2d jk/send-email-with-new-readline later to maint).
