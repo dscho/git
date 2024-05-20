@@ -1,0 +1,6 @@
+Git v2.40.3 Release Notes
+=========================
+
+This release merges up the regression bug fixes in v2.39.5,
+most notably the bug where cloning Git LFS-enabled repositories
+failed; see the release notes for that version for details.
