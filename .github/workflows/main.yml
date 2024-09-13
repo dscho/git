@@ -42,9 +42,17 @@ jobs:
     runs-on: ubuntu-latest
     container: ${{matrix.vector.image}}
     steps:
+    - name: dump info
+      run: |
+        file /__e/node20/bin/node
+        ls -l /__e/node20/bin/node
     - name: prepare libc6 for actions
       if: matrix.vector.jobname == 'linux32'
-      run: apt -q update && apt -q -y install libc6-amd64 lib64stdc++6
+      run: apt -q update && apt -q -y install libc6-amd64 lib64stdc++6 file
+    - name: dump info
+      run: |
+        file /__e/node20/bin/node
+        ls -l /__e/node20/bin/node
     - uses: actions/checkout@v4
     # - run: ci/install-dependencies.sh
     # - run: ci/run-build-and-tests.sh
