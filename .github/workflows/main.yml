@@ -54,11 +54,13 @@ jobs:
         curl -Lo /tmp/node.tar.gz $NODE_URL &&
         tar -C /__e/node20 -x --strip-components=1 -f /tmp/node.tar.gz
     - uses: actions/checkout@v4
-    - run: ci/install-dependencies.sh
-    - run: ci/run-build-and-tests.sh
-    - name: print test failures
-      if: failure() && env.FAILED_TEST_ARTIFACTS != ''
-      run: ci/print-test-failures.sh
+    # - run: ci/install-dependencies.sh
+    # - run: ci/run-build-and-tests.sh
+    - name: let it fail
+      run: echo FAILED_TEST_ARTIFACTS=ci >>$GITHUB_ENV && exit 1
+    # - name: print test failures
+    #   if: failure() && env.FAILED_TEST_ARTIFACTS != ''
+    #   run: ci/print-test-failures.sh
     - name: Upload failed tests' directories
       if: failure() && env.FAILED_TEST_ARTIFACTS != ''
       uses: actions/upload-artifact@v4
