@@ -44,7 +44,7 @@ jobs:
     steps:
     - name: dump info
       run: |
-        file /__e/node20/bin/node
+        file /__e/node20/bin/node || :
         ls -l /__e/node20/bin/node
     - name: prepare libc6 for actions
       if: matrix.vector.jobname == 'linux32'
