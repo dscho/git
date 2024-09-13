@@ -8,6 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     container: i386/ubuntu:focal
     steps:
+    - uses: actions/checkout@v4
     - name: Upload fails
       # shows 'exec /__e/node20/bin/node: no such file or directory'
       uses: actions/upload-artifact@v4
