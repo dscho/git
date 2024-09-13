@@ -40,11 +40,19 @@ jobs:
       jobname: ${{matrix.vector.jobname}}
       distro: ${{matrix.vector.distro}}
     runs-on: ubuntu-latest
-    container: ${{matrix.vector.image}}
+    container:
+      image: ${{matrix.vector.image}}
+      volumes:
+        # override /__e/node20 on 32-bit because it is 64-bit
+        - /tmp:/__e${{matrix.vector.jobname != 'linux32' && '-x86' || ''}}/node20
     steps:
-    - name: prepare libc6 for actions
+    - name: prepare x86 variant of node20
       if: matrix.vector.jobname == 'linux32'
-      run: apt -q update && apt -q -y install libc6-amd64 lib64stdc++6
+      run: |
+        apt -q update && apt -q -y install curl &&
+        NODE_URL=https://unofficial-builds.nodejs.org/download/release/v20.17.0/node-v20.17.0-linux-x86.tar.gz &&
+        curl -Lo /tmp/node.tar.gz $NODE_URL &&
+        tar -C /__e/node20 -x --strip-components=1 -f /tmp/node.tar.gz
     - uses: actions/checkout@v4
     - run: ci/install-dependencies.sh
     - run: ci/run-build-and-tests.sh
