@@ -2,11 +2,45 @@ name: CI
 
 on: [push, pull_request]
 
+env:
+  DEVELOPER: 1
+
+# If more than one workflow run is triggered for the very same commit hash
+# (which happens when multiple branches pointing to the same commit), only
+# the first one is allowed to run, the second will be kept in the "queued"
+# state. This allows a successful completion of the first run to be reused
+# in the second run via the `skip-if-redundant` logic in the `config` job.
+#
+# The only caveat is that if a workflow run is triggered for the same commit
+# hash that another run is already being held, that latter run will be
+# canceled. For more details about the `concurrency` attribute, see:
+# https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#concurrency
+concurrency:
+  group: ${{ github.sha }}
+
 jobs:
-  demo:
-    name: demonstrate need for "deprecated" actions/upload-artifact in i386 containers
+  dockerized:
+    name: ${{matrix.vector.jobname}} (${{matrix.vector.image}})
+    concurrency:
+      group: dockerized-${{ matrix.vector.jobname }}-${{ matrix.vector.image }}-${{ github.ref }}
+    strategy:
+      fail-fast: false
+      matrix:
+        vector:
+        - jobname: linux-musl
+          image: alpine
+          distro: alpine-latest
+        - jobname: linux32
+          image: i386/ubuntu:focal
+          distro: ubuntu32-20.04
+        - jobname: pedantic
+          image: fedora
+          distro: fedora-latest
+    env:
+      jobname: ${{matrix.vector.jobname}}
+      distro: ${{matrix.vector.distro}}
     runs-on: ubuntu-latest
-    container: i386/ubuntu:focal
+    container: ${{matrix.vector.image}}
     steps:
     - uses: actions/checkout@v4
     - name: Upload fails
