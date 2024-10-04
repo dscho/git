@@ -456,9 +456,9 @@ test_expect_success 'ref transaction: many concurrent writers' '
 	(
 		cd repo &&
 		# Set a high timeout such that a busy CI machine will not abort
-		# early. 10 seconds should hopefully be ample of time to make
+		# early. One minute should hopefully be ample of time to make
 		# this non-flaky.
-		git config set reftable.lockTimeout 10000 &&
+		git config set reftable.lockTimeout 60000 &&
 		test_commit --no-tag initial &&
 
 		head=$(git rev-parse HEAD) &&
