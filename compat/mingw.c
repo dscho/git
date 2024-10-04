@@ -784,6 +784,7 @@ int mingw_open (const char *filename, int oflags, ...)
 	int fd, create = (oflags & (O_CREAT | O_EXCL)) == (O_CREAT | O_EXCL);
 	wchar_t wfilename[MAX_LONG_PATH];
 	open_fn_t open_fn;
+	int tries = 0;
 
 	va_start(args, oflags);
 	mode = va_arg(args, int);
@@ -813,7 +814,11 @@ int mingw_open (const char *filename, int oflags, ...)
 	else if (xutftowcs_long_path(wfilename, filename) < 0)
 		return -1;
 
-	fd = open_fn(wfilename, oflags, mode);
+	do {
+		fd = open_fn(wfilename, oflags, mode);
+	} while (fd < 0 && GetLastError() == ERROR_SHARING_VIOLATION &&
+		 retry_ask_yes_no(&tries, "Opening '%s' failed because another "
+			"application accessed it. Try again?", filename));
 
 	if ((oflags & O_CREAT) && fd >= 0 && are_wsl_compatible_mode_bits_enabled()) {
 		_mode_t wsl_mode = S_IFREG | (mode&0777);
