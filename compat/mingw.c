@@ -2723,6 +2723,26 @@ int mingw_accept(int sockfd1, struct sockaddr *sa, socklen_t *sz)
 	return sockfd2;
 }
 
+/*
+ * This is only available on Windows 10 build 1607 or later, and mingw-w64's
+ * headers only define this if NTDDI_VERSION >= 0x0A000002.
+ *
+ * We use it here optimistically.
+ */
+typedef struct _FILE_RENAME_INFORMATION {
+	ULONG Flags;
+	HANDLE RootDirectory;
+	ULONG FileNameLength;
+	WCHAR FileName[1];
+} FILE_RENAME_INFORMATION, *PFILE_RENAME_INFORMATION;
+
+enum {
+	FILE_RENAME_REPLACE_IF_EXISTS = 0x00000001,
+	FILE_RENAME_POSIX_SEMANTICS = 0x00000002,
+	FILE_RENAME_IGNORE_READONLY_ATTRIBUTE = 0x00000040,
+};
+#define FileRenameInfoEx 22
+
 #undef rename
 int mingw_rename(const char *pold, const char *pnew)
 {
@@ -2733,7 +2753,6 @@ int mingw_rename(const char *pold, const char *pnew)
 	    xutftowcs_long_path(wpnew, pnew) < 0)
 		return -1;
 
-repeat:
 	if (MoveFileExW(wpold, wpnew,
 			MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED))
 		return 0;
@@ -2775,17 +2794,46 @@ repeat:
 			if (attrsold == INVALID_FILE_ATTRIBUTES ||
 			    !(attrsold & FILE_ATTRIBUTE_DIRECTORY))
 				errno = EISDIR;
-			else if (!_wrmdir(wpnew))
-				goto repeat;
+			else if (_wrmdir(wpnew))
+				return -1;
+		}
+		if (attrs & FILE_ATTRIBUTE_READONLY)
+			SetFileAttributesW(wpnew, attrs & ~FILE_ATTRIBUTE_READONLY);
+	}
+
+	{
+		PFILE_RENAME_INFORMATION fri = NULL;
+		size_t wpnew_size;
+		HANDLE handle = CreateFileW(wpold, DELETE,
+					    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL,
+					    OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+
+		if (handle == INVALID_HANDLE_VALUE) {
+			errno = ENOENT;
 			return -1;
 		}
-		if ((attrs & FILE_ATTRIBUTE_READONLY) &&
-		    SetFileAttributesW(wpnew, attrs & ~FILE_ATTRIBUTE_READONLY))
-			goto repeat;
+
+		wpnew_size = sizeof(wchar_t) * (1 + wcslen(wpnew));
+		fri = xcalloc(1, sizeof(*fri) + wpnew_size);
+		fri->Flags = FILE_RENAME_REPLACE_IF_EXISTS | FILE_RENAME_POSIX_SEMANTICS |
+			FILE_RENAME_IGNORE_READONLY_ATTRIBUTE;
+		fri->FileNameLength = wpnew_size - sizeof(wchar_t);
+		memcpy(fri->FileName, wpnew, wpnew_size);
+
+		do {
+			if (SetFileInformationByHandle(handle, FileRenameInfoEx,
+						       fri, sizeof(*fri) + wpnew_size) ||
+			    MoveFileExW(wpold, wpnew,
+					MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED)) {
+				CloseHandle(handle);
+				free(fri);
+				return 0;
+			}
+		} while (retry_ask_yes_no(&tries, "Rename from '%s' to '%s' failed. "
+					 "Should I try again?", pold, pnew));
+		CloseHandle(handle);
+		free(fri);
 	}
-	if (retry_ask_yes_no(&tries, "Rename from '%s' to '%s' failed. "
-		       "Should I try again?", pold, pnew))
-		goto repeat;
 
 	errno = EACCES;
 	return -1;
