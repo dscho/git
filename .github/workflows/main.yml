@@ -25,8 +25,45 @@ jobs:
     concurrency:
       group: windows-build-${{ github.ref }}
     steps:
-    - uses: actions/checkout@v4
     - uses: git-for-windows/setup-git-for-windows-sdk@v1
+    - name: debug using tmate
+      shell: bash
+      run: |
+        (
+          cd / &&
+          G4W=/c/Program\ Files/Git &&
+          cp -n "$G4W"/usr/bin/{ssh-keygen.exe,msys-crypto-3.dll,msys-z.dll} usr/bin/ &&
+
+          CURL="$G4W"/mingw64/bin/curl.exe &&
+          "$CURL" -Lo /usr/bin/zstd.exe https://github.com/git-for-windows/git-sdk-64/raw/HEAD/usr/bin/zstd.exe &&
+          "$CURL" -Lo /tmp/tmate.tar.zst https://repo.msys2.org/msys/x86_64/tmate-2.4.0-4-x86_64.pkg.tar.zst &&
+          tar xvf /tmp/tmate.tar.zst usr/bin/tmate.exe &&
+          "$CURL" -Lo /tmp/libevent.tar.zst https://repo.msys2.org/msys/x86_64/libevent-2.1.12-4-x86_64.pkg.tar.zst &&
+          tar xvf /tmp/libevent.tar.zst usr/bin/msys-event-2-1-7.dll &&
+          "$CURL" -Lo /tmp/msgpack-c.tar.zst https://repo.msys2.org/msys/x86_64/msgpack-c-6.1.0-1-x86_64.pkg.tar.zst &&
+          tar xvf /tmp/msgpack-c.tar.zst usr/bin/msys-msgpack-c-2.dll &&
+          "$CURL" -Lo /tmp/libssh.tar.zst https://repo.msys2.org/msys/x86_64/libssh-0.11.1-1-x86_64.pkg.tar.zst &&
+          tar xvf /tmp/libssh.tar.zst usr/bin/msys-ssh-4.dll
+        ) &&
+
+        # restrict SSH access to the "actor", i.e. the GitHub user who triggered this workflow
+        # this requires calling `ssh -i <private-key> [...]` later on
+        mkdir -p ~/.ssh &&
+        curl -H 'Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}' \
+          https://api.github.com/users/${{github.actor}}/keys |
+        sed -n 's/.*"key": "\(.*\)".*/\1/p' >~/.ssh/authorized_keys &&
+
+        # Generate an SSH key (needed for tmate)
+        echo -e 'y\n' | ssh-keygen -q -t rsa -N '' -f ~/.ssh/id_rsa &&
+
+        # Start tmate session
+        export CHERE_INVOKING=1 &&
+        tmate -S /tmp/tmate.sock -a ~/.ssh/authorized_keys new-session -d &&
+        tmate -S /tmp/tmate.sock wait tmate-ready &&
+
+        # Print SSH invocation, then let the workflow continue
+        tmate -S /tmp/tmate.sock display -p '#{tmate_ssh}'
+    - uses: actions/checkout@v4
     - name: build
       shell: bash
       env:
@@ -35,3 +72,13 @@ jobs:
       run: . /etc/profile && ci/make-test-artifacts.sh artifacts
     - name: run t0610
       run: cd t && sh t0610-*.sh -ivx
+    - name: wait for tmate to be done
+      if: always()
+      shell: bash
+      run: |
+        PATH=$HOME/bin:$PATH
+        while test -e /tmp/tmate.sock
+        do
+          tmate -S /tmp/tmate.sock display -p '#{tmate_ssh}'
+          sleep 5
+        done
