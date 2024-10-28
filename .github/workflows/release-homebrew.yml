@@ -3,6 +3,9 @@ on:
   release:
     types: [released]
 
+permissions:
+  id-token: write # required for Azure login via OIDC
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -19,10 +22,27 @@ jobs:
         asset: /git-(.*)\.pkg/
         hash: sha256
         token: ${{ secrets.GITHUB_TOKEN }}
+    - name: Log into Azure
+      uses: azure/login@v2
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+    - name: Retrieve token
+      id: token
+      run: |
+        az keyvault secret show \
+          --name ${{ secrets.HOMEBREW_TOKEN_SECRET_NAME }} \
+          --vault-name ${{ secrets.AZURE_VAULT }} \
+          --query "value" -o tsv >token &&
+        # avoid outputting the token under `set -x` by using `sed` instead of `echo`
+        sed s/^/::add-mask::/ <token &&
+        sed s/^/result=/ <token >>$GITHUB_OUTPUT &&
+        rm token
     - name: Update scalar Cask
       uses: mjcheetham/update-homebrew@v1.3
       with:
-        token: ${{ secrets.HOMEBREW_TOKEN }}
+        token: ${{ steps.token.outputs.result }}
         tap: microsoft/git
         name: microsoft-git
         type: cask
