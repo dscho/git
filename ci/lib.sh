@@ -383,6 +383,9 @@ linux-asan-ubsan)
 	export NO_SVN_TESTS=LetsSaveSomeTime
 	MAKEFLAGS="$MAKEFLAGS NO_PYTHON=YepBecauseP4FlakesTooOften"
 	;;
+windows-*)
+	export MSYS=${MSYS+$MSYS }winsymlinks:nativestrict
+	;;
 esac
 
 MAKEFLAGS="$MAKEFLAGS CC=${CC:-cc}"
