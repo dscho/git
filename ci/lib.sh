@@ -367,6 +367,11 @@ osx-meson)
 	;;
 windows-*)
 	export MSYS=${MSYS+$MSYS }winsymlinks:nativestrict
+set -x
+echo "::notice::enabled symlinks"
+ln -s a1 /tmp/a2
+ls -la /tmp/a?
+set +x
 	;;
 esac
 
