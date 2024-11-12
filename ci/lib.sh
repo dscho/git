@@ -365,6 +365,9 @@ linux-asan-ubsan)
 osx-meson)
 	MESONFLAGS="$MESONFLAGS -Dcredential_helpers=osxkeychain"
 	;;
+windows-*)
+	export MSYS=${MSYS+$MSYS }winsymlinks:nativestrict
+	;;
 esac
 
 MAKEFLAGS="$MAKEFLAGS CC=${CC:-cc}"
