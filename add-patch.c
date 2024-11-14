@@ -55,7 +55,8 @@ static struct patch_mode patch_mode_add = {
 			"ones\n"
 		   "a - stage this hunk and all later hunks in the file\n"
 		   "d - do not stage this hunk or any of the later hunks in "
-			"the file\n")
+			"the file\n"
+		   "t - stash this hunk instead of staging it\n")
 };
 
 static struct patch_mode patch_mode_stash = {
@@ -1215,7 +1216,7 @@ static int run_apply_check(struct add_p_state *s,
 			    "apply", "--check", NULL);
 	strvec_pushv(&cp.args, s->mode->apply_check_args);
 	if (pipe_command(&cp, s->buf.buf, s->buf.len, NULL, 0, NULL, 0))
-		return error(_("'git apply --cached' failed"));
+		return error(_("'git apply --check' failed"));
 
 	return 0;
 }
@@ -1697,6 +1698,8 @@ soft_increment:
 		} else if (ch == 'p') {
 			rendered_hunk_index = -1;
 			use_pager = (s->answer.buf[0] == 'P') ? 1 : 0;
+		} else if (s->answer.buf[0] == 't') {
+			hunk->use = STASH_HUNK;
 		} else if (s->answer.buf[0] == '?') {
 			const char *p = _(help_patch_remainder), *eol = p;
 
