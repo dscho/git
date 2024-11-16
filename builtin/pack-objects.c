@@ -196,7 +196,7 @@ static struct bitmap_index *bitmap_git;
 static uint32_t write_layer;
 
 static int non_empty;
-static int reuse_delta = 1, reuse_object = 1;
+static int reuse_delta = -1, reuse_object = 1;
 static int keep_unreachable, unpack_unreachable, include_tag;
 static timestamp_t unpack_unreachable_expiration;
 static int pack_loose_unreachable;
@@ -4786,6 +4786,19 @@ int cmd_pack_objects(int argc,
 			path_walk = 1;
 		else
 			path_walk = git_env_bool("GIT_TEST_PACK_PATH_WALK", 0);
+	}
+
+	if (reuse_delta < 0) {
+		/*
+		 * If we are using the --revs option and path-walk is _implied_
+		 * then use --no-reuse-delta by default.
+		 */
+		if (use_internal_rev_list &&
+		    the_repository->gitdir &&
+		    the_repository->settings.pack_use_path_walk)
+			reuse_delta = 0;
+		else
+			reuse_delta = 1;
 	}
 
 	if (depth < 0)
