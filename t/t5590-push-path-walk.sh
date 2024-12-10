@@ -26,35 +26,44 @@ test_expect_success 'avoid reusing deltified objects' '
 	pack=clone.git/objects/pack/pack-tmp.pack &&
 	pack_header 2 >$pack &&
 
-	# add x256 as a non-deltified object, using uncompressed zlib for simplicity
-	# 0x30 = OBJ_BLOB << 4, 0x80 = size larger than 15, 0x0 = lower 4 bits of size, 0x10 = bits 5-9 of size (size = 256)
-	printf "\xb0\x10" >>$pack &&
-	# Uncompressed zlib stream always starts with 0x78 0x01 0x01, followed
+	# add x256 as a non-deltified object, using an uncompressed zlib stream
+	# for simplicity
+	# 060 = OBJ_BLOB << 4, 0200 = size larger than 15,
+	# 0 = lower 4 bits of size, 020 = bits 5-9 of size (size = 256)
+	printf "\260\020" >>$pack &&
+	# Uncompressed zlib stream always starts with 0170 1 1, followed
 	# by two bytes encoding the size, little endian, then two bytes with
 	# the bitwise-complement of that size, then the payload, and then the
-	# Adler32 checksum. For some reason, the checksum is in big-endian format.
-	printf "\x78\x01\x01\0\x01\xff\xfe" >>$pack &&
+	# Adler32 checksum. For some reason, the checksum is in big-endian
+	# format.
+	printf "\170\001\001\0\001\377\376" >>$pack &&
 	cat x256 >>$pack &&
 	# Manually-computed Adler32 checksum: 0xd7ae4621
-	printf "\xd7\xae\x46\x21" >>$pack &&
+	printf "\327\256\106\041" >>$pack &&
 
 	# add x128 as a very badly deltified object
-	# 0x60 = OBJ_OFS_DELTA << 4, 0x80 = total size larger than 15, 0x4 = lower 4 bits of size, 0x03 = bits 5-9 of size (size = 128 * 3 + 2 + 2)
-	printf "\xe4\x18" >>$pack &&
-	# 0x010d = size (i.e. the relative negative offset) of the previous object (x256, used as base object)
-	# encoded as 0x80 | ((0x010d >> 7) - 1), 0x010d & 0x7f
-	printf "\x81\x0d" >>$pack &&
-	# Uncompressed zlib stream, as before, size = 2 + 2 + 128 * 3 (i.e. 0x184)
-	printf "\x78\x01\x01\x84\x01\x7b\xfe" >>$pack &&
-	# base object size = 0x0100 (encoded as 0x80 | (0x0100 & 0x7f), 0x0100 >> 7
-	printf "\x80\x02" >>$pack &&
-	# object size = 0x80 (encoded as 0x80 | (0x80 & 0x7f), 0x80 >> 7
-	printf "\x80\x01" >>$pack &&
+	# 0120 = OBJ_OFS_DELTA << 4, 0200 = total size larger than 15,
+	# 4 = lower 4 bits of size, 030 = bits 5-9 of size
+	# (size = 128 * 3 + 2 + 2)
+	printf "\344\030" >>$pack &&
+	# 0415 = size (i.e. the relative negative offset) of the previous
+	# object (x256, used as base object)
+	# encoded as 0200 | ((0415 >> 7) - 1), 0415 & 0177
+	printf "\201\015" >>$pack &&
+	# Uncompressed zlib stream, as before, size = 2 + 2 + 128 * 3 (i.e.
+	# 0604)
+	printf "\170\001\001\204\001\173\376" >>$pack &&
+	# base object size = 0400 (encoded as 0200 | (0400 & 0177),
+	# 0400 >> 7)
+	printf "\200\002" >>$pack &&
+	# object size = 0200 (encoded as 0200 | (0200 & 0177), 0200 >> 7
+	printf "\200\001" >>$pack &&
 	# massively badly-deltified object: copy every single byte individually
-	# 0x80 = copy, 0x01 = use 1 byte to encode the offset (0), 0x10 = use 1 byte to encode the size (1, i.e. 0x01)
-	printf "$(printf "\\\\x91\\\\x%02x\\\\x01" $(test_seq 0 127))" >>$pack &&
+	# 0200 = copy, 1 = use 1 byte to encode the offset (counter),
+	# 020 = use 1 byte to encode the size (1)
+	printf "$(printf "\\\\221\\\\%03o\\\\001" $(test_seq 0 127))" >>$pack &&
 	# Manually-computed Adler32 checksum: 0x99c369c4
-	printf "\x99\xc3\x69\xc4" >>$pack &&
+	printf "\231\303\151\304" >>$pack &&
 
 	pack_trailer $pack &&
 	git index-pack -v $pack &&
@@ -86,7 +95,7 @@ test_expect_success 'avoid reusing deltified objects' '
 	# The on-disk size of the delta object should be smaller than, or equal
 	# to, 18 bytes, as that would be the size if storing the payload
 	# uncompressed:
-	#   3 bytes: \x78\x01\x01
+	#   3 bytes: 0170 01 01
 	# + 2 bytes: zlib stream size
 	# + 2 bytes: but-wise complement of the zlib stream size
 	# + 7 bytes: payload
