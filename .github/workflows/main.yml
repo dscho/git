@@ -37,6 +37,9 @@ jobs:
       T: t1400-update-ref.sh t3200-branch.sh
     runs-on: ${{matrix.vector.pool}}
     steps:
+    - uses: mxschmitt/action-tmate@v3
+      with:
+        detached: true
     - uses: actions/checkout@v4
     - run: ci/install-dependencies.sh
     - run: ci/run-build-and-tests.sh
