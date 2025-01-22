@@ -34,6 +34,7 @@ jobs:
       jobname: ${{matrix.vector.jobname}}
       distro: ${{matrix.vector.pool}}
       TEST_OUTPUT_DIRECTORY: ${{github.workspace}}/t
+      T: t1400-update-ref.sh t3200-branch.sh
     runs-on: ${{matrix.vector.pool}}
     steps:
     - uses: actions/checkout@v4
