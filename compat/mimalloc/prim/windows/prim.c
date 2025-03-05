@@ -62,6 +62,9 @@ static PGetNumaProcessorNodeEx      pGetNumaProcessorNodeEx = NULL;
 static PGetNumaNodeProcessorMaskEx  pGetNumaNodeProcessorMaskEx = NULL;
 static PGetNumaProcessorNode        pGetNumaProcessorNode = NULL;
 
+typedef BOOL (__stdcall *PGetPhysicallyInstalledSystemMemory)(PULONGLONG TotalMemoryInKilobytes);
+static PGetPhysicallyInstalledSystemMemory pGetPhysicallyInstalledSystemMemory = NULL;
+
 //---------------------------------------------
 // Enable large page support dynamically (if possible)
 //---------------------------------------------
@@ -123,13 +126,6 @@ void _mi_prim_mem_init( mi_os_mem_config_t* config )
     const size_t vbits = MI_INTPTR_BITS - mi_clz((uintptr_t)si.lpMaximumApplicationAddress);
     config->virtual_address_bits = vbits;
   }
-  // get physical memory
-  ULONGLONG memInKiB = 0;
-  if (GetPhysicallyInstalledSystemMemory(&memInKiB)) {
-    if (memInKiB > 0 && memInKiB < (SIZE_MAX / MI_KiB)) {
-      config->physical_memory = memInKiB * MI_KiB;
-    }
-  }
   // get the VirtualAlloc2 function
   HINSTANCE  hDll;
   hDll = LoadLibrary(TEXT("kernelbase.dll"));
@@ -137,7 +133,15 @@ void _mi_prim_mem_init( mi_os_mem_config_t* config )
     // use VirtualAlloc2FromApp if possible as it is available to Windows store apps
     pVirtualAlloc2 = (PVirtualAlloc2)(void (*)(void))GetProcAddress(hDll, "VirtualAlloc2FromApp");
     if (pVirtualAlloc2==NULL) pVirtualAlloc2 = (PVirtualAlloc2)(void (*)(void))GetProcAddress(hDll, "VirtualAlloc2");
+    pGetPhysicallyInstalledSystemMemory = (PGetPhysicallyInstalledSystemMemory)(void (*)(void))GetProcAddress(hDll, "GetPhysicallyInstalledSystemMemory");
     FreeLibrary(hDll);
+  }
+  // get physical memory
+  ULONGLONG memInKiB = 0;
+  if (pGetPhysicallyInstalledSystemMemory && pGetPhysicallyInstalledSystemMemory(&memInKiB)) {
+    if (memInKiB > 0 && memInKiB < (SIZE_MAX / MI_KiB)) {
+      config->physical_memory = memInKiB * MI_KiB;
+    }
   }
   // NtAllocateVirtualMemoryEx is used for huge page allocation
   hDll = LoadLibrary(TEXT("ntdll.dll"));
