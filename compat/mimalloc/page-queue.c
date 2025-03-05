@@ -1,5 +1,5 @@
 /*----------------------------------------------------------------------------
-Copyright (c) 2018-2020, Microsoft Research, Daan Leijen
+Copyright (c) 2018-2024, Microsoft Research, Daan Leijen
 This is free software; you can redistribute it and/or modify it under the
 terms of the MIT license. A copy of the license can be found in the file
 "LICENSE" at the root of this distribution.
@@ -11,6 +11,10 @@ terms of the MIT license. A copy of the license can be found in the file
 
 #ifndef MI_IN_PAGE_C
 #error "this file should be included from 'page.c'"
+// include to help an IDE
+#include "mimalloc.h"
+#include "mimalloc/internal.h"
+#include "mimalloc/atomic.h"
 #endif
 
 /* -----------------------------------------------------------
@@ -109,10 +113,10 @@ size_t _mi_bin_size(uint8_t bin) {
 // Good size for allocation
 size_t mi_good_size(size_t size) mi_attr_noexcept {
   if (size <= MI_MEDIUM_OBJ_SIZE_MAX) {
-    return _mi_bin_size(mi_bin(size));
+    return _mi_bin_size(mi_bin(size + MI_PADDING_SIZE));
   }
   else {
-    return _mi_align_up(size,_mi_os_page_size());
+    return _mi_align_up(size + MI_PADDING_SIZE,_mi_os_page_size());
   }
 }
 
@@ -137,21 +141,25 @@ static bool mi_heap_contains_queue(const mi_heap_t* heap, const mi_page_queue_t*
 }
 #endif
 
-static mi_page_queue_t* mi_page_queue_of(const mi_page_t* page) {
-  uint8_t bin = (mi_page_is_in_full(page) ? MI_BIN_FULL : mi_bin(page->xblock_size));
-  mi_heap_t* heap = mi_page_heap(page);
-  mi_assert_internal(heap != NULL && bin <= MI_BIN_FULL);
-  mi_page_queue_t* pq = &heap->pages[bin];
-  mi_assert_internal(bin >= MI_BIN_HUGE || page->xblock_size == pq->block_size);
-  mi_assert_expensive(mi_page_queue_contains(pq, page));
-  return pq;
+static inline bool mi_page_is_large_or_huge(const mi_page_t* page) {
+  return (mi_page_block_size(page) > MI_MEDIUM_OBJ_SIZE_MAX || mi_page_is_huge(page));
 }
 
 static mi_page_queue_t* mi_heap_page_queue_of(mi_heap_t* heap, const mi_page_t* page) {
-  uint8_t bin = (mi_page_is_in_full(page) ? MI_BIN_FULL : mi_bin(page->xblock_size));
+  mi_assert_internal(heap!=NULL);
+  uint8_t bin = (mi_page_is_in_full(page) ? MI_BIN_FULL : (mi_page_is_huge(page) ? MI_BIN_HUGE : mi_bin(mi_page_block_size(page))));
   mi_assert_internal(bin <= MI_BIN_FULL);
   mi_page_queue_t* pq = &heap->pages[bin];
-  mi_assert_internal(mi_page_is_in_full(page) || page->xblock_size == pq->block_size);
+  mi_assert_internal((mi_page_block_size(page) == pq->block_size) ||
+                       (mi_page_is_large_or_huge(page) && mi_page_queue_is_huge(pq)) ||
+                         (mi_page_is_in_full(page) && mi_page_queue_is_full(pq)));
+  return pq;
+}
+
+static mi_page_queue_t* mi_page_queue_of(const mi_page_t* page) {
+  mi_heap_t* heap = mi_page_heap(page);
+  mi_page_queue_t* pq = mi_heap_page_queue_of(heap, page);
+  mi_assert_expensive(mi_page_queue_contains(pq, page));
   return pq;
 }
 
@@ -206,7 +214,9 @@ static bool mi_page_queue_is_empty(mi_page_queue_t* queue) {
 static void mi_page_queue_remove(mi_page_queue_t* queue, mi_page_t* page) {
   mi_assert_internal(page != NULL);
   mi_assert_expensive(mi_page_queue_contains(queue, page));
-  mi_assert_internal(page->xblock_size == queue->block_size || (page->xblock_size > MI_MEDIUM_OBJ_SIZE_MAX && mi_page_queue_is_huge(queue))  || (mi_page_is_in_full(page) && mi_page_queue_is_full(queue)));
+  mi_assert_internal(mi_page_block_size(page) == queue->block_size ||
+                      (mi_page_is_large_or_huge(page) && mi_page_queue_is_huge(queue)) ||
+                        (mi_page_is_in_full(page) && mi_page_queue_is_full(queue)));
   mi_heap_t* heap = mi_page_heap(page);
 
   if (page->prev != NULL) page->prev->next = page->next;
@@ -232,9 +242,9 @@ static void mi_page_queue_push(mi_heap_t* heap, mi_page_queue_t* queue, mi_page_
   #if MI_HUGE_PAGE_ABANDON
   mi_assert_internal(_mi_page_segment(page)->kind != MI_SEGMENT_HUGE);
   #endif
-  mi_assert_internal(page->xblock_size == queue->block_size ||
-		      (page->xblock_size > MI_MEDIUM_OBJ_SIZE_MAX) ||
-			(mi_page_is_in_full(page) && mi_page_queue_is_full(queue)));
+  mi_assert_internal(mi_page_block_size(page) == queue->block_size ||
+                      (mi_page_is_large_or_huge(page) && mi_page_queue_is_huge(queue)) ||
+                        (mi_page_is_in_full(page) && mi_page_queue_is_full(queue)));
 
   mi_page_set_in_full(page, mi_page_queue_is_full(queue));
   // mi_atomic_store_ptr_release(mi_atomic_cast(void*, &page->heap), heap);
@@ -254,19 +264,30 @@ static void mi_page_queue_push(mi_heap_t* heap, mi_page_queue_t* queue, mi_page_
   heap->page_count++;
 }
 
+static void mi_page_queue_move_to_front(mi_heap_t* heap, mi_page_queue_t* queue, mi_page_t* page) {
+  mi_assert_internal(mi_page_heap(page) == heap);
+  mi_assert_internal(mi_page_queue_contains(queue, page));
+  if (queue->first == page) return;
+  mi_page_queue_remove(queue, page);
+  mi_page_queue_push(heap, queue, page);
+  mi_assert_internal(queue->first == page);
+}
 
-static void mi_page_queue_enqueue_from(mi_page_queue_t* to, mi_page_queue_t* from, mi_page_t* page) {
+static void mi_page_queue_enqueue_from_ex(mi_page_queue_t* to, mi_page_queue_t* from, bool enqueue_at_end, mi_page_t* page) {
   mi_assert_internal(page != NULL);
   mi_assert_expensive(mi_page_queue_contains(from, page));
   mi_assert_expensive(!mi_page_queue_contains(to, page));
-
-  mi_assert_internal((page->xblock_size == to->block_size && page->xblock_size == from->block_size) ||
-		     (page->xblock_size == to->block_size && mi_page_queue_is_full(from)) ||
-		     (page->xblock_size == from->block_size && mi_page_queue_is_full(to)) ||
-		     (page->xblock_size > MI_LARGE_OBJ_SIZE_MAX && mi_page_queue_is_huge(to)) ||
-		     (page->xblock_size > MI_LARGE_OBJ_SIZE_MAX && mi_page_queue_is_full(to)));
+  const size_t bsize = mi_page_block_size(page);
+  MI_UNUSED(bsize);
+  mi_assert_internal((bsize == to->block_size && bsize == from->block_size) ||
+                     (bsize == to->block_size && mi_page_queue_is_full(from)) ||
+                     (bsize == from->block_size && mi_page_queue_is_full(to)) ||
+                     (mi_page_is_large_or_huge(page) && mi_page_queue_is_huge(to)) ||
+                     (mi_page_is_large_or_huge(page) && mi_page_queue_is_full(to)));
 
   mi_heap_t* heap = mi_page_heap(page);
+
+  // delete from `from`
   if (page->prev != NULL) page->prev->next = page->next;
   if (page->next != NULL) page->next->prev = page->prev;
   if (page == from->last)  from->last = page->prev;
@@ -277,20 +298,57 @@ static void mi_page_queue_enqueue_from(mi_page_queue_t* to, mi_page_queue_t* fro
     mi_heap_queue_first_update(heap, from);
   }
 
-  page->prev = to->last;
-  page->next = NULL;
-  if (to->last != NULL) {
-    mi_assert_internal(heap == mi_page_heap(to->last));
-    to->last->next = page;
-    to->last = page;
+  // insert into `to`
+  if (enqueue_at_end) {
+    // enqueue at the end
+    page->prev = to->last;
+    page->next = NULL;
+    if (to->last != NULL) {
+      mi_assert_internal(heap == mi_page_heap(to->last));
+      to->last->next = page;
+      to->last = page;
+    }
+    else {
+      to->first = page;
+      to->last = page;
+      mi_heap_queue_first_update(heap, to);
+    }
   }
   else {
-    to->first = page;
-    to->last = page;
-    mi_heap_queue_first_update(heap, to);
+    if (to->first != NULL) {
+      // enqueue at 2nd place
+      mi_assert_internal(heap == mi_page_heap(to->first));
+      mi_page_t* next = to->first->next;
+      page->prev = to->first;
+      page->next = next;
+      to->first->next = page;
+      if (next != NULL) { 
+        next->prev = page; 
+      }
+      else {
+        to->last = page;
+      }
+    }
+    else {
+      // enqueue at the head (singleton list)
+      page->prev = NULL;
+      page->next = NULL;
+      to->first = page;
+      to->last = page;
+      mi_heap_queue_first_update(heap, to);
+    }
   }
 
   mi_page_set_in_full(page, mi_page_queue_is_full(to));
+}
+
+static void mi_page_queue_enqueue_from(mi_page_queue_t* to, mi_page_queue_t* from, mi_page_t* page) {
+  mi_page_queue_enqueue_from_ex(to, from, true /* enqueue at the end */, page);
+}
+
+static void mi_page_queue_enqueue_from_full(mi_page_queue_t* to, mi_page_queue_t* from, mi_page_t* page) {
+  // note: we could insert at the front to increase reuse, but it slows down certain benchmarks (like `alloc-test`)
+  mi_page_queue_enqueue_from_ex(to, from, true /* enqueue at the end of the `to` queue? */, page);
 }
 
 // Only called from `mi_heap_absorb`.
