@@ -2180,7 +2180,7 @@ ifdef USE_MIMALLOC
 		compat/mimalloc/os.o \
 		compat/mimalloc/page.o \
 		compat/mimalloc/random.o \
-		compat/mimalloc/prim/windows/prim.o \
+		compat/mimalloc/prim/$(USE_MIMALLOC)/prim.o \
 		compat/mimalloc/segment.o \
 		compat/mimalloc/segment-cache.o \
 		compat/mimalloc/segment-map.o \
