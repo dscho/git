@@ -70,6 +70,12 @@
 #      # Execute single test interactively such that features like `debug ()` work.
 #      $ meson test -i --test-args='-ix' t1400-update-ref
 #
+#      # Execute all benchmarks.
+#      $ meson test -i --benchmark
+#
+#      # Execute single benchmark.
+#      $ meson test -i --benchmark p0000-*
+#
 #   Test execution is parallelized by default and scales with the number of
 #   processor cores available. You can change the number of processes by passing
 #   the `-jN` flag to `meson test`.
@@ -204,6 +210,7 @@ git = find_program('git', dirs: program_path, required: false)
 sed = find_program('sed', dirs: program_path)
 shell = find_program('sh', dirs: program_path)
 tar = find_program('tar', dirs: program_path)
+time = find_program('time', dirs: program_path, required: false)
 
 # Sanity-check that programs required for the build exist.
 foreach tool : ['cat', 'cut', 'grep', 'sort', 'tr', 'uname']
