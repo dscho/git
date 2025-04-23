@@ -59,6 +59,8 @@ git send-email --translate-aliases
     --smtp-server-port      <int>  * Outgoing SMTP server port.
     --smtp-user             <str>  * Username for SMTP-AUTH.
     --smtp-pass             <str>  * Password for SMTP-AUTH; not necessary.
+    --smtp-passeval         <str>  * Path to script or a command to generate
+                                     password like OAuth2 token for SMTP-AUTH.
     --smtp-encryption       <str>  * tls or ssl; anything else disables.
     --smtp-ssl                     * Deprecated. Use '--smtp-encryption ssl'.
     --smtp-ssl-cert-path    <str>  * Path to ca-certificates (either directory or file).
@@ -280,6 +282,7 @@ my (@suppress_cc);
 my ($auto_8bit_encoding);
 my ($compose_encoding);
 my ($sendmail_cmd);
+my ($smtp_authpasseval);
 my ($mailmap_file, $mailmap_blob);
 # Variables with corresponding config settings & hardcoded defaults
 my ($debug_net_smtp) = 0;		# Net::SMTP, see send_message()
@@ -316,6 +319,7 @@ my %config_settings = (
     "smtppass" => \$smtp_authpass,
     "smtpdomain" => \$smtp_domain,
     "smtpauth" => \$smtp_auth,
+    "smtppasseval" => \$smtp_authpasseval,
     "smtpbatchsize" => \$batch_size,
     "smtprelogindelay" => \$relogin_delay,
     "to" => \@config_to,
@@ -516,6 +520,7 @@ my %options = (
 		    "smtp-server-port=s" => \$smtp_server_port,
 		    "smtp-user=s" => \$smtp_authuser,
 		    "smtp-pass:s" => \$smtp_authpass,
+		    "smtp-passeval=s" => \$smtp_authpasseval,
 		    "smtp-ssl" => sub { $smtp_encryption = 'ssl' },
 		    "smtp-encryption=s" => \$smtp_encryption,
 		    "smtp-ssl-cert-path=s" => \$smtp_ssl_cert_path,
@@ -1461,6 +1466,16 @@ sub smtp_bearer_auth {
 sub smtp_auth_maybe {
 	if (!defined $smtp_authuser || $auth || (defined $smtp_auth && $smtp_auth eq "none")) {
 		return 1;
+	}
+
+	# If smtpPassEval is set, run the user specified command to get the password
+	if (defined $smtp_authpasseval) {
+		printf __("Executing token generating script: %s\n"), $smtp_authpasseval;
+		chomp(my $generated_password = `$smtp_authpasseval 2>&1`);
+		if ($? != 0) {
+			die sprintf(__("Failed to execute token generating script: %s\n"), $smtp_authpasseval);
+		}
+		$smtp_authpass = $generated_password;
 	}
 
 	# Workaround AUTH PLAIN/LOGIN interaction defect

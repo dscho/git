@@ -230,6 +230,14 @@ or on the command line. If a username has been specified (with
 specified (with `--smtp-pass` or `sendemail.smtpPass`), then
 a password is obtained using 'git-credential'.
 
+--smtp-passeval[=<command>]::
+	Generate password like OAuth2 token for SMTP AUTH. If specified,
+	it will use the output of the command specified as a password for
+	authentication.
++
+Note that it will override any existing password specified using
+`--smtp-pass` or a `sendemail.smtpPass`.
+
 --no-smtp-auth::
 	Disable SMTP authentication. Short hand for `--smtp-auth=none`
 
