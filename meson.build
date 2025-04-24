@@ -2080,3 +2080,9 @@ summary({
   'sha256': sha256_backend,
   'zlib': zlib_backend,
 }, section: 'Backends')
+
+summary({
+  'perl': target_perl.found() ? target_perl.full_path() : 'none',
+  'python': target_python.found() ? target_python.full_path() : 'none',
+  'shell': target_shell.full_path(),
+}, section: 'Runtime executable paths')
