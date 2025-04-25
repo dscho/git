@@ -1309,6 +1309,8 @@ else
     'mmap',
     # unsetenv is provided by compat/mingw.c.
     'unsetenv',
+    # no compat, is provided by compat/mingw.c
+    'getpagesize',
   ]
 endif
 
