@@ -29,6 +29,7 @@
 #include "commit-reach.h"
 #include "khash.h"
 #include "date.h"
+#include "gpg-interface.h"
 
 #define PACK_ID_BITS 16
 #define MAX_PACK_ID ((1<<PACK_ID_BITS)-1)
@@ -2831,12 +2832,15 @@ static void parse_new_commit(const char *arg)
 			"encoding %s\n",
 			encoding);
 	if (sig_alg) {
-		if (!strcmp(sig_alg, "sha1"))
-			strbuf_addstr(&new_data, "gpgsig ");
-		else if (!strcmp(sig_alg, "sha256"))
+		if (!strcmp(sig_alg, "sha256"))
 			strbuf_addstr(&new_data, "gpgsig-sha256 ");
-		else
-			die("Expected gpgsig algorithm sha1 or sha256, got %s", sig_alg);
+		else if (valid_signature_name(sig_alg))
+			strbuf_addstr(&new_data, "gpgsig ");
+		else if (!strcmp(sig_alg, "unknown")) {
+			warning("Unknown gpgsig algorithm name!");
+			strbuf_addstr(&new_data, "gpgsig ");
+		} else
+			die("Invalid gpgsig algorithm name, got '%s'", sig_alg);
 		string_list_split_in_place(&siglines, sig.buf, "\n", -1);
 		strbuf_add_separated_string_list(&new_data, "\n ", &siglines);
 		strbuf_addch(&new_data, '\n');

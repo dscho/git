@@ -521,7 +521,20 @@ The optional `gpgsig` command is used to include a PGP/GPG signature
 that signs the commit data.
 
 Here <alg> specifies which hashing algorithm is used for this
-signature, either `sha1` or `sha256`.
+signature. Current valid values are:
+
+* "openpgp" for SHA-1 OpenPGP signatures,
+
+* "sha256" for SHA-256 OpenPGP signatures,
+
+* "x509" for X.509 (GPGSM) signatures,
+
+* "ssh", for SSH signatures,
+
+* "unknown" for signatures that can't be identified (a warning is
+  emitted).
+
+Signatures are not yet checked in the current implementation though.
 
 `encoding`
 ^^^^^^^^^^

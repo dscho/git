@@ -29,6 +29,7 @@
 #include "quote.h"
 #include "remote.h"
 #include "blob.h"
+#include "gpg-interface.h"
 
 static const char *const fast_export_usage[] = {
 	N_("git fast-export [<rev-list-opts>]"),
@@ -700,9 +701,10 @@ static void handle_commit(struct commit *commit, struct rev_info *rev,
 	}
 
 	if (*commit_buffer_cursor == '\n') {
-		if ((signature = find_commit_multiline_header(commit_buffer_cursor + 1, "gpgsig", &commit_buffer_cursor)))
-			signature_alg = "sha1";
-		else if ((signature = find_commit_multiline_header(commit_buffer_cursor + 1, "gpgsig-sha256", &commit_buffer_cursor)))
+		if ((signature = find_commit_multiline_header(commit_buffer_cursor + 1, "gpgsig", &commit_buffer_cursor))) {
+			const char *name = get_signature_name(signature);
+			signature_alg = name ? name : "unknown";
+		} else if ((signature = find_commit_multiline_header(commit_buffer_cursor + 1, "gpgsig-sha256", &commit_buffer_cursor)))
 			signature_alg = "sha256";
 	}
 

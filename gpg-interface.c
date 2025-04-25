@@ -144,6 +144,17 @@ static struct gpg_format *get_format_by_sig(const char *sig)
 	return NULL;
 }
 
+const char *get_signature_name(const char *buf)
+{
+	struct gpg_format *format = get_format_by_sig(buf);
+	return format ? format->name : NULL;
+}
+
+int valid_signature_name(const char *name)
+{
+	return (get_format_by_name(name) != NULL);
+}
+
 void signature_check_clear(struct signature_check *sigc)
 {
 	FREE_AND_NULL(sigc->payload);

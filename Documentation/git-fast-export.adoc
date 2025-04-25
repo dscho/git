@@ -54,6 +54,11 @@ of tools that call 'git fast-export' but do not yet support
 '--signed-commits', you may set the environment variable
 'FAST_EXPORT_SIGNED_COMMITS_NOABORT=1' in order to change the default
 from 'abort' to 'warn-strip'.
++
+When exported, signature starts with "gpgsig <alg>" where <alg> is the
+signature algorithm name as identified by Git (e.g. "openpgp", "x509",
+"ssh", or "sha256" for SHA-256 OpenPGP signatures), or "unknown" for
+signatures that can't be identified.
 
 --tag-of-filtered-object=(abort|drop|rewrite)::
 	Specify how to handle tags whose tagged object is filtered out.
