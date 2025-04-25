@@ -242,7 +242,7 @@ sed = find_program('sed', dirs: program_path, native: true)
 shell = find_program('sh', dirs: program_path, native: true)
 tar = find_program('tar', dirs: program_path, native: true)
 
-target_shell = find_program('sh', dirs: program_path, native: false)
+target_shell = find_program('sh', dirs: program_path + [ '/bin' ], native: false)
 time = find_program('time', dirs: program_path, native: true, required: false)
 
 # Sanity-check that programs required for the build exist.
@@ -2193,3 +2193,9 @@ summary({
   'sha256': sha256_backend,
   'zlib': zlib_backend,
 }, section: 'Backends')
+
+summary({
+  'perl': target_perl.found() ? target_perl.full_path() : 'none',
+  'python': target_python.found() ? target_python.full_path() : 'none',
+  'shell': target_shell.full_path(),
+}, section: 'Runtime executable paths')
