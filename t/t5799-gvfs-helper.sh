@@ -1148,7 +1148,7 @@ test_expect_success 'HTTP GET Auth on Origin Server' '
 	test_cmp "$OID_ONE_BLOB_FILE" OUT.actual &&
 
 	verify_objects_in_shared_cache "$OID_ONE_BLOB_FILE" &&
-	verify_connection_count 2
+	verify_connection_count 1
 '
 
 test_expect_success 'HTTP POST Auth on Origin Server' '
