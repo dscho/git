@@ -455,6 +455,7 @@ per_test_cleanup () {
 	rm -rf "$SHARED_CACHE_T1"/info/*
 	rm -rf "$SHARED_CACHE_T1"/pack/*
 
+	for f in OUT.*; do echo "=== $f ===" >&2; cat "$f" >&2; done
 	rm -rf OUT.*
 	return 0
 }
