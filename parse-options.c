@@ -658,7 +658,7 @@ static const char *autocorrect_subcommand(const char *cmd,
 
 	for_each_string_list_item(cand, cmds) {
 		if (starts_with(cand->string, cmd)) {
-			cand->util = 0;
+			cand->util = NULL;
 		} else {
 			int edit = levenshtein(cmd, cand->string,
 					       0, 2, 1, 3) + 1;
