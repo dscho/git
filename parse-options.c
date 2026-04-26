@@ -648,7 +648,8 @@ static const char *autocorrect_subcommand(const char *cmd,
 					  struct string_list *cmds)
 {
 	struct autocorrect autocorrect = { 0 };
-	unsigned int n = 0, best = 0;
+	unsigned int n = 0;
+	intptr_t best = 0;
 	struct string_list_item *cand;
 
 	autocorrect_resolve(&autocorrect);
