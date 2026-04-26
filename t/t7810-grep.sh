@@ -322,11 +322,11 @@ do
 		${HC}file:1:5:mmap
 		${HC}file:2:5:mmap
 		${HC}file:3:5:mmap
-		${HC}file:3:13:mmap
+		${HC}file:3:14:mmap
 		${HC}file:4:5:mmap
-		${HC}file:4:13:mmap
+		${HC}file:4:14:mmap
 		${HC}file:5:5:mmap
-		${HC}file:5:13:mmap
+		${HC}file:5:14:mmap
 		EOF
 		git grep --column -n -o -e mmap $H >actual &&
 		test_cmp expected actual
@@ -1927,6 +1927,41 @@ test_expect_success 'grep does not report i-t-a and assume unchanged with -L' '
 	git ls-files | grep -v "^intend-to-add-assume-unchanged\$" >expected &&
 	git grep -L "nonexistent_string" >actual &&
 	test_cmp expected actual
+'
+
+test_expect_success 'grep of revision in partial clone does bulk prefetch' '
+	test_when_finished "rm -rf grep-partial-src grep-partial" &&
+
+	git init grep-partial-src &&
+	(
+		cd grep-partial-src &&
+		git config uploadpack.allowfilter 1 &&
+		git config uploadpack.allowanysha1inwant 1 &&
+		echo "needle in haystack" >searchme &&
+		echo "no match here" >other &&
+		mkdir subdir &&
+		echo "needle again" >subdir/deep &&
+		git add . &&
+		git commit -m "initial"
+	) &&
+
+	git clone --no-checkout --filter=blob:none \
+		"file://$(pwd)/grep-partial-src" grep-partial &&
+
+	# All blobs should be missing after a blobless clone.
+	git -C grep-partial rev-list --quiet --objects \
+		--missing=print HEAD >missing &&
+	test_line_count = 3 missing &&
+
+	# grep HEAD should batch-prefetch all blobs in one request.
+	GIT_TRACE2_EVENT="$(pwd)/grep-trace" \
+		git -C grep-partial grep -c "needle" HEAD >result &&
+
+	# Should find matches in two files.
+	test_line_count = 2 result &&
+
+	# Should have prefetched all 3 objects at once
+	test_trace2_data promisor fetch_count 3 <grep-trace
 '
 
 test_done

@@ -723,6 +723,132 @@ test_expect_success 'after fetching descendants of non-promisor commits, gc work
 	git -C partial gc --prune=now
 '
 
+# Test clone.<url>.defaultObjectFilter config
+
+test_expect_success 'setup for clone.defaultObjectFilter tests' '
+	git init default-filter-src &&
+	echo "small" >default-filter-src/small.txt &&
+	git -C default-filter-src add . &&
+	git -C default-filter-src commit -m "initial" &&
+
+	git clone --bare "file://$(pwd)/default-filter-src" default-filter-srv.bare &&
+	git -C default-filter-srv.bare config --local uploadpack.allowfilter 1 &&
+	git -C default-filter-srv.bare config --local uploadpack.allowanysha1inwant 1
+'
+
+test_expect_success 'clone with clone.<url>.defaultObjectFilter applies filter' '
+	test_when_finished "rm -r default-filter-clone" &&
+	SERVER_URL="file://$(pwd)/default-filter-srv.bare" &&
+	git -c "clone.$SERVER_URL.defaultObjectFilter=blob:limit=1k" clone \
+		"$SERVER_URL" default-filter-clone &&
+
+	echo true >expect &&
+	git -C default-filter-clone config --local remote.origin.promisor >actual &&
+	test_cmp expect actual &&
+
+	echo "blob:limit=1024" >expect &&
+	git -C default-filter-clone config --local remote.origin.partialclonefilter >actual &&
+	test_cmp expect actual
+'
+
+test_expect_success 'clone with --filter overrides clone.<url>.defaultObjectFilter' '
+	test_when_finished "rm -r default-filter-override" &&
+	SERVER_URL="file://$(pwd)/default-filter-srv.bare" &&
+	git -c "clone.$SERVER_URL.defaultObjectFilter=blob:limit=1k" \
+		clone --filter=blob:none "$SERVER_URL" default-filter-override &&
+
+	echo "blob:none" >expect &&
+	git -C default-filter-override config --local remote.origin.partialclonefilter >actual &&
+	test_cmp expect actual
+'
+
+test_expect_success 'clone with clone.<url>.defaultObjectFilter=blob:none works' '
+	test_when_finished "rm -r default-filter-blobnone" &&
+	SERVER_URL="file://$(pwd)/default-filter-srv.bare" &&
+	git -c "clone.$SERVER_URL.defaultObjectFilter=blob:none" clone \
+		"$SERVER_URL" default-filter-blobnone &&
+
+	echo true >expect &&
+	git -C default-filter-blobnone config --local remote.origin.promisor >actual &&
+	test_cmp expect actual &&
+
+	echo "blob:none" >expect &&
+	git -C default-filter-blobnone config --local remote.origin.partialclonefilter >actual &&
+	test_cmp expect actual
+'
+
+test_expect_success 'clone.<url>.defaultObjectFilter with tree:0 works' '
+	test_when_finished "rm -r default-filter-tree0" &&
+	SERVER_URL="file://$(pwd)/default-filter-srv.bare" &&
+	git -c "clone.$SERVER_URL.defaultObjectFilter=tree:0" clone \
+		"$SERVER_URL" default-filter-tree0 &&
+
+	echo true >expect &&
+	git -C default-filter-tree0 config --local remote.origin.promisor >actual &&
+	test_cmp expect actual &&
+
+	echo "tree:0" >expect &&
+	git -C default-filter-tree0 config --local remote.origin.partialclonefilter >actual &&
+	test_cmp expect actual
+'
+
+test_expect_success 'most specific URL match wins for clone.defaultObjectFilter' '
+	test_when_finished "rm -r default-filter-url-specific" &&
+	SERVER_URL="file://$(pwd)/default-filter-srv.bare" &&
+	git \
+		-c "clone.file://.defaultObjectFilter=blob:limit=1k" \
+		-c "clone.$SERVER_URL.defaultObjectFilter=blob:none" \
+		clone "$SERVER_URL" default-filter-url-specific &&
+
+	echo "blob:none" >expect &&
+	git -C default-filter-url-specific config --local remote.origin.partialclonefilter >actual &&
+	test_cmp expect actual
+'
+
+test_expect_success 'non-matching URL does not apply clone.defaultObjectFilter' '
+	test_when_finished "rm -r default-filter-url-nomatch" &&
+	git \
+		-c "clone.https://other.example.com/.defaultObjectFilter=blob:none" \
+		clone "file://$(pwd)/default-filter-srv.bare" default-filter-url-nomatch &&
+
+	test_must_fail git -C default-filter-url-nomatch config --local remote.origin.promisor
+'
+
+test_expect_success 'bare clone.defaultObjectFilter applies to all clones' '
+	test_when_finished "rm -r default-filter-bare-key" &&
+	git -c clone.defaultObjectFilter=blob:none \
+		clone "file://$(pwd)/default-filter-srv.bare" default-filter-bare-key &&
+
+	echo true >expect &&
+	git -C default-filter-bare-key config --local remote.origin.promisor >actual &&
+	test_cmp expect actual &&
+
+	echo "blob:none" >expect &&
+	git -C default-filter-bare-key config --local remote.origin.partialclonefilter >actual &&
+	test_cmp expect actual
+'
+
+test_expect_success 'URL-specific clone.defaultObjectFilter overrides bare form' '
+	test_when_finished "rm -r default-filter-url-over-bare" &&
+	SERVER_URL="file://$(pwd)/default-filter-srv.bare" &&
+	git \
+		-c clone.defaultObjectFilter=blob:limit=1k \
+		-c "clone.$SERVER_URL.defaultObjectFilter=blob:none" \
+		clone "$SERVER_URL" default-filter-url-over-bare &&
+
+	echo "blob:none" >expect &&
+	git -C default-filter-url-over-bare config --local remote.origin.partialclonefilter >actual &&
+	test_cmp expect actual
+'
+
+test_expect_success '--no-filter defeats clone.defaultObjectFilter' '
+	test_when_finished "rm -r default-filter-no-filter" &&
+	SERVER_URL="file://$(pwd)/default-filter-srv.bare" &&
+	git -c "clone.$SERVER_URL.defaultObjectFilter=blob:none" \
+		clone --no-filter "$SERVER_URL" default-filter-no-filter &&
+
+	test_must_fail git -C default-filter-no-filter config --local remote.origin.promisor
+'
 
 . "$TEST_DIRECTORY"/lib-httpd.sh
 start_httpd
@@ -905,6 +1031,66 @@ test_expect_success PERL_TEST_HELPERS 'tolerate server sending REF_DELTA against
 	! grep "want $(cat deltabase_have)" trace &&
 
 	# Ensure that the one-time-script script was used.
+	! test -e "$HTTPD_ROOT_PATH/one-time-script"
+'
+
+test_expect_success PERL_TEST_HELPERS 'lazy-fetch of REF_DELTA with missing base does not recurse' '
+	SERVER="$HTTPD_DOCUMENT_ROOT_PATH/server" &&
+	rm -rf "$SERVER" repo &&
+	test_create_repo "$SERVER" &&
+	test_config -C "$SERVER" uploadpack.allowfilter 1 &&
+	test_config -C "$SERVER" uploadpack.allowanysha1inwant 1 &&
+
+	# Create a commit with 2 blobs to be used as delta base and content.
+	for i in $(test_seq 10)
+	do
+		echo "this is a line" >>"$SERVER/foo.txt" &&
+		echo "this is another line" >>"$SERVER/bar.txt" || return 1
+	done &&
+	git -C "$SERVER" add foo.txt bar.txt &&
+	git -C "$SERVER" commit -m initial &&
+	BLOB_FOO=$(git -C "$SERVER" rev-parse HEAD:foo.txt) &&
+	BLOB_BAR=$(git -C "$SERVER" rev-parse HEAD:bar.txt) &&
+
+	# Partial clone with blob:none. The client has commits and
+	# trees but no blobs.
+	test_config -C "$SERVER" protocol.version 2 &&
+	git -c protocol.version=2 clone --no-checkout \
+		--filter=blob:none $HTTPD_URL/one_time_script/server repo &&
+
+	# Sanity check: client does not have either blob locally.
+	git -C repo rev-list --objects --ignore-missing \
+		-- $BLOB_FOO >objlist &&
+	test_line_count = 0 objlist &&
+
+	# Craft a thin pack where BLOB_FOO is a REF_DELTA against
+	# BLOB_BAR. Since the client has neither blob (blob:none
+	# filter), the delta base will be missing. This simulates a
+	# misbehaving server that sends REF_DELTA against an object
+	# the client does not have.
+	test-tool -C "$SERVER" pack-deltas --num-objects=1 >thin.pack <<-EOF &&
+	REF_DELTA $BLOB_FOO $BLOB_BAR
+	EOF
+
+	replace_packfile thin.pack &&
+
+	# Trigger a lazy fetch for BLOB_FOO. The child fetch spawned
+	# by fetch_objects() receives our crafted thin pack. Its
+	# index-pack encounters the missing delta base (BLOB_BAR) and
+	# tries to lazy-fetch it via promisor_remote_get_direct().
+	#
+	# With the fix: fetch_objects() propagates GIT_NO_LAZY_FETCH=1
+	# to the child, so the depth-2 fetch is blocked and we see the
+	# "lazy fetching disabled" warning. The object cannot be
+	# resolved, so cat-file fails.
+	#
+	# Without the fix: the depth-2 fetch would proceed, potentially
+	# recursing unboundedly with a persistently misbehaving server.
+	test_must_fail git -C repo -c protocol.version=2 \
+		cat-file -p $BLOB_FOO 2>err &&
+	test_grep "lazy fetching disabled" err &&
+
+	# Ensure that the one-time-script was used.
 	! test -e "$HTTPD_ROOT_PATH/one-time-script"
 '
 
