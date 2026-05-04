@@ -20,6 +20,17 @@ terms of the MIT license. A copy of the license can be found in the file
 #include "free.c"
 #undef MI_IN_ALLOC_C
 
+// `mi_cfree` ("checked free") lives in mimalloc's `alloc-posix.c` upstream,
+// which we do not vendor in (it contains many other public-API entry points
+// that nothing inside mimalloc itself calls). The non-Windows branch of
+// `mi_heap_realpath()` below is the only caller; bring the definition in
+// here so that linking succeeds on Linux and macOS.
+void mi_cfree(void* p) mi_attr_noexcept {
+  if (mi_is_in_heap_region(p)) {
+    mi_free(p);
+  }
+}
+
 // ------------------------------------------------------
 // Allocation
 // ------------------------------------------------------
