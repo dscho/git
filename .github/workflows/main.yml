@@ -36,11 +36,11 @@ jobs:
         shell: bash
         run: |
           if [ "$RUNNER_OS" = Windows ]; then . /etc/profile; fi
-          mkdir -p _bench
+          mkdir -p _bench/vanilla
           make NO_PERL=YesPlease NO_TCLTK=YesPlease NO_GETTEXT=YesPlease -j4 all
           case "$RUNNER_OS" in
-            Windows) cp git.exe _bench/git-vanilla.exe ;;
-            *)       cp git     _bench/git-vanilla ;;
+            Windows) cp git.exe _bench/vanilla/git.exe ;;
+            *)       cp git     _bench/vanilla/git ;;
           esac
           make clean
 
@@ -48,11 +48,12 @@ jobs:
         shell: bash
         run: |
           if [ "$RUNNER_OS" = Windows ]; then . /etc/profile; fi
+          mkdir -p _bench/mimalloc
           make NO_PERL=YesPlease NO_TCLTK=YesPlease NO_GETTEXT=YesPlease \
                USE_MIMALLOC=YesPlease -j4 all
           case "$RUNNER_OS" in
-            Windows) cp git.exe _bench/git-mimalloc.exe ;;
-            *)       cp git     _bench/git-mimalloc ;;
+            Windows) cp git.exe _bench/mimalloc/git.exe ;;
+            *)       cp git     _bench/mimalloc/git ;;
           esac
 
       - name: prepare benchmark repo (linux.git subset reachable from 93a6fefe2f)
@@ -66,7 +67,7 @@ jobs:
           git -C _bench/template.git update-ref refs/heads/master "$SHA"
           git -C _bench/template.git reflog expire --all --expire=now
           git -C _bench/template.git gc --prune=now
-          du -sh _bench/template.git
+          echo "objects on master: $(git -C _bench/template.git rev-list --count refs/heads/master)"
 
       - name: run benchmark
         shell: bash
@@ -77,8 +78,8 @@ jobs:
             *)       ext= ;;
           esac
           python3 ci/bench-mimalloc.py \
-            --vanilla "./_bench/git-vanilla${ext}" \
-            --mimalloc "./_bench/git-mimalloc${ext}" \
+            --vanilla "./_bench/vanilla/git${ext}" \
+            --mimalloc "./_bench/mimalloc/git${ext}" \
             --template _bench/template.git \
             --work _bench/run.git \
             --results _bench/results.csv \
