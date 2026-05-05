@@ -17,6 +17,23 @@ import sys
 import time
 
 
+def robust_rmtree(path, attempts=20, delay=0.5):
+    """`shutil.rmtree` with retries.
+
+    Windows may briefly retain a file lock on objects (e.g. an mmap'd
+    commit-graph) even after the process that opened them has exited,
+    causing `rmtree` to raise `PermissionError`. Retry a few times.
+    """
+    for i in range(attempts):
+        try:
+            shutil.rmtree(path)
+            return
+        except (PermissionError, OSError):
+            if i == attempts - 1:
+                raise
+            time.sleep(delay)
+
+
 def time_one_repack(binary, template, work):
     """Run `<binary> -C <work> repack -adfq` once and return elapsed seconds.
 
@@ -24,7 +41,7 @@ def time_one_repack(binary, template, work):
     before the timed command runs.
     """
     if os.path.exists(work):
-        shutil.rmtree(work)
+        robust_rmtree(work)
     shutil.copytree(template, work)
     cmd = [binary, "-C", work, "-c", "pack.threads=4", "repack", "-adfq"]
     t0 = time.monotonic_ns()
