@@ -77,11 +77,16 @@ jobs:
       - name: run benchmark
         shell: bash
         run: |
-          if [ "$RUNNER_OS" = Windows ]; then . /etc/profile; fi
-          case "$RUNNER_OS" in
-            Windows) ext=.exe ;;
-            *)       ext= ;;
-          esac
+          if [ "$RUNNER_OS" = Windows ]; then
+            . /etc/profile
+            # `. /etc/profile` resets PATH to the SDK's own; re-expose the
+            # Python that `actions/setup-python` installed via the
+            # `pythonLocation` env var the action records.
+            export PATH="$(cygpath "$pythonLocation"):$PATH"
+            ext=.exe
+          else
+            ext=
+          fi
           python ci/bench-mimalloc.py \
             --vanilla "./_bench/vanilla/git${ext}" \
             --mimalloc "./_bench/mimalloc/git${ext}" \
