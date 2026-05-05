@@ -61,14 +61,19 @@ jobs:
             *)       cp git     _bench/mimalloc/git ;;
           esac
 
-      - name: prepare benchmark repo (linux.git subset reachable from 93a6fefe2f)
+      - name: prepare benchmark repo (linux.git subset reachable from v3.0)
         shell: bash
         run: |
           if [ "$RUNNER_OS" = Windows ]; then . /etc/profile; fi
-          SHA=93a6fefe2f6fc380870c0985b246bec7f37a06f7
+          # `linux v3.0` (released 2011-07-22): 255,039 commits, 2.06M
+          # objects, ~788 MB on disk. Roughly 5x the commit count of the
+          # 2007-era anchor used by 6a29c2dfecc; tuned so a single
+          # `repack -adfq` run lands in the ~2 minute ballpark, where
+          # allocator differences (if any) are most clearly visible.
+          SHA=02f8c6aee8df3cdc935e9bdd4f2d020306035dbe
           git init --bare _bench/template.git
           git -C _bench/template.git remote add origin https://github.com/torvalds/linux
-          git -C _bench/template.git fetch --no-tags --depth=50000 origin "$SHA"
+          git -C _bench/template.git fetch --no-tags --depth=300000 origin "$SHA"
           git -C _bench/template.git update-ref refs/heads/master "$SHA"
           git -C _bench/template.git reflog expire --all --expire=now
           git -C _bench/template.git gc --prune=now
