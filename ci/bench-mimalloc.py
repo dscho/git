@@ -17,12 +17,12 @@ import sys
 import time
 
 
-def robust_rmtree(path, attempts=20, delay=0.5):
+def robust_rmtree(path, attempts=60, delay=1.0):
     """`shutil.rmtree` with retries.
 
     Windows may briefly retain a file lock on objects (e.g. an mmap'd
     commit-graph) even after the process that opened them has exited,
-    causing `rmtree` to raise `PermissionError`. Retry a few times.
+    causing `rmtree` to raise `PermissionError`. Retry generously.
     """
     for i in range(attempts):
         try:
@@ -37,11 +37,9 @@ def robust_rmtree(path, attempts=20, delay=0.5):
 def time_one_repack(binary, template, work):
     """Run `<binary> -C <work> repack -adfq` once and return elapsed seconds.
 
-    The work directory is overwritten with a fresh copy of `template`
-    before the timed command runs.
+    The work directory must not already exist; it is created from
+    `template` byte-for-byte before the timed command runs.
     """
-    if os.path.exists(work):
-        robust_rmtree(work)
     shutil.copytree(template, work)
     cmd = [binary, "-C", work, "-c", "pack.threads=4", "repack", "-adfq"]
     t0 = time.monotonic_ns()
@@ -77,25 +75,48 @@ def main():
     rng = random.Random(args.seed)
     os.makedirs(os.path.dirname(args.results) or ".", exist_ok=True)
 
-    with open(args.results, "w", newline="") as f:
-        writer = csv.DictWriter(
-            f, fieldnames=["iteration", "position", "variant", "seconds"])
-        writer.writeheader()
-        for it in range(1, args.iterations + 1):
-            order = list(binaries.keys())
-            rng.shuffle(order)
-            print(f"=== iteration {it}: order = {order} ===", flush=True)
-            for pos, variant in enumerate(order, start=1):
-                seconds = time_one_repack(binaries[variant], args.template, args.work)
-                writer.writerow({
-                    "iteration": it,
-                    "position": pos,
-                    "variant": variant,
-                    "seconds": f"{seconds:.6f}",
-                })
-                f.flush()
-                print(f"  pos={pos} variant={variant} seconds={seconds:.3f}",
-                      flush=True)
+    # The work directory used by --work is a *base name*; each timed run
+    # uses a unique sibling like ${work}.1.1, ${work}.1.2, ... so we never
+    # need to rmtree a directory whose files might still be mmap-locked
+    # by the just-exited git process (a Windows-specific issue with the
+    # commit-graph file).
+    work_base = args.work
+    if os.path.exists(work_base):
+        robust_rmtree(work_base)
+    work_dirs = []
+
+    try:
+        with open(args.results, "w", newline="") as f:
+            writer = csv.DictWriter(
+                f, fieldnames=["iteration", "position", "variant", "seconds"])
+            writer.writeheader()
+            for it in range(1, args.iterations + 1):
+                order = list(binaries.keys())
+                rng.shuffle(order)
+                print(f"=== iteration {it}: order = {order} ===", flush=True)
+                for pos, variant in enumerate(order, start=1):
+                    work = f"{work_base}.{it}.{pos}"
+                    work_dirs.append(work)
+                    seconds = time_one_repack(binaries[variant],
+                                              args.template, work)
+                    writer.writerow({
+                        "iteration": it,
+                        "position": pos,
+                        "variant": variant,
+                        "seconds": f"{seconds:.6f}",
+                    })
+                    f.flush()
+                    print(f"  pos={pos} variant={variant} "
+                          f"seconds={seconds:.3f}", flush=True)
+    finally:
+        # Cleanup is best-effort; if Windows still holds locks we accept
+        # that the workspace will be reaped by the runner.
+        for work in work_dirs:
+            try:
+                robust_rmtree(work)
+            except OSError as e:
+                print(f"warning: could not remove {work}: {e}",
+                      file=sys.stderr)
 
     # Summary
     with open(args.results) as f:
