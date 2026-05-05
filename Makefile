@@ -2295,6 +2295,14 @@ ifdef USE_MIMALLOC
 	COMPAT_CFLAGS += -Icompat/mimalloc -DMI_DEBUG=0 -DUSE_MIMALLOC --std=gnu11
 	COMPAT_OBJS += $(MIMALLOC_OBJS)
 
+	# `getdelim(3)` allocates the strbuf's `buf` via libc. Since
+	# `compat/posix.h` redirects `free` to `mi_free`, a later
+	# `strbuf_release()` (or any `xrealloc()` triggered by
+	# `strbuf_grow()`) on such a buffer would mismatch the allocators
+	# and crash with SIGSEGV. Disable the `getdelim()` fast path to keep
+	# every strbuf buffer mimalloc-managed end-to-end.
+	HAVE_GETDELIM =
+
 $(MIMALLOC_OBJS): COMPAT_CFLAGS += -DBANNED_H
 
 $(MIMALLOC_OBJS): COMPAT_CFLAGS += \
