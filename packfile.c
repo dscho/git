@@ -1964,10 +1964,8 @@ void *unpack_entry(struct repository *r, struct packed_git *p, off_t obj_offset,
 			      (uintmax_t)curpos, p->pack_name);
 			data = NULL;
 		} else {
-			unsigned long sz;
 			data = patch_delta(base, base_size, delta_data,
-					   delta_size, &sz);
-			size = sz;
+					   delta_size, &size);
 
 			/*
 			 * We could not apply the delta; warn the user, but
