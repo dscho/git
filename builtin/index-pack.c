@@ -258,7 +258,7 @@ static unsigned check_object(struct object *obj)
 		return 0;
 
 	if (!(obj->flags & FLAG_CHECKED)) {
-		unsigned long size;
+		size_t size;
 		int type = odb_read_object_info(the_repository->objects,
 						&obj->oid, &size);
 		if (type <= 0)
@@ -911,7 +911,7 @@ static void sha1_object(const void *data, struct object_entry *obj_entry,
 	if (collision_test_needed) {
 		void *has_data;
 		enum object_type has_type;
-		unsigned long has_size;
+		size_t has_size;
 		read_lock();
 		has_type = odb_read_object_info(the_repository->objects, oid, &has_size);
 		if (has_type < 0)
@@ -1525,7 +1525,7 @@ static void fix_unresolved_deltas(struct hashfile *f)
 		struct ref_delta_entry *d = sorted_by_pos[i];
 		enum object_type type;
 		void *data;
-		unsigned long size;
+		size_t size;
 
 		if (objects[d->obj_no].real_type != OBJ_REF_DELTA)
 			continue;

@@ -1293,7 +1293,10 @@ static void load_tree(struct tree_entry *root)
 			die(_("can't load tree %s"), oid_to_hex(oid));
 	} else {
 		enum object_type type;
-		buf = odb_read_object(the_repository->objects, oid, &type, &size);
+		size_t size_st = 0;
+		buf = odb_read_object(the_repository->objects, oid, &type,
+				      &size_st);
+		size = cast_size_t_to_ulong(size_st);
 		if (!buf || type != OBJ_TREE)
 			die(_("can't load tree %s"), oid_to_hex(oid));
 	}
@@ -2562,7 +2565,7 @@ static void note_change_n(const char *p, struct branch *b, unsigned char *old_fa
 			die(_("mark :%" PRIuMAX " not a commit"), commit_mark);
 		oidcpy(&commit_oid, &commit_oe->idx.oid);
 	} else if (!repo_get_oid(the_repository, p, &commit_oid)) {
-		unsigned long size;
+		size_t size;
 		char *buf = odb_read_object_peeled(the_repository->objects,
 						   &commit_oid, OBJ_COMMIT, &size,
 						   &commit_oid);
@@ -2629,10 +2632,12 @@ static void parse_from_existing(struct branch *b)
 		oidclr(&b->branch_tree.versions[1].oid, the_repository->hash_algo);
 	} else {
 		unsigned long size;
+		size_t size_st = 0;
 		char *buf;
 
 		buf = odb_read_object_peeled(the_repository->objects, &b->oid,
-					     OBJ_COMMIT, &size, &b->oid);
+					     OBJ_COMMIT, &size_st, &b->oid);
+		size = cast_size_t_to_ulong(size_st);
 		parse_from_commit(b, buf, size);
 		free(buf);
 	}
@@ -2724,7 +2729,7 @@ static struct hash_list *parse_merge(unsigned int *count)
 				die(_("mark :%" PRIuMAX " not a commit"), idnum);
 			oidcpy(&n->oid, &oe->idx.oid);
 		} else if (!repo_get_oid(the_repository, from, &n->oid)) {
-			unsigned long size;
+			size_t size;
 			char *buf = odb_read_object_peeled(the_repository->objects,
 							   &n->oid, OBJ_COMMIT,
 							   &size, &n->oid);
@@ -3332,7 +3337,10 @@ static void cat_blob(struct object_entry *oe, struct object_id *oid)
 	char *buf;
 
 	if (!oe || oe->pack_id == MAX_PACK_ID) {
-		buf = odb_read_object(the_repository->objects, oid, &type, &size);
+		size_t size_st = 0;
+		buf = odb_read_object(the_repository->objects, oid, &type,
+				      &size_st);
+		size = cast_size_t_to_ulong(size_st);
 	} else {
 		type = oe->type;
 		buf = gfi_unpack_entry(oe, &size);
@@ -3440,8 +3448,10 @@ static struct object_entry *dereference(struct object_entry *oe,
 		buf = gfi_unpack_entry(oe, &size);
 	} else {
 		enum object_type unused;
+		size_t size_st = 0;
 		buf = odb_read_object(the_repository->objects, oid,
-				      &unused, &size);
+				      &unused, &size_st);
+		size = cast_size_t_to_ulong(size_st);
 	}
 	if (!buf)
 		die(_("can't load object %s"), oid_to_hex(oid));

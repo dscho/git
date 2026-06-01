@@ -1607,13 +1607,10 @@ static int packed_object_info_with_index_pos(struct packed_git *p, off_t obj_off
 	 * a "real" type later if the caller is interested.
 	 */
 	if (oi->contentp) {
-		size_t size_st = 0;
 		*oi->contentp = cache_or_unpack_entry(p->repo, p, obj_offset,
-						      &size_st, &type);
+						      oi->sizep, &type);
 		if (!*oi->contentp)
 			type = OBJ_BAD;
-		else if (oi->sizep)
-			*oi->sizep = cast_size_t_to_ulong(size_st);
 	} else if (oi->sizep || oi->typep || oi->delta_base_oid) {
 		type = unpack_object_header(p, &w_curs, &curpos, &size);
 	}
@@ -1633,7 +1630,7 @@ static int packed_object_info_with_index_pos(struct packed_git *p, off_t obj_off
 				goto out;
 			}
 		}
-		*oi->sizep = (unsigned long)size;
+		*oi->sizep = size;
 	}
 
 	if (oi->disk_sizep || (oi->mtimep && p->is_cruft)) {
@@ -1919,7 +1916,6 @@ void *unpack_entry(struct repository *r, struct packed_git *p, off_t obj_offset,
 			struct object_id base_oid;
 			if (!(offset_to_pack_pos(p, obj_offset, &pos))) {
 				struct object_info oi = OBJECT_INFO_INIT;
-				unsigned long bsz_ul = 0;
 
 				nth_packed_object_id(&base_oid, p,
 						     pack_pos_to_index(p, pos));
@@ -1930,13 +1926,11 @@ void *unpack_entry(struct repository *r, struct packed_git *p, off_t obj_offset,
 				mark_bad_packed_object(p, &base_oid);
 
 				oi.typep = &type;
-				oi.sizep = &bsz_ul;
+				oi.sizep = &base_size;
 				oi.contentp = &base;
 				if (odb_read_object_info_extended(r->objects, &base_oid,
 								  &oi, 0) < 0)
 					base = NULL;
-				else
-					base_size = bsz_ul;
 
 				external_base = base;
 			}

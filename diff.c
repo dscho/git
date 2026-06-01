@@ -4608,8 +4608,9 @@ int diff_populate_filespec(struct repository *r,
 		}
 	}
 	else {
+		size_t size_st = 0;
 		struct object_info info = {
-			.sizep = &s->size
+			.sizep = &size_st
 		};
 
 		if (!(size_only || check_binary))
@@ -4631,6 +4632,7 @@ int diff_populate_filespec(struct repository *r,
 			die("unable to read %s", oid_to_hex(&s->oid));
 
 object_read:
+		s->size = cast_size_t_to_ulong(size_st);
 		if (size_only || check_binary) {
 			if (size_only)
 				return 0;
@@ -4645,6 +4647,7 @@ object_read:
 			if (odb_read_object_info_extended(r->objects, &s->oid, &info,
 							  OBJECT_INFO_LOOKUP_REPLACE))
 				die("unable to read %s", oid_to_hex(&s->oid));
+			s->size = cast_size_t_to_ulong(size_st);
 		}
 		s->should_free = 1;
 	}

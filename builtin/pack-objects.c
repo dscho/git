@@ -356,14 +356,17 @@ static void *get_delta(struct object_entry *entry)
 	unsigned long size, base_size, delta_size;
 	void *buf, *base_buf, *delta_buf;
 	enum object_type type;
+	size_t size_st = 0, base_size_st = 0;
 
 	buf = odb_read_object(the_repository->objects, &entry->idx.oid,
-			      &type, &size);
+			      &type, &size_st);
+	size = cast_size_t_to_ulong(size_st);
 	if (!buf)
 		die(_("unable to read %s"), oid_to_hex(&entry->idx.oid));
 	base_buf = odb_read_object(the_repository->objects,
 				   &DELTA(entry)->idx.oid, &type,
-				   &base_size);
+				   &base_size_st);
+	base_size = cast_size_t_to_ulong(base_size_st);
 	if (!base_buf)
 		die("unable to read %s",
 		    oid_to_hex(&DELTA(entry)->idx.oid));
@@ -530,9 +533,11 @@ static unsigned long write_no_reuse_object(struct hashfile *f, struct object_ent
 			type = st->type;
 			size = st->size;
 		} else {
+			size_t size_st = 0;
 			buf = odb_read_object(the_repository->objects,
 					      &entry->idx.oid, &type,
-					      &size);
+					      &size_st);
+			size = cast_size_t_to_ulong(size_st);
 			if (!buf)
 				die(_("unable to read %s"),
 				    oid_to_hex(&entry->idx.oid));
@@ -1939,6 +1944,7 @@ static struct pbase_tree_cache *pbase_tree_get(const struct object_id *oid)
 	struct pbase_tree_cache *ent, *nent;
 	void *data;
 	unsigned long size;
+	size_t size_st = 0;
 	enum object_type type;
 	int neigh;
 	int my_ix = pbase_tree_cache_ix(oid);
@@ -1966,7 +1972,8 @@ static struct pbase_tree_cache *pbase_tree_get(const struct object_id *oid)
 	/* Did not find one.  Either we got a bogus request or
 	 * we need to read and perhaps cache.
 	 */
-	data = odb_read_object(the_repository->objects, oid, &type, &size);
+	data = odb_read_object(the_repository->objects, oid, &type, &size_st);
+	size = cast_size_t_to_ulong(size_st);
 	if (!data)
 		return NULL;
 	if (type != OBJ_TREE) {
@@ -2121,13 +2128,15 @@ static void add_preferred_base(struct object_id *oid)
 	struct pbase_tree *it;
 	void *data;
 	unsigned long size;
+	size_t size_st = 0;
 	struct object_id tree_oid;
 
 	if (window <= num_preferred_base++)
 		return;
 
 	data = odb_read_object_peeled(the_repository->objects, oid,
-				      OBJ_TREE, &size, &tree_oid);
+				      OBJ_TREE, &size_st, &tree_oid);
+	size = cast_size_t_to_ulong(size_st);
 	if (!data)
 		return;
 
@@ -2239,7 +2248,7 @@ static void prefetch_to_pack(uint32_t object_index_start) {
 
 static void check_object(struct object_entry *entry, uint32_t object_index)
 {
-	unsigned long canonical_size;
+	size_t canonical_size;
 	enum object_type type;
 	struct object_info oi = {.typep = &type, .sizep = &canonical_size};
 
@@ -2438,7 +2447,7 @@ static void drop_reused_delta(struct object_entry *entry)
 	unsigned *idx = &to_pack.objects[entry->delta_idx - 1].delta_child_idx;
 	struct object_info oi = OBJECT_INFO_INIT;
 	enum object_type type;
-	unsigned long size;
+	size_t size;
 
 	while (*idx) {
 		struct object_entry *oe = &to_pack.objects[*idx - 1];
@@ -2766,7 +2775,7 @@ size_t oe_get_size_slow(struct packing_data *pack,
 	size_t size;
 
 	if (e->type_ != OBJ_OFS_DELTA && e->type_ != OBJ_REF_DELTA) {
-		unsigned long sz;
+		size_t sz;
 		packing_data_lock(&to_pack);
 		if (odb_read_object_info(the_repository->objects,
 					 &e->idx.oid, &sz) < 0)
@@ -2851,10 +2860,12 @@ static int try_delta(struct unpacked *trg, struct unpacked *src,
 
 	/* Load data if not already done */
 	if (!trg->data) {
+		size_t sz_st = 0;
 		packing_data_lock(&to_pack);
 		trg->data = odb_read_object(the_repository->objects,
 					    &trg_entry->idx.oid, &type,
-					    &sz);
+					    &sz_st);
+		sz = cast_size_t_to_ulong(sz_st);
 		packing_data_unlock(&to_pack);
 		if (!trg->data)
 			die(_("object %s cannot be read"),
@@ -2866,10 +2877,12 @@ static int try_delta(struct unpacked *trg, struct unpacked *src,
 		*mem_usage += sz;
 	}
 	if (!src->data) {
+		size_t sz_st = 0;
 		packing_data_lock(&to_pack);
 		src->data = odb_read_object(the_repository->objects,
 					    &src_entry->idx.oid, &type,
-					    &sz);
+					    &sz_st);
+		sz = cast_size_t_to_ulong(sz_st);
 		packing_data_unlock(&to_pack);
 		if (!src->data) {
 			if (src_entry->preferred_base) {
