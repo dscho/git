@@ -27,12 +27,12 @@ void *patch_delta(const void *src_buf, size_t src_size,
 	top = (const unsigned char *) delta_buf + delta_size;
 
 	/* make sure the orig file size matches what we expect */
-	size = get_delta_hdr_size_sz(&data, top);
+	size = get_delta_hdr_size(&data, top);
 	if (size != src_size)
 		return NULL;
 
 	/* now the result size */
-	size = get_delta_hdr_size_sz(&data, top);
+	size = get_delta_hdr_size(&data, top);
 	dst_buf = xmallocz(size);
 
 	out = dst_buf;

@@ -86,11 +86,8 @@ void *patch_delta(const void *src_buf, size_t src_size,
  * This must be called twice on the delta data buffer, first to get the
  * expected source buffer size, and again to get the target buffer size.
  */
-/*
- * Size_t variant that doesn't truncate - use for >4GB objects on Windows.
- */
-static inline size_t get_delta_hdr_size_sz(const unsigned char **datap,
-					   const unsigned char *top)
+static inline size_t get_delta_hdr_size(const unsigned char **datap,
+					const unsigned char *top)
 {
 	const unsigned char *data = *datap;
 	size_t cmd, size = 0;
@@ -102,13 +99,6 @@ static inline size_t get_delta_hdr_size_sz(const unsigned char **datap,
 	} while (cmd & 0x80 && data < top);
 	*datap = data;
 	return size;
-}
-
-static inline unsigned long get_delta_hdr_size(const unsigned char **datap,
-					       const unsigned char *top)
-{
-	size_t size = get_delta_hdr_size_sz(datap, top);
-	return cast_size_t_to_ulong(size);
 }
 
 #endif
