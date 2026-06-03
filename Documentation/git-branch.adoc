@@ -14,6 +14,7 @@ git branch [--color[=<when>] | --no-color] [--show-current]
 	   [--merged [<commit>]] [--no-merged [<commit>]]
 	   [--contains [<commit>]] [--no-contains [<commit>]]
 	   [--points-at <object>] [--format=<format>]
+	   [(--forked <branch>)...]
 	   [(-r|--remotes) | (-a|--all)]
 	   [--list] [<pattern>...]
 git branch [--track[=(direct|inherit)] | --no-track] [-f]
@@ -24,6 +25,7 @@ git branch (-m|-M) [<old-branch>] <new-branch>
 git branch (-c|-C) [<old-branch>] <new-branch>
 git branch (-d|-D) [-r] <branch-name>...
 git branch --edit-description [<branch-name>]
+git branch [--dry-run] (--prune-merged <branch>)...
 
 DESCRIPTION
 -----------
@@ -198,6 +200,41 @@ This option is only applicable in non-verbose mode.
 `--show-current`::
 	Print the name of the current branch. In detached `HEAD` state,
 	nothing is printed.
+
+`--forked <branch>`::
+	List only branches whose configured upstream matches
+	_<branch>_. The argument can be a ref (e.g. `origin/main`,
+	`master`) or a shell-style glob (e.g. `'origin/*'`). The
+	option can be repeated to widen the filter.
+
+`--prune-merged <branch>`::
+	Delete the local branches that `--forked` would list for the
+	same _<branch>_, but only those whose tip is reachable from
+	their configured upstream. In other words, the work on the
+	branch has already landed on the upstream it tracks, so the
+	local copy is no longer needed. May be given more than once to
+	union the matches; positional arguments are not accepted.
++
+Reachability is checked against whatever the upstream refs say
+locally; nothing is fetched. Run `git fetch` first if you want
+the upstream refs refreshed.
++
+A branch is left alone if any of the following holds:
+its upstream no longer resolves locally; it is checked out in any
+worktree; its push destination (`<branch>@{push}`) equals its
+upstream (`<branch>@{upstream}`), so it cannot be distinguished
+from a freshly pulled trunk that just looks "fully merged"; or
+`branch.<name>.pruneMerged` is set to `false`.
++
+Branches refused by the "fully merged" safety check are listed as
+warnings and skipped; pass them to `git branch -D` explicitly if
+you want them gone.
+
+`--dry-run`::
+	With `--prune-merged`, print which branches would be
+	deleted and exit without touching any ref.  Useful for
+	sanity-checking a wide pattern like `'origin/*'` before
+	committing to the deletion.
 
 `-v`::
 `-vv`::
