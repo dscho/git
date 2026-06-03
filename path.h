@@ -262,6 +262,22 @@ enum scld_error safe_create_leading_directories_no_share(char *path);
 int safe_create_file_with_leading_directories(struct repository *repo,
 					      const char *path);
 
+enum path_format_type {
+	PATH_FORMAT_DEFAULT,
+	PATH_FORMAT_RELATIVE,
+	PATH_FORMAT_CANONICAL
+};
+
+enum path_default_type {
+	PATH_DEFAULT_RELATIVE,
+	PATH_DEFAULT_RELATIVE_IF_SHARED,
+	PATH_DEFAULT_CANONICAL,
+	PATH_DEFAULT_UNMODIFIED
+};
+
+void strbuf_add_path(struct strbuf *buf, const char *path, const char *prefix,
+		     enum path_format_type format, enum path_default_type def);
+
 # ifdef USE_THE_REPOSITORY_VARIABLE
 #  include "strbuf.h"
 #  include "repository.h"

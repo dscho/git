@@ -155,4 +155,36 @@ test_expect_success 'git repo info -h shows only repo info usage' '
 	test_grep ! "git repo structure" actual
 '
 
+test_repo_info_path () {
+	field_name=$1
+	expect_relative=$2
+
+	test_expect_success "query individual key: path.$field_name.absolute" '
+		(
+			cd test-repo/sub &&
+			expect_absolute=$(cd .. && pwd)/.git &&
+			echo "path.$field_name.absolute=$expect_absolute" >expect &&
+			git repo info path.$field_name.absolute >actual &&
+			test_cmp expect actual
+		)
+	'
+
+	test_expect_success "query individual key: path.$field_name.relative" '
+		(
+			cd test-repo/sub &&
+			echo "path.$field_name.relative=$expect_relative" >expect &&
+			git repo info path.$field_name.relative >actual &&
+			test_cmp expect actual
+		)
+	'
+}
+
+test_expect_success 'setup test repository layout for path fields' '
+	git init test-repo &&
+	mkdir -p test-repo/sub
+'
+
+test_repo_info_path 'commondir' '../.git'
+test_repo_info_path 'gitdir' '../.git'
+
 test_done
