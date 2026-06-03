@@ -1821,6 +1821,17 @@ test_expect_success 'updateInstead with push-to-checkout hook' '
 	)
 '
 
+test_expect_success 'denyCurrentBranch and core.worktree' '
+	test_when_finished "rm -fr cloned cloned.git" &&
+	git clone --separate-git-dir cloned.git . cloned &&
+	git --git-dir cloned.git config receive.denyCurrentBranch updateInstead &&
+	git --git-dir cloned.git config core.worktree "$PWD/cloned" &&
+	test_commit raspberry &&
+	git push cloned.git HEAD:main &&
+	test_path_exists cloned/raspberry.t &&
+	test_must_fail git push --delete cloned.git main
+'
+
 test_expect_success 'denyCurrentBranch and worktrees' '
 	test_when_finished "rm -fr cloned && git worktree remove --force new-wt" &&
 	git worktree add new-wt &&
