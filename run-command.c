@@ -25,7 +25,8 @@ const char *get_shell_path(const char *fallback)
 	static int initialized;
 
 	if (!initialized) {
-		if (!repo_config_get_pathname(the_repository, "core.shell", &shell))
+		shell = xstrdup_or_null(getenv("GIT_TEST_SHELL_PATH"));
+		if (shell || !repo_config_get_pathname(the_repository, "core.shell", &shell))
 			setenv("SHELL", shell, 1);
 		initialized = 1;
 	}
