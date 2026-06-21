@@ -135,8 +135,9 @@ jobs:
       fail-fast: false
       matrix:
         nr: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        use-busybox: [false, true]
     concurrency:
-      group: windows-test-${{ matrix.nr }}-${{ github.ref }}
+      group: windows-test-${{ matrix.nr }}-${{ matrix.use-busybox }}-${{ github.ref }}
       cancel-in-progress: ${{ needs.ci-config.outputs.skip_concurrent == 'yes' }}
     steps:
     - name: download tracked files and build artifacts
@@ -148,6 +149,30 @@ jobs:
       shell: bash
       run: tar xf artifacts.tar.gz && tar xf tracked.tar.gz
     - uses: git-for-windows/setup-git-for-windows-sdk@v2
+    - name: download BusyBox' ash.exe and use it as the POSIX shell
+      if: matrix.use-busybox == true
+      shell: bash
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        # TEMPORARY: pull the freshly-built, speed-optimized ash.exe from the
+        # latest successful busybox-w32 main build instead of waiting for the
+        # next SDK refresh to pick up the released package.
+        run_id="$(gh run list -R git-for-windows/busybox-w32 \
+          --branch main --workflow build.yml --status success --limit 1 \
+          --json databaseId --jq '.[0].databaseId')" &&
+        test -n "$run_id" &&
+        gh run download -R git-for-windows/busybox-w32 "$run_id" \
+          -n busybox -D bb &&
+        test -f bb/busybox.exe &&
+        cp bb/busybox.exe /mingw64/bin/ash.exe &&
+        ash="$(cygpath -am /mingw64/bin/ash.exe)" &&
+        echo "GIT_TEST_SHELL_PATH=$ash" >>$GITHUB_ENV &&
+        echo "SHELL=$ash" >>$GITHUB_ENV &&
+        echo "SHELL_PATH=$ash" >>$GITHUB_ENV &&
+        echo "TEST_SHELL_PATH=$ash" >>$GITHUB_ENV &&
+        echo "SHELL_PATH=$ash" >>GIT-BUILD-OPTIONS &&
+        echo "TEST_SHELL_PATH=$ash" >>GIT-BUILD-OPTIONS
     - name: test
       shell: bash
       run: . /etc/profile && ci/run-test-slice.sh $((${{matrix.nr}} + 1)) 10
@@ -159,7 +184,7 @@ jobs:
       if: failure() && env.FAILED_TEST_ARTIFACTS != ''
       uses: actions/upload-artifact@v7
       with:
-        name: failed-tests-windows-${{ matrix.nr }}
+        name: failed-tests-windows-${{ matrix.nr }}-${{ matrix.use-busybox }}
         path: ${{env.FAILED_TEST_ARTIFACTS}}
   vs-build:
     name: win+VS build
