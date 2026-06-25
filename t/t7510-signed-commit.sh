@@ -458,7 +458,7 @@ test_expect_success 'custom `gpg.program`' '
 
 	# `gpg.program` does not specify an absolute path, it should find a program in `$PATH`
 	test_config gpg.program "fake-gpg" &&
-	env PATH="$PWD:$PATH" \
+	env PATH="$PWD$PATH_SEP$PATH" \
 	git commit -S --allow-empty -m signed-commit
 '
 

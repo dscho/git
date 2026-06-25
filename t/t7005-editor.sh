@@ -58,7 +58,7 @@ do
 				export $i
 				;;
 			esac &&
-			PATH="$PWD:$PATH" TERM=vt100 git commit --amend
+			PATH="$PWD$PATH_SEP$PATH" TERM=vt100 git commit --amend
 		) &&
 		test_commit_message HEAD -m "Edited by $i"
 	'
@@ -80,7 +80,7 @@ test_expect_success 'Using editors with overrides' '
 				export $i
 				;;
 			esac &&
-			PATH="$PWD:$PATH" git commit --amend &&
+			PATH="$PWD$PATH_SEP$PATH" git commit --amend &&
 			test_commit_message HEAD expect || exit 1
 		done
 	)
