@@ -158,7 +158,13 @@ do
 			mkdir foo &&
 			echo bar >foo/bar &&
 			echo baz >"baz baz" &&
-			echo bat >bat\" &&
+			# Unlike MSYS2, the native Win32 BusyBox cannot create a file
+			# whose name contains the reserved double-quote character; no
+			# test here references it, so skip creating it under BusyBox.
+			if ! test_have_prereq BUSYBOX
+			then
+				echo bat >bat\"
+			fi &&
 			git add -A &&
 			git commit -m second &&
 
