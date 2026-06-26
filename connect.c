@@ -1094,6 +1094,9 @@ static enum url_scheme parse_connect_url(const char *url_orig, char **ret_host,
 		path = host - 2; /* include the leading "//" */
 	else if (scheme == URL_SCHEME_FILE && has_dos_drive_prefix(end))
 		path = end; /* "file://$(pwd)" may be "file://C:/projects/repo" */
+	else if (scheme == URL_SCHEME_FILE && end[0] == '/' &&
+		 has_dos_drive_prefix(end + 1))
+		path = end + 1; /* "file:///C:/repo" (RFC 8089) -> "C:/repo" */
 	else
 		path = strchr(end, separator);
 
