@@ -182,8 +182,15 @@ test_expect_success 'allow all control sequences for a specific URL' '
 	test_grep "\\^\\[\\[K" decoded &&
 
 	rm -rf throw-away &&
+	url="file://$PWD" &&
+	# On Windows $PWD looks like "D:/path"; "file://D:/path" parses "D:"
+	# as the URL host, so the per-URL sideband.file:// config below would
+	# not match. Insert an extra slash to form the RFC 8089
+	# "file:///D:/path" (empty host) which Git for Windows resolves like
+	# the "/d/path" form the MSYS2 Bash produces.
+	case "$PWD" in [A-Za-z]:*) url="file:///$PWD";; esac &&
 	git -c "sideband.file://.allowControlCharacters=true" \
-		clone --no-local "file://$PWD" throw-away 2>stderr &&
+		clone --no-local "$url" throw-away 2>stderr &&
 	test_decode_color <stderr >color-decoded &&
 	test_decode_csi <color-decoded >decoded &&
 	test_grep "CSI \\[K" decoded &&
