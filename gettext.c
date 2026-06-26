@@ -141,7 +141,13 @@ int gettext_width(const char *s)
 
 int is_utf8_locale(void)
 {
-#ifdef NO_GETTEXT
+	/*
+	 * The charset is normally set by git_setup_gettext(), but it bails out
+	 * early when the locale directory is missing, leaving `charset` NULL.
+	 * As is_encoding_utf8(NULL) answers "yes", that would make us assume a
+	 * UTF-8 locale even under e.g. LC_ALL=C, so derive the charset from the
+	 * environment ourselves in that case.
+	 */
 	if (!charset) {
 		const char *env = getenv("LC_ALL");
 		if (!env || !*env)
@@ -154,6 +160,5 @@ int is_utf8_locale(void)
 			env = strchr(env, '.') + 1;
 		charset = xstrdup(env);
 	}
-#endif
 	return is_encoding_utf8(charset);
 }
