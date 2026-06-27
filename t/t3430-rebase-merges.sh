@@ -234,7 +234,7 @@ test_expect_success 'merge -c rewords when a strategy is given' '
 	git add G.t
 	EOF
 
-	PATH="$PWD:$PATH" \
+	PATH="$PWD$PATH_SEP$PATH" \
 	GIT_SEQUENCE_EDITOR="echo merge -c H G >" \
 	GIT_EDITOR="echo edited >>" \
 		git rebase --no-ff -ir -s override -Xxopt E &&
@@ -570,7 +570,7 @@ test_expect_success '--rebase-merges with strategies' '
 	echo overridden$1 >>G.t
 	git add G.t
 	EOF
-	PATH="$PWD:$PATH" git rebase -ir -s override -Xxopt G &&
+	PATH="$PWD$PATH_SEP$PATH" git rebase -ir -s override -Xxopt G &&
 	test_write_lines G overridden--xopt >expect &&
 	test_cmp expect G.t
 '

@@ -2621,7 +2621,7 @@ test_expect_success $PREREQ 'mailmap support in Cc header' '
 
 test_expect_success $PREREQ 'test using command name with --sendmail-cmd' '
 	clean_fake_sendmail &&
-	PATH="$PWD:$PATH" \
+	PATH="$PWD$PATH_SEP$PATH" \
 	git send-email \
 		--from="Example <nobody@example.com>" \
 		--to=nobody@example.com \

@@ -350,7 +350,7 @@ test_expect_success 'totally broken helper reports failure message' '
 	exit 1
 	EOF
 	test_must_fail \
-		env PATH="$PWD:$PATH" \
+		env PATH="$PWD$PATH_SEP$PATH" \
 		git clone broken://example.com/foo.git 2>stderr &&
 	grep aborted stderr
 '

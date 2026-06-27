@@ -156,7 +156,7 @@ test_expect_success POSIXPERM 'GIT_SHELL_PATH points to a valid executable' '
 test_expect_success MINGW 'GIT_SHELL_PATH points to a suitable shell' '
 	shellpath=$(git var GIT_SHELL_PATH) &&
 	case "$shellpath" in
-	[A-Z]:/*/sh.exe) test -f "$shellpath";;
+	[A-Z]:/*/*sh.exe) test -f "$shellpath";;
 	*) return 1;;
 	esac
 '
@@ -189,7 +189,7 @@ test_expect_success 'GIT_CONFIG_SYSTEM points to the correct location' '
 		systempath=$(git var GIT_CONFIG_SYSTEM) &&
 		test "$systempath" != "" &&
 		systempath=$(GIT_CONFIG_SYSTEM=/dev/null git var GIT_CONFIG_SYSTEM) &&
-		if test_have_prereq MINGW
+		if test_have_prereq MINGW && ! test_have_prereq BUSYBOX
 		then
 			test "$systempath" = "nul"
 		else
@@ -213,7 +213,7 @@ test_expect_success 'GIT_CONFIG_GLOBAL points to the correct location' '
 		echo "$TRASHDIR/.gitconfig" >>expected &&
 		test_cmp expected actual &&
 		globalpath=$(GIT_CONFIG_GLOBAL=/dev/null git var GIT_CONFIG_GLOBAL) &&
-		if test_have_prereq MINGW
+		if test_have_prereq MINGW && ! test_have_prereq BUSYBOX
 		then
 			test "$globalpath" = "nul"
 		else

@@ -5,9 +5,11 @@
 # Copyright (C) 2009 Avery Pennarun <apenwarr@gmail.com>
 #
 
+case "$PATH" in *\;*) PATH_SEP=\;;; *) PATH_SEP=:;; esac
+
 if test -z "$GIT_EXEC_PATH" || ! test -f "$GIT_EXEC_PATH/git-sh-setup" || {
-	test "${PATH#"${GIT_EXEC_PATH}:"}" = "$PATH" &&
-	test ! "$GIT_EXEC_PATH" -ef "${PATH%%:*}" 2>/dev/null
+	test "${PATH#"${GIT_EXEC_PATH}$PATH_SEP"}" = "$PATH" &&
+	test ! "$GIT_EXEC_PATH" -ef "${PATH%%$PATH_SEP*}" 2>/dev/null
 }
 then
 	basename=${0##*[/\\]}
