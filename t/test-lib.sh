@@ -49,6 +49,11 @@ case "$PATH" in
 *) PATH_SEP=: ;;
 esac
 
+test_shell_is_busybox=
+case "$($SHELL --help 2>&1)" in
+*BusyBox*) test_shell_is_busybox=t ;;
+esac
+
 # Test the binaries we have just built.  The tests are kept in
 # t/ subdirectory and are run in 'trash directory' subdirectory.
 if test -z "$TEST_DIRECTORY"
@@ -68,6 +73,14 @@ else
 	# the "$TEST_DIRECTORY", and e.g. "$TEST_DIRECTORY/helper"
 	# needing to exist.
 	TEST_DIRECTORY=$(cd "$TEST_DIRECTORY" && pwd) || exit 1
+fi
+if test -z "$test_shell_is_busybox"
+then
+	case "$(uname -s)" in
+	*MINGW*)
+		TEST_DIRECTORY="$(cygpath -au "$TEST_DIRECTORY")"
+		;;
+	esac
 fi
 GIT_BUILD_DIR="${GIT_BUILD_DIR:-${TEST_DIRECTORY%/t}}"
 if test "$TEST_DIRECTORY" = "$GIT_BUILD_DIR"
@@ -1468,8 +1481,8 @@ GIT_TEMPLATE_DIR="$GIT_TEST_TEMPLATE_DIR"
 GIT_CONFIG_NOSYSTEM=1
 GIT_ATTR_NOSYSTEM=1
 GIT_CEILING_DIRECTORIES="$TRASH_DIRECTORY/.."
-case "$($SHELL --help 2>&1)" in
-*BusyBox*)
+if test -n "$test_shell_is_busybox"
+then
 	# Unlike the MSYS2 Bash, BusyBox' ash does not translate
 	# MSYS2-style paths to Windows form when spawning the native
 	# git.exe, so it would be handed unusable "/d/..." paths. Convert
@@ -1486,8 +1499,7 @@ case "$($SHELL --help 2>&1)" in
 	# Perl-equipped MSYS2/Linux runs -- suppress it under BusyBox so the
 	# suite can also run in a Perl-less environment.
 	GIT_TEST_EXT_CHAIN_LINT=0
-	;;
-esac
+fi
 export PATH GIT_EXEC_PATH GIT_TEMPLATE_DIR GIT_CONFIG_NOSYSTEM GIT_ATTR_NOSYSTEM GIT_CEILING_DIRECTORIES
 
 # Add libc MALLOC and MALLOC_PERTURB test only if we are not executing
@@ -1770,15 +1782,15 @@ Darwin)
 	test_set_prereq GREP_STRIPS_CR
 	test_set_prereq WINDOWS
 	GIT_TEST_CMP="GIT_DIR=/dev/null git diff --no-index --ignore-cr-at-eol --"
-	case "$($SHELL --help 2>&1)" in
-	*BusyBox*)
+	if test -n "$test_shell_is_busybox"
+	then
 		# Unlike the MSYS2 Bash, BusyBox does not translate /dev/null
 		# to the Windows null device when spawning the native git.exe,
 		# and the minimal CI SDK provides no /dev/null for it to open;
 		# name nul directly so test_cmp (and --ignore-cr-at-eol) works.
-		GIT_TEST_CMP="GIT_DIR=nul git diff --no-index --ignore-cr-at-eol --"
-		;;
-	esac
+		GIT_TEST_CMP="GIT_DIR=nul git diff --no-index"
+		GIT_TEST_CMP="$GIT_TEST_CMP --ignore-cr-at-eol --"
+	fi
 	if ! type iconv >/dev/null 2>&1
 	then
 		iconv () {
@@ -1966,7 +1978,7 @@ test_lazy_prereq UNZIP '
 '
 
 test_lazy_prereq BUSYBOX '
-	case "$($SHELL --help 2>&1)" in *BusyBox*) true;; *) false;; esac
+	test -n "$test_shell_is_busybox"
 '
 
 run_with_limited_cmdline () {
