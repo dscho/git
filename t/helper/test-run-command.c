@@ -17,6 +17,7 @@
 #include "parse-options.h"
 #include "string-list.h"
 #include "thread-utils.h"
+#include "trace.h"
 #include "wildmatch.h"
 
 static int number_callbacks;
@@ -105,19 +106,29 @@ static int test_stdin_pipe_feed(int hook_stdin_fd, void *cb UNUSED, void *task_c
 
 struct testsuite {
 	struct string_list tests, failed;
+	struct strvec extra_args;
 	int next;
 	int quiet, immediate, verbose, verbose_log, trace, write_junit_xml;
+	int prove_style;
+	uint64_t suite_start_ns;
 	const char *shell_path;
 };
 #define TESTSUITE_INIT { \
 	.tests = STRING_LIST_INIT_DUP, \
 	.failed = STRING_LIST_INIT_DUP, \
+	.extra_args = STRVEC_INIT, \
 }
+
+struct test_task {
+	const char *name;
+	uint64_t start_ns;
+};
 
 static int next_test(struct child_process *cp, struct strbuf *err, void *cb,
 		     void **task_cb)
 {
 	struct testsuite *suite = cb;
+	struct test_task *task;
 	const char *test;
 	if (suite->next >= suite->tests.nr)
 		return 0;
@@ -132,41 +143,90 @@ static int next_test(struct child_process *cp, struct strbuf *err, void *cb,
 		strvec_push(&cp->args, "-i");
 	if (suite->verbose)
 		strvec_push(&cp->args, "-v");
-	if (suite->verbose_log)
+	if (suite->verbose_log || suite->prove_style)
 		strvec_push(&cp->args, "-V");
 	if (suite->trace)
 		strvec_push(&cp->args, "-x");
 	if (suite->write_junit_xml)
 		strvec_push(&cp->args, "--write-junit-xml");
+	if (suite->extra_args.nr)
+		strvec_pushv(&cp->args, suite->extra_args.v);
 
-	strbuf_addf(err, "Output of '%s':\n", test);
-	*task_cb = (void *)test;
+	task = xmalloc(sizeof(*task));
+	task->name = test;
+	task->start_ns = getnanotime();
+	*task_cb = task;
+
+	if (err)
+		strbuf_addf(err, "Output of '%s':\n", test);
 
 	return 1;
+}
+
+/*
+ * Pad the test name with dots to align the status column, "prove --timer"
+ * style. We do not attempt to match prove's exact width; we just give a
+ * stable column for human scanning.
+ */
+#define PROVE_NAME_WIDTH 48
+
+static void append_prove_line(struct strbuf *out, const char *name,
+			      int ok, double elapsed_s)
+{
+	size_t namelen = strlen(name);
+	strbuf_addstr(out, name);
+	if (namelen < PROVE_NAME_WIDTH) {
+		strbuf_addch(out, ' ');
+		strbuf_addchars(out, '.', PROVE_NAME_WIDTH - namelen - 1);
+	}
+	strbuf_addf(out, " %s  %7.2fs\n", ok ? "ok  " : "FAIL", elapsed_s);
 }
 
 static int test_finished(int result, struct strbuf *err, void *cb,
 			 void *task_cb)
 {
 	struct testsuite *suite = cb;
-	const char *name = (const char *)task_cb;
+	struct test_task *task = task_cb;
+	double elapsed_s = (getnanotime() - task->start_ns) / 1.0e9;
 
 	if (result)
-		string_list_append(&suite->failed, name);
+		string_list_append(&suite->failed, task->name);
 
-	strbuf_addf(err, "%s: '%s'\n", result ? "FAIL" : "SUCCESS", name);
+	if (suite->prove_style) {
+		/*
+		 * Drop the captured per-test output entirely (test-lib's -V
+		 * trace under test-results/<name>.out still has everything we
+		 * need for failure diagnosis) and emit a single prove-style
+		 * summary line. Note that run-command's pp_output streams the
+		 * "output owner" task's stderr live, so a small fraction of
+		 * test output may still reach the terminal -- but that mirrors
+		 * `prove`'s own behaviour and cannot be suppressed without
+		 * losing parallelism (ungroup=1 has no per-child completion
+		 * signal in this codepath, so it serialises on finish_command).
+		 */
+		strbuf_reset(err);
+		append_prove_line(err, task->name, !result, elapsed_s);
+		if (result)
+			strbuf_addf(err, "  -> see test-results/%.*s.out\n",
+				    (int)(strlen(task->name) - 3), task->name);
+	} else {
+		strbuf_addf(err, "%s: '%s'\n",
+			    result ? "FAIL" : "SUCCESS", task->name);
+	}
 
+	free(task);
 	return 0;
 }
 
 static int test_failed(struct strbuf *out, void *cb, void *task_cb)
 {
 	struct testsuite *suite = cb;
-	const char *name = (const char *)task_cb;
+	struct test_task *task = task_cb;
 
-	string_list_append(&suite->failed, name);
-	strbuf_addf(out, "FAILED TO START: '%s'\n", name);
+	string_list_append(&suite->failed, task->name);
+	strbuf_addf(out, "FAILED TO START: '%s'\n", task->name);
 
+	free(task);
 	return 0;
 }
 
@@ -192,6 +252,11 @@ static int testsuite(int argc, const char **argv)
 		OPT_BOOL('x', "trace", &suite.trace, "trace shell commands"),
 		OPT_BOOL(0, "write-junit-xml", &suite.write_junit_xml,
 			 "write JUnit-style XML files"),
+		OPT_BOOL(0, "prove-style", &suite.prove_style,
+			 "imitate `prove --timer`: one timed line per test, "
+			 "suppress per-test output on success"),
+		OPT_STRVEC(0, "test-arg", &suite.extra_args, "arg",
+			   "pass <arg> to each test script (repeatable)"),
 		OPT_END()
 	};
 	struct run_process_parallel_opts opts = {
@@ -254,7 +319,16 @@ static int testsuite(int argc, const char **argv)
 		(uintmax_t)suite.tests.nr, max_jobs);
 
 	opts.processes = max_jobs;
+	suite.suite_start_ns = getnanotime();
 	run_processes_parallel(&opts);
+
+	if (suite.prove_style) {
+		double wall_s = (getnanotime() - suite.suite_start_ns) / 1.0e9;
+		fprintf(stderr,
+			"Files=%"PRIuMAX", Failed=%"PRIuMAX", %.2fs wallclock\n",
+			(uintmax_t)suite.tests.nr,
+			(uintmax_t)suite.failed.nr, wall_s);
+	}
 
 	if (suite.failed.nr > 0) {
 		ret = 1;
@@ -266,6 +340,7 @@ static int testsuite(int argc, const char **argv)
 
 	string_list_clear(&suite.tests, 0);
 	string_list_clear(&suite.failed, 0);
+	strvec_clear(&suite.extra_args);
 	strbuf_release(&progpath);
 
 	return ret;
