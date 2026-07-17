@@ -263,13 +263,6 @@ static inline int git_offset_1st_component(const char *path)
 #define fspathncmp git_fspathncmp
 #endif
 
-#ifndef warn_about_git_lfs_on_windows7
-static inline void warn_about_git_lfs_on_windows7(int exit_code UNUSED,
-						  const char *argv0 UNUSED)
-{
-}
-#endif
-
 #ifndef is_valid_path
 #define is_valid_path(path) 1
 #endif
@@ -697,15 +690,6 @@ static inline size_t st_left_shift(size_t a, unsigned shift)
 		die("size_t overflow: %"PRIuMAX" << %u",
 		    (uintmax_t)a, shift);
 	return a << shift;
-}
-
-static inline unsigned long cast_size_t_to_ulong(size_t a)
-{
-	if (a != (unsigned long)a)
-		die("object too large to read on this platform: %"
-		    PRIuMAX" is cut off to %lu",
-		    (uintmax_t)a, (unsigned long)a);
-	return (unsigned long)a;
 }
 
 static inline uint32_t cast_size_t_to_uint32_t(size_t a)

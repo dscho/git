@@ -39,6 +39,27 @@ On Windows (in a Git for Windows SDK shell):
 make -j15
 ```
 
+When driving the build non-interactively (for example from PowerShell, or
+from an automation agent, rather than an interactive SDK shell), do not use
+a login shell. A login shell (`bash -l` / `bash --login`) re-runs the
+profile scripts and is unnecessary once `MSYSTEM` and `PATH` are set
+explicitly. Instead set `MSYSTEM` and prepend the SDK's binary directories
+to `PATH`, then invoke a non-login `bash -c` (replace `C:\git-sdk-64` with
+your SDK root):
+
+```powershell
+$env:MSYSTEM = "MINGW64"
+$env:PATH = "C:\git-sdk-64\mingw64\bin;C:\git-sdk-64\usr\bin;" + $env:PATH
+& C:\git-sdk-64\usr\bin\bash.exe -c "make -j15"
+```
+
+If the link step fails to find `target/release/libgitcore.a` (the optional
+Rust component), pass `NO_RUST=1` to skip the cargo step:
+
+```powershell
+& C:\git-sdk-64\usr\bin\bash.exe -c "make -j15 NO_RUST=1"
+```
+
 ### Run Specific Tests
 
 ```bash

@@ -1659,14 +1659,14 @@ struct tm *localtime_r(const time_t *timep, struct tm *result)
 
 char *mingw_strbuf_realpath(struct strbuf *resolved, const char *path)
 {
-	wchar_t wpath[MAX_PATH];
+	wchar_t wpath[MAX_LONG_PATH];
 	HANDLE h;
 	DWORD ret;
 	int len;
 	const char *last_component = NULL;
 	char *append = NULL;
 
-	if (xutftowcs_path(wpath, path) < 0)
+	if (xutftowcs_long_path(wpath, path) < 0)
 		return NULL;
 
 	h = CreateFileW(wpath, 0,
@@ -3870,18 +3870,42 @@ static int acls_supported(const char *path)
 	return 0;
 }
 
+int is_valid_windows_path_element(wchar_t ch)
+{
+	// cf. https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file
+	// Windows disallows ASCII control characters 0x00–0x1F
+	if (ch < 0x1F)
+		return false;
+
+	// Windows reserved path characters
+	switch (ch) {
+	case L'<':
+	case L'>':
+	case L':':
+	case L'"':
+	case L'/':
+	case L'\\':
+	case L'|':
+	case L'?':
+	case L'*':
+		return 0;
+	default:
+		return 1;
+	}
+}
+
 int is_path_owned_by_current_sid(const char *path, struct strbuf *report)
 {
-	WCHAR wpath[MAX_PATH];
+	WCHAR wpath[MAX_LONG_PATH];
 	PSID sid = NULL;
 	PSECURITY_DESCRIPTOR descriptor = NULL;
 	DWORD err;
 
-	static wchar_t home[MAX_PATH];
+	static wchar_t home[MAX_LONG_PATH];
 
 	int result = 0;
 
-	if (xutftowcs_path(wpath, path) < 0)
+	if (xutftowcs_long_path(wpath, path) < 0)
 		return 0;
 
 	/*
@@ -3897,6 +3921,15 @@ int is_path_owned_by_current_sid(const char *path, struct strbuf *report)
 	}
 	if (!wcsicmp(wpath, home))
 		return 1;
+
+	/* Do not leak NTLM hashes, UNC paths etc. are generally problematic */
+	if (wpath[0] == L'\\' && !is_valid_windows_path_element(wpath[1])) {
+		if (report)
+			strbuf_addf(report,
+				    "'%s' may refer to a non-local directory",
+				    path);
+		return 0;
+	}
 
 	/* Get the owner SID */
 	err = GetNamedSecurityInfoW(wpath, SE_FILE_OBJECT,
