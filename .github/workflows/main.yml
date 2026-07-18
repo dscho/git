@@ -137,7 +137,9 @@ jobs:
         nr: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
         use-busybox: [false, true]
     concurrency:
-      group: windows-test-${{ matrix.nr }}-${{ matrix.use-busybox }}-${{ github.ref }}
+      group: >-
+        ${{ format('windows-test-{0}-{1}-{2}', matrix.nr,
+        matrix.use-busybox, github.ref) }}
       cancel-in-progress: ${{ needs.ci-config.outputs.skip_concurrent == 'yes' }}
     steps:
     - name: download tracked files and build artifacts

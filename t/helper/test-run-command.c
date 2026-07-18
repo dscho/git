@@ -325,7 +325,8 @@ static int testsuite(int argc, const char **argv)
 	if (suite.prove_style) {
 		double wall_s = (getnanotime() - suite.suite_start_ns) / 1.0e9;
 		fprintf(stderr,
-			"Files=%"PRIuMAX", Failed=%"PRIuMAX", %.2fs wallclock\n",
+			"Files=%"PRIuMAX", Failed=%"PRIuMAX", "
+			"%.2fs wallclock\n",
 			(uintmax_t)suite.tests.nr,
 			(uintmax_t)suite.failed.nr, wall_s);
 	}

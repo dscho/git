@@ -222,7 +222,8 @@ test_expect_success '`rm -rf dir` even with only tracked files will remove somet
 	test_path_is_dir a/b
 '
 
-test_expect_success !BUSYBOX 'git version continues working from a deleted dir' '
+test_expect_success !BUSYBOX \
+	'git version continues working from a deleted dir' '
 	mkdir tmp &&
 	(
 		cd tmp &&

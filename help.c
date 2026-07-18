@@ -793,8 +793,9 @@ void get_version_info(struct strbuf *buf, int show_build_options)
 			strbuf_addstr(buf, "no commit associated with this build\n");
 		strbuf_addf(buf, "sizeof-long: %d\n", (int)sizeof(long));
 		strbuf_addf(buf, "sizeof-size_t: %d\n", (int)sizeof(size_t));
-		strbuf_addf(buf, "shell-path: %s\n", get_shell_path(SHELL_PATH));
-		/* NEEDSWORK: also save and output GIT-BUILD_OPTIONS? */
+			strbuf_addf(buf, "shell-path: %s\n",
+				    get_shell_path(SHELL_PATH));
+			/* NEEDSWORK: also save and output GIT-BUILD_OPTIONS? */
 
 #if defined WITH_RUST
 		strbuf_addstr(buf, "rust: enabled\n");
