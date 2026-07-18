@@ -63,6 +63,12 @@ test_expect_success 'clone with backslashed path' '
 	git clone "$BACKSLASHED" backslashed
 '
 
+test_expect_success 'clone with backslashed path using Bash override' '
+	BACKSLASHED="$(echo "$UNCPATH" | tr / \\\\)" &&
+	GIT_TEST_SHELL_PATH="$(cygpath -am /usr/bin/bash.exe)" \
+		git clone "$BACKSLASHED" backslashed-bash
+'
+
 test_expect_success fetch '
 	git init to-fetch &&
 	(

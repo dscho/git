@@ -2122,6 +2122,20 @@ static inline int match_last_path_component(const char *path, size_t *len,
 	return 1;
 }
 
+static int is_msys2_shell_path(const char *path)
+{
+	size_t len = strlen(path);
+
+	if (!match_last_path_component(path, &len, "sh.exe")) {
+		len = strlen(path);
+		if (!match_last_path_component(path, &len, "bash.exe"))
+			return 0;
+	}
+
+	return match_last_path_component(path, &len, "bin") &&
+		match_last_path_component(path, &len, "usr");
+}
+
 static int is_msys2_sh(const char *cmd)
 {
 	if (!cmd)
@@ -2134,36 +2148,21 @@ static int is_msys2_sh(const char *cmd)
 		if (ret >= 0)
 			return ret;
 
-		if (get_shell_path(NULL)) {
-			/* Assume an overridden shell is not MSYS2 */
-			ret = 0;
-			return ret;
-		}
-
 		p = path_lookup(cmd, 0);
-		if (!p)
-			ret = 0;
-		else {
-			size_t len = strlen(p);
-
-			ret = match_last_path_component(p, &len, "sh.exe") &&
-				match_last_path_component(p, &len, "bin") &&
-				match_last_path_component(p, &len, "usr");
-			free(p);
-		}
+		ret = p && is_msys2_shell_path(p);
+		free(p);
 		return ret;
 	}
 
-	if (ends_with(cmd, "\\sh.exe") || ends_with(cmd, "/sh.exe")) {
+	{
 		static char *sh;
 
 		if (!sh)
 			sh = path_lookup("sh", 0);
 
-		return !fspathcmp(cmd, sh);
+		return sh && !fspathcmp(cmd, sh) &&
+			is_msys2_shell_path(sh);
 	}
-
-	return 0;
 }
 
 static pid_t mingw_spawnve_fd(const char *cmd, const char **argv, char **deltaenv,
@@ -2398,8 +2397,9 @@ pid_t mingw_spawnvpe(const char *cmd, const char **argv, char **deltaenv,
 				pid = -1;
 			}
 			else {
-				pid = mingw_spawnve_fd(iprog, argv, deltaenv, dir, 1,
-						       fhin, fhout, fherr);
+				pid = mingw_spawnve_fd(iprog, argv, deltaenv,
+						       dir, 1, fhin, fhout,
+						       fherr);
 				free(iprog);
 			}
 			argv[0] = argv0;
