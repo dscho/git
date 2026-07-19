@@ -74,19 +74,19 @@ else
 	# needing to exist.
 	TEST_DIRECTORY=$(cd "$TEST_DIRECTORY" && pwd) || exit 1
 fi
-if test -z "$test_shell_is_busybox"
-then
-	case "$(uname -s)" in
-	*MINGW*)
-		TEST_DIRECTORY="$(cygpath -au "$TEST_DIRECTORY")"
-		;;
-	esac
-fi
 GIT_BUILD_DIR="${GIT_BUILD_DIR:-${TEST_DIRECTORY%/t}}"
 if test "$TEST_DIRECTORY" = "$GIT_BUILD_DIR"
 then
 	echo "PANIC: Running in a $TEST_DIRECTORY that doesn't end in '/t'?" >&2
 	exit 1
+fi
+if test -z "$test_shell_is_busybox"
+then
+	case "$(uname -s)" in
+	*MINGW*)
+		GIT_BUILD_DIR="$(cygpath -au "$GIT_BUILD_DIR")"
+		;;
+	esac
 fi
 if test -f "$GIT_BUILD_DIR/GIT-BUILD-DIR"
 then
