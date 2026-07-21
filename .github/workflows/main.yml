@@ -158,7 +158,7 @@ jobs:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         # TEMPORARY: use the artifact built for busybox-w32 PR #17.
-        gh run download -R git-for-windows/busybox-w32 29563456146 \
+        gh run download -R git-for-windows/busybox-w32 29837676933 \
           -n busybox -D bb &&
         test -f bb/busybox.exe &&
         cp bb/busybox.exe /mingw64/bin/ash.exe &&
