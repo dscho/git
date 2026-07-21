@@ -83,7 +83,7 @@ test_expect_success GPGSSH 'sign commits using literal public keys with ssh-agen
 	test_when_finished "test_unconfig commit.gpgsign" &&
 	test_config gpg.format ssh &&
 	eval $(ssh-agent -T || ssh-agent) &&
-	test_when_finished "kill ${SSH_AGENT_PID}" &&
+	test_when_finished "ssh-agent -k >/dev/null" &&
 	test_when_finished "test_unconfig user.signingkey" &&
 	mkdir tmpdir &&
 	TMPDIR="$(pwd)/tmpdir" &&

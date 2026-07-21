@@ -63,13 +63,23 @@ else
 	TT=test-tool
 fi
 
+filter_runner_ancestry () {
+	if test_have_prereq BUSYBOX
+	then
+		sed "s/ ash$X.*//"
+	else
+		cat
+	fi
+}
+
 filter_ancestry_normal () {
 	sed -n '/^cmd_ancestry/{
 		s/^cmd_ancestry //
 		s/ <- / /g
 		s/\(.*'"$TT"'\) .*/\1/
 		p
-	}'
+	}' |
+	filter_runner_ancestry
 }
 
 filter_ancestry_perf () {
@@ -78,7 +88,8 @@ filter_ancestry_perf () {
 		s/\]//
 		s/\(.*'"$TT"'\) .*/\1/
 		p
-	}'
+	}' |
+	filter_runner_ancestry
 }
 
 filter_ancestry_event () {
@@ -89,13 +100,14 @@ filter_ancestry_event () {
 		s/,/ /g
 		s/\(.*'"$TT"'\) .*/\1/
 		p
-	}'
+	}' |
+	filter_runner_ancestry
 }
 
 # On Windows (MINGW) when running with the bin-wrappers, we also see "sh.exe" in
 # the ancestry. We must therefore account for this expected ancestry element in
 # the expected output of the tests.
-if test_have_prereq MINGW && test -z "$no_bin_wrappers"; then
+if test_have_prereq MINGW,!BUSYBOX && test -z "$no_bin_wrappers"; then
 	SH_TT="sh$X $TT"
 else
 	SH_TT="$TT"
