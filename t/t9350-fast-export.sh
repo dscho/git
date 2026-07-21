@@ -170,7 +170,8 @@ test_expect_success 'preserving iso-8859-7' '
 	test $(($(test_oid hexsz) + 200)) -eq "$(git -C new cat-file -s i18n-no-recoding)" &&
 	# ...as well as the expected byte.
 	git -C new cat-file commit i18n-no-recoding >actual &&
-	grep $(printf "\360") actual &&
+	printf "\360" >raw-byte &&
+	grep -F -f raw-byte actual &&
 	# Also make sure the commit has the "encoding" header
 	grep ^encoding actual
 '
@@ -191,8 +192,10 @@ test_expect_success 'encoding preserved if reencoding fails' '
 	# that no bytes were re-encoded to a different encoding.
 	test $(($(test_oid hexsz) + 212)) -eq "$(git -C new cat-file -s i18n-invalid)" &&
 	# ...and check for the original special bytes
-	grep $(printf "\360") actual &&
-	grep $(printf "\377") actual
+	printf "\360" >raw-byte &&
+	grep -F -f raw-byte actual &&
+	printf "\377" >raw-byte &&
+	grep -F -f raw-byte actual
 '
 
 test_expect_success 'import/export-marks' '
