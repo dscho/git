@@ -26,7 +26,7 @@ jobs:
       group: windows-build-${{ github.ref }}
     steps:
     - uses: actions/checkout@v7
-    - uses: git-for-windows/setup-git-for-windows-sdk@v2
+    - uses: git-for-windows/setup-git-for-windows-sdk@add-mingw64-pseudo-architecture
     - name: build
       shell: bash
       env:
@@ -59,7 +59,7 @@ jobs:
     - name: extract tracked files and build artifacts
       shell: bash
       run: tar xf artifacts.tar.gz && tar xf tracked.tar.gz
-    - uses: git-for-windows/setup-git-for-windows-sdk@v2
+    - uses: git-for-windows/setup-git-for-windows-sdk@add-mingw64-pseudo-architecture
     - name: test
       shell: bash
       run: . /etc/profile && ci/run-test-slice.sh $((${{matrix.nr}} + 1)) 10
