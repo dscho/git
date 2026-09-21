@@ -201,9 +201,9 @@ static uint32_t clamp32(uintmax_t n)
 	return (n < max) ? n : max;
 }
 
-static void *zlib_deflate_raw(void *data, unsigned long size,
+static void *zlib_deflate_raw(void *data, size_t size,
 			      int compression_level,
-			      unsigned long *compressed_size)
+			      size_t *compressed_size)
 {
 	git_zstream stream;
 	size_t maxsize;
@@ -234,8 +234,8 @@ static void *zlib_deflate_raw(void *data, unsigned long size,
 	return buffer;
 }
 
-static void write_zip_data_desc(unsigned long size,
-				unsigned long compressed_size,
+static void write_zip_data_desc(size_t size,
+				size_t compressed_size,
 				unsigned long crc)
 {
 	if (size >= 0xffffffff || compressed_size >= 0xffffffff) {
@@ -258,8 +258,8 @@ static void write_zip_data_desc(unsigned long size,
 }
 
 static void set_zip_header_data_desc(struct zip_local_header *header,
-				     unsigned long size,
-				     unsigned long compressed_size,
+				     size_t size,
+				     size_t compressed_size,
 				     unsigned long crc)
 {
 	copy_le32(header->crc32, crc);
@@ -295,7 +295,7 @@ static int write_zip_entry(struct archiver_args *args,
 			   const struct object_id *oid,
 			   const char *path, size_t pathlen,
 			   unsigned int mode,
-			   void *buffer, unsigned long size)
+			   void *buffer, size_t size)
 {
 	struct zip_local_header header;
 	uintmax_t offset = zip_offset;
@@ -304,7 +304,7 @@ static int write_zip_entry(struct archiver_args *args,
 	size_t header_extra_size = ZIP_EXTRA_MTIME_SIZE;
 	int need_zip64_extra = 0;
 	unsigned long attr2;
-	unsigned long compressed_size;
+	size_t compressed_size;
 	unsigned long crc;
 	enum zip_method method;
 	unsigned char *out;

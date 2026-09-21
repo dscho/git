@@ -66,7 +66,7 @@ static void write_if_needed(void)
  * queues up writes, so that all our write(2) calls write exactly one
  * full block; pads writes to RECORDSIZE
  */
-static void do_write_blocked(const void *data, unsigned long size)
+static void do_write_blocked(const void *data, size_t size)
 {
 	const char *buf = data;
 
@@ -102,7 +102,7 @@ static void finish_record(void)
 	write_if_needed();
 }
 
-static void write_blocked(const void *data, unsigned long size)
+static void write_blocked(const void *data, size_t size)
 {
 	do_write_blocked(data, size);
 	finish_record();
@@ -218,7 +218,7 @@ static size_t get_path_prefix(const char *path, size_t pathlen, size_t maxlen)
 
 static void prepare_header(struct archiver_args *args,
 			   struct ustar_header *header,
-			   unsigned int mode, unsigned long size)
+			   unsigned int mode, size_t size)
 {
 	xsnprintf(header->mode, sizeof(header->mode), "%07o", mode & 07777);
 	xsnprintf(header->size, sizeof(header->size), "%011"PRIoMAX , S_ISREG(mode) ? (uintmax_t)size : (uintmax_t)0);
@@ -239,7 +239,7 @@ static void prepare_header(struct archiver_args *args,
 
 static void write_extended_header(struct archiver_args *args,
 				  const struct object_id *oid,
-				  const void *buffer, unsigned long size)
+				  const void *buffer, size_t size)
 {
 	struct ustar_header header;
 	unsigned int mode;
@@ -256,11 +256,11 @@ static int write_tar_entry(struct archiver_args *args,
 			   const struct object_id *oid,
 			   const char *path, size_t pathlen,
 			   unsigned int mode,
-			   void *buffer, unsigned long size)
+			   void *buffer, size_t size)
 {
 	struct ustar_header header;
 	struct strbuf ext_header = STRBUF_INIT;
-	unsigned long size_in_header;
+	size_t size_in_header;
 	int err = 0;
 
 	memset(&header, 0, sizeof(header));
