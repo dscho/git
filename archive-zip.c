@@ -236,7 +236,7 @@ static void *zlib_deflate_raw(void *data, size_t size,
 
 static void write_zip_data_desc(size_t size,
 				size_t compressed_size,
-				unsigned long crc)
+				uint32_t crc)
 {
 	if (size >= 0xffffffff || compressed_size >= 0xffffffff) {
 		struct zip64_data_desc trailer;
@@ -260,7 +260,7 @@ static void write_zip_data_desc(size_t size,
 static void set_zip_header_data_desc(struct zip_local_header *header,
 				     size_t size,
 				     size_t compressed_size,
-				     unsigned long crc)
+				     uint32_t crc)
 {
 	copy_le32(header->crc32, crc);
 	copy_le32(header->compressed_size, compressed_size);
@@ -305,7 +305,7 @@ static int write_zip_entry(struct archiver_args *args,
 	int need_zip64_extra = 0;
 	unsigned long attr2;
 	size_t compressed_size;
-	unsigned long crc;
+	uint32_t crc;
 	enum zip_method method;
 	unsigned char *out;
 	void *deflated = NULL;
@@ -318,7 +318,7 @@ static int write_zip_entry(struct archiver_args *args,
 	size_t zip_dir_extra_size = ZIP_EXTRA_MTIME_SIZE;
 	size_t zip64_dir_extra_payload_size = 0;
 
-	crc = crc32(0, NULL, 0);
+	crc = crc32_z(0, NULL, 0);
 
 	if (!has_only_ascii(path)) {
 		if (is_utf8(path))
@@ -355,7 +355,7 @@ static int write_zip_entry(struct archiver_args *args,
 			flags |= ZIP_STREAM;
 			out = NULL;
 		} else {
-			crc = crc32(crc, buffer, size);
+			crc = crc32_z(crc, buffer, size);
 			is_binary = entry_is_binary(args->repo->index,
 						    path_without_prefix,
 						    buffer, size);
@@ -431,7 +431,7 @@ static int write_zip_entry(struct archiver_args *args,
 			readlen = odb_stream_read(stream, buf, sizeof(buf));
 			if (readlen <= 0)
 				break;
-			crc = crc32(crc, buf, readlen);
+			crc = crc32_z(crc, buf, readlen);
 			if (is_binary == -1)
 				is_binary = entry_is_binary(args->repo->index,
 							    path_without_prefix,
@@ -464,7 +464,7 @@ static int write_zip_entry(struct archiver_args *args,
 			readlen = odb_stream_read(stream, buf, sizeof(buf));
 			if (readlen <= 0)
 				break;
-			crc = crc32(crc, buf, readlen);
+			crc = crc32_z(crc, buf, readlen);
 			if (is_binary == -1)
 				is_binary = entry_is_binary(args->repo->index,
 							    path_without_prefix,

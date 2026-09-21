@@ -10,6 +10,7 @@
 # define adler32(adler, buf, len) zng_adler32(adler, buf, len)
 
 # define crc32(crc, buf, len) zng_crc32(crc, buf, len)
+# define crc32_z(crc, buf, len) zng_crc32_z(crc, buf, len)
 
 # define inflate(strm, bits) zng_inflate(strm, bits)
 # define inflateEnd(strm) zng_inflateEnd(strm)
@@ -48,6 +49,22 @@ static int deflateSetHeader(z_streamp strm, struct gz_header_s *head)
 	(void)(strm);
 	(void)(head);
 	return Z_OK;
+}
+# endif
+
+# if ZLIB_VERNUM < 0x1290
+static inline uLong crc32_z(uLong crc, const Bytef *buf, size_t size)
+{
+	if (!buf)
+		return crc32(crc, buf, 0);
+
+	while (size > UINT_MAX) {
+		crc = crc32(crc, buf, UINT_MAX);
+		buf += UINT_MAX;
+		size -= UINT_MAX;
+	}
+
+	return crc32(crc, buf, size);
 }
 # endif
 #endif /* HAVE_ZLIB_NG */
