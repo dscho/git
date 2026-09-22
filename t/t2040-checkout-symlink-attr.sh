@@ -71,7 +71,7 @@ test_expect_success MINGW,SYMLINKS 'replace a pending prefix symlink' '
 		git checkout-index -f --stdin &&
 		cmd.exe //c dir . >dir-listing &&
 		test_grep "<SYMLINKD>.*nested " dir-listing &&
-		test "$(readlink nested)" = leading/sub
+		test "$(test-tool path-utils readlink nested)" = leading/sub
 	)
 '
 
@@ -86,7 +86,7 @@ test_expect_success MINGW,SYMLINKS 'resolve a dot-dot prefix target' '
 		git checkout-index --stdin &&
 		cmd.exe //c dir . >dir-listing &&
 		test_grep "<SYMLINKD>.*nested " dir-listing &&
-		test "$(readlink links/leading)" = ../realdir
+		test "$(test-tool path-utils readlink links/leading)" = ../realdir
 	)
 '
 
