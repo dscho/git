@@ -32,9 +32,11 @@ test_expect_success 'add and commit 4GB file' '
 	git add large &&
 	git cat-file -s :large >size-staged &&
 	test $size_4gb = $(cat size-staged) &&
-	git commit -m large-file
+	git commit -m large-file &&
+	rm large
 '
 test_expect_success 'read 4GB loose object' '
+	test_when_finished "rm -f read" &&
 	git -P show :large >read &&
 	test_file_size read >size-read &&
 	test $size_4gb = $(cat size-read)
@@ -43,6 +45,7 @@ test_expect_success 'read 4GB loose object' '
 # export-subst disables streaming; archiving a tree avoids substitutions.
 test_expect_success UNZIP,UNZIP_ZIP64_SUPPORT \
 	'zip archive of 4GB file (buffered)' '
+	test_when_finished "rm -f .git/info/attributes large.zip read" &&
 	mkdir -p .git/info &&
 	echo "large export-subst" >.git/info/attributes &&
 	git archive --format=zip -0 HEAD: >large.zip &&
@@ -52,6 +55,7 @@ test_expect_success UNZIP,UNZIP_ZIP64_SUPPORT \
 '
 
 test_expect_success GZIP 'tar.gz archive of 4GB file' '
+	test_when_finished "rm -f large.tar.gz large.tar extract/large" &&
 	git archive --format=tar.gz -0 HEAD >large.tar.gz &&
 	gzip -d large.tar.gz &&
 	mkdir extract &&
