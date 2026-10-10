@@ -105,6 +105,10 @@ static void sha1dc_choose(void)
 			    backend);
 	}
 
+	if (!use_c &&
+	    !sha1dc_rs_ctx_fits(sizeof(SHA1_CTX), SHA1DC_CTX_ALIGNMENT))
+		BUG("Rust SHA-1 context does not fit in SHA1_CTX");
+
 	sha1dc_clone = use_c ? sha1dc_c_clone : sha1dc_rs_clone;
 	sha1dc_update = use_c ? git_SHA1DCUpdate : sha1dc_rs_update;
 	sha1dc_final = use_c ? git_SHA1DCFinal : sha1dc_rs_final;
