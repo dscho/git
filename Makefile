@@ -1009,7 +1009,8 @@ endif
 
 # For the 'sparse' target
 SPARSE_FLAGS ?= -std=gnu99 -D__STDC_NO_VLA__
-SP_EXTRA_FLAGS =
+# Sparse cannot parse the compiler-specific SIMD intrinsic headers.
+SP_EXTRA_FLAGS = -DSHA1DC_ACCEL_PORTABLE_ONLY
 
 # For informing GIT-BUILD-OPTIONS of the SANITIZE=leak,address targets
 SANITIZE_LEAK =
