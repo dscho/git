@@ -386,7 +386,7 @@ core.sha1dcBackend::
 	Select the collision-detecting SHA-1 implementation: `c` keeps the
 	original C code and is the default, `accel` selects accelerated C,
 	and `rust` selects the Rust implementation. Rust is available only
-	in Rust-enabled builds, and accelerated C can be omitted at build
+	in builds with `DC_SHA1_RS`, and accelerated C can be omitted at build
 	time. Selecting an unavailable implementation is an error.
 	This setting has no effect with other SHA-1 backends.
 

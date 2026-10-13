@@ -47,6 +47,13 @@ test_expect_success SHA1DC_RS 'select SHA1DC backend via config' '
 	test c = "$(test-tool sha1-is-sha1dc --backend)"
 '
 
+test_expect_success !SHA1DC_RS 'reject uncompiled Rust SHA1DC backend' '
+	test_must_fail env \
+		GIT_CONFIG_PARAMETERS="${SQ}core.sha1dcBackend=rust${SQ}" \
+		test-tool sha1-is-sha1dc --backend 2>err &&
+	test_grep "unavailable or invalid SHA-1 backend" err
+'
+
 test_expect_success SHA1DC_ACCEL 'select accelerated C via config' '
 	test_config core.sha1dcBackend accel &&
 	test accel = "$(test-tool sha1-is-sha1dc --backend)"
