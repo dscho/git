@@ -441,9 +441,7 @@ static inline void process(const struct backend *be, SHA1_CTX *ctx,
 		int i;
 
 		for (i = 0; i < 40; i++) {
-			uint32_t tmp = w[i];
-			w[i] = w[79 - i];
-			w[79 - i] = tmp;
+			SWAP(w[i], w[79 - i]);
 		}
 	}
 #endif
