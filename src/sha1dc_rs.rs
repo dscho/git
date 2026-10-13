@@ -7,9 +7,7 @@ use std::{ptr, slice};
 /// Check whether C's context storage can hold the Rust hasher.
 #[no_mangle]
 pub extern "C" fn sha1dc_rs_ctx_fits(size: usize, alignment: usize) -> i32 {
-    (size >= size_of::<Hasher>()
-        && alignment != 0
-        && alignment % align_of::<Hasher>() == 0) as i32
+    (size >= size_of::<Hasher>() && alignment != 0 && alignment % align_of::<Hasher>() == 0) as i32
 }
 
 /// Initialize a collision-detecting SHA-1 context.
