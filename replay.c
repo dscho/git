@@ -484,6 +484,8 @@ struct commit *pick_merge_commit(struct repository *repo,
 	merge_opt->branch2 = NULL;
 	merge_opt->in_replay_orig_intervals = saved_orig_in;
 	merge_opt->in_replay_side2_intervals = saved_side2_in;
+	if (!result->clean && !new_merge_res.clean)
+		merge_replay_conflict_stages(result, &new_merge_res);
 	if (result->clean <= 0)
 		goto out;
 

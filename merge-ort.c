@@ -4952,6 +4952,30 @@ void merge_display_update_messages(struct merge_options *opt,
 	trace2_region_leave("merge", "display messages", opt->repo);
 }
 
+void merge_replay_conflict_stages(struct merge_result *result,
+				 const struct merge_result *inner)
+{
+	struct merge_options_internal *opti = result->priv;
+	struct merge_options_internal *inner_opti = inner->priv;
+	struct hashmap_iter iter;
+	struct strmap_entry *entry;
+
+	assert(!result->clean && !inner->clean);
+	strmap_for_each_entry(&opti->conflicted, &iter, entry) {
+		struct conflict_info *ci = entry->value;
+		struct conflict_info *inner_ci;
+
+		VERIFY_CI(ci);
+		inner_ci = strmap_get(&inner_opti->conflicted,
+				      ci->pathnames[MERGE_SIDE2]);
+		if (!inner_ci)
+			continue;
+		VERIFY_CI(inner_ci);
+		COPY_ARRAY(ci->stages, inner_ci->stages, 3);
+		ci->filemask = inner_ci->filemask;
+	}
+}
+
 void merge_get_conflicted_files(struct merge_result *result,
 				struct string_list *conflicted_files)
 {

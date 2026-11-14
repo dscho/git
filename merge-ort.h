@@ -179,6 +179,14 @@ struct stage_info {
 void merge_get_conflicted_files(struct merge_result *result,
 				struct string_list *conflicted_files);
 
+/*
+ * For paths conflicted in both merges, copy the inner stages into result,
+ * matching by its side2 input path without changing its worktree tree.
+ * Both results must be unclean and not yet finalized.
+ */
+void merge_replay_conflict_stages(struct merge_result *result,
+				 const struct merge_result *inner);
+
 /* Do needed cleanup when not calling merge_switch_to_result() */
 void merge_finalize(struct merge_options *opt,
 		    struct merge_result *result);
