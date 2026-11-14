@@ -72,13 +72,17 @@ rebase.forkPoint::
 
 rebase.rebaseMerges::
 	Whether and how to set the `--rebase-merges` option by default. Can
-	be `rebase-cousins`, `no-rebase-cousins`, or a boolean. Setting to
-	true or to `no-rebase-cousins` is equivalent to
+	be `rebase-cousins`, `no-rebase-cousins`, `recreate`, a comma-separated
+	combination of `recreate` with either cousin mode, or a boolean.
+	Setting to true or to `no-rebase-cousins` is equivalent to
 	`--rebase-merges=no-rebase-cousins`, setting to `rebase-cousins` is
 	equivalent to `--rebase-merges=rebase-cousins`, and setting to false is
-	equivalent to `--no-rebase-merges`. Passing `--rebase-merges` on the
-	command line, with or without an argument, overrides any
-	`rebase.rebaseMerges` configuration.
+	equivalent to `--no-rebase-merges`. Setting to `recreate` is equivalent
+	to `--rebase-merges=recreate`.
++
+Passing `--rebase-merges` on the command line, with or without an argument,
+overrides any `rebase.rebaseMerges` configuration. Without an argument, it
+selects replay with `no-rebase-cousins`, even if `recreate` is configured.
 
 rebase.maxLabelLength::
 	When generating label names from commit subjects, truncate the names to

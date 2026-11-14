@@ -519,20 +519,20 @@ have the commit hash prepended to the format.
 See also <<INCOMPATIBLE_OPTIONS,INCOMPATIBLE OPTIONS>> below.
 
 -r::
---rebase-merges[=(rebase-cousins|no-rebase-cousins)]::
+--rebase-merges[=<mode>[,<mode>...]]::
 --no-rebase-merges::
 	By default, a rebase will simply drop merge commits from the todo
 	list, and put the rebased commits into a single, linear branch.
 	With `--rebase-merges`, the rebase will instead try to preserve
 	the branching structure within the commits that are to be rebased,
-	by recreating the merge commits. Any resolved merge conflicts or
-	manual amendments in these merge commits will have to be
-	resolved/re-applied manually. `--no-rebase-merges` can be used to
-	countermand both the `rebase.rebaseMerges` config option and a previous
-	`--rebase-merges`.
+	by retaining merge commits. For existing two-parent merges, Git
+	replays their recorded conflict resolutions and manual amendments
+	onto the rebased parents. New conflicts may still require manual
+	resolution. `--no-rebase-merges` can countermand both the
+	`rebase.rebaseMerges` config option and a previous `--rebase-merges`.
 +
-When rebasing merges, there are two modes: `rebase-cousins` and
-`no-rebase-cousins`. If the mode is not specified, it defaults to
+The `rebase-cousins` and `no-rebase-cousins` modes control where side
+branches are rebased. If neither is specified, the default is
 `no-rebase-cousins`. In `no-rebase-cousins` mode, commits which do not have
 `<upstream>` as direct ancestor will keep their original branch point, i.e.
 commits that would be excluded by linkgit:git-log[1]'s `--ancestry-path`
@@ -540,9 +540,15 @@ option will keep their original ancestry by default. In `rebase-cousins` mode,
 such commits are instead rebased onto `<upstream>` (or `<onto>`, if
 specified).
 +
-It is currently only possible to recreate the merge commits using the
-`ort` merge strategy; different merge strategies can be used only via
-explicit `exec git merge -s <strategy> [...]` commands.
+To recreate merges from their rebased parents without reusing previous
+conflict resolutions or manual amendments, specify `recreate`. It can be
+combined with either cousin mode in a comma-separated list, for example
+`--rebase-merges=recreate,rebase-cousins`.
++
+Merge replay uses the `ort` strategy. Octopus merges and merges without
+an original two-parent merge commit are recreated instead. Specifying
+any strategy other than `ort` or `recursive`, or any `--strategy-option`
+(`-X`), also selects merge recreation.
 +
 See also <<REBASING_MERGES,REBASING MERGES>> and
 <<INCOMPATIBLE_OPTIONS,INCOMPATIBLE OPTIONS>> below.
@@ -1226,7 +1232,9 @@ list manually and contains a typo).
 
 The `merge` command will merge the specified revision(s) into whatever
 is HEAD at that time. With `-C <original-commit>`, the commit message of
-the specified merge commit will be used. When the `-C` is changed to
+the specified merge commit will be used. With `--rebase-merges`, changes
+recorded in an original two-parent merge are also replayed unless
+`recreate` was specified. When the `-C` is changed to
 a lower-case `-c`, the message will be opened in an editor after a
 successful merge so that the user can edit the message.
 

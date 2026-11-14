@@ -125,6 +125,7 @@ struct rebase_options {
 	struct string_list exec;
 	int allow_empty_message;
 	int rebase_merges, rebase_cousins;
+	int recreate_merges;
 	char *strategy;
 	struct string_list strategy_opts;
 	struct strbuf git_format_patch_opt;
@@ -197,6 +198,8 @@ static struct replay_opts get_replay_opts(const struct rebase_options *opts)
 	replay.committer_date_is_author_date =
 					opts->committer_date_is_author_date;
 	replay.ignore_date = opts->ignore_date;
+	replay.replay_merges = opts->rebase_merges > 0 &&
+		!opts->recreate_merges;
 	free(replay.gpg_sign);
 	replay.gpg_sign = xstrdup_or_null(opts->gpg_sign_opt);
 	replay.reflog_action = xstrdup(opts->reflog_action);
@@ -789,12 +792,24 @@ static int run_specific_rebase(struct rebase_options *opts)
 
 static void parse_rebase_merges_value(struct rebase_options *options, const char *value)
 {
-	if (!strcmp("no-rebase-cousins", value))
-		options->rebase_cousins = 0;
-	else if (!strcmp("rebase-cousins", value))
-		options->rebase_cousins = 1;
-	else
-		die(_("Unknown rebase-merges mode: %s"), value);
+	struct string_list modes = STRING_LIST_INIT_DUP;
+
+	options->rebase_cousins = 0;
+	options->recreate_merges = 0;
+	string_list_split(&modes, value, ",", -1);
+	for (size_t i = 0; i < modes.nr; i++) {
+		const char *mode = modes.items[i].string;
+
+		if (!strcmp("no-rebase-cousins", mode))
+			options->rebase_cousins = 0;
+		else if (!strcmp("rebase-cousins", mode))
+			options->rebase_cousins = 1;
+		else if (!strcmp("recreate", mode))
+			options->recreate_merges = 1;
+		else
+			die(_("Unknown rebase-merges mode: %s"), mode);
+	}
+	string_list_clear(&modes, 0);
 }
 
 static int rebase_config(const char *var, const char *value,
@@ -834,6 +849,7 @@ static int rebase_config(const char *var, const char *value,
 			parse_rebase_merges_value(opts, value);
 		} else {
 			opts->rebase_cousins = 0;
+			opts->recreate_merges = 0;
 		}
 		return 0;
 	}
@@ -1045,6 +1061,7 @@ static int parse_opt_rebase_merges(const struct option *opt, const char *arg, in
 
 	options->rebase_merges = !unset;
 	options->rebase_cousins = 0;
+	options->recreate_merges = 0;
 
 	if (arg) {
 		if (!*arg) {

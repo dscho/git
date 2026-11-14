@@ -6,7 +6,7 @@
 test_description='git rebase -i --rebase-merges
 
 This test runs git rebase "interactively", retaining the branch structure by
-recreating merge commits.
+replaying merge commits.
 
 Initial setup:
 
@@ -672,7 +672,7 @@ test_expect_success 'setup for replaying merge resolutions' '
 	EOF
 '
 
-test_expect_failure 'merge replay retains resolutions on --continue' '
+test_expect_success 'merge replay retains resolutions on --continue' '
 	test_when_finished \
 		"test_might_fail git -C replay-merges rebase --abort" &&
 	(
@@ -690,7 +690,7 @@ test_expect_failure 'merge replay retains resolutions on --continue' '
 	)
 '
 
-test_expect_failure 'merge replay handles unchanged parent trees' '
+test_expect_success 'merge replay handles unchanged parent trees' '
 	test_when_finished \
 		"test_might_fail git -C replay-merges rebase --abort" &&
 	(
@@ -701,7 +701,7 @@ test_expect_failure 'merge replay handles unchanged parent trees' '
 	)
 '
 
-test_expect_failure 'merge replay reports new conflicts and can continue' '
+test_expect_success 'merge replay reports new conflicts and can continue' '
 	test_when_finished \
 		"test_might_fail git -C replay-merges rebase --abort" &&
 	(
@@ -729,7 +729,7 @@ test_expect_failure 'merge replay reports new conflicts and can continue' '
 	)
 '
 
-test_expect_failure 'merge replay retains edits when a parent is upstream' '
+test_expect_success 'merge replay retains edits when a parent is upstream' '
 	test_when_finished \
 		"test_might_fail git -C replay-merges rebase --abort" &&
 	(
@@ -803,13 +803,13 @@ test_expect_success 'merge replay exposes inner conflicts in dir/a' '
 	(cd replay-merges && check_inner_conflict I_M dir/a)
 '
 
-test_expect_failure 'merge replay exposes inner conflicts after a rename' '
+test_expect_success 'merge replay exposes inner conflicts after a rename' '
 	test_when_finished \
 		"test_might_fail git -C replay-merges rebase --abort" &&
 	(cd replay-merges && check_inner_conflict I_R renamed/a)
 '
 
-test_expect_failure 'merge replay keeps old resolutions with new conflicts' '
+test_expect_success 'merge replay keeps old resolutions with new conflicts' '
 	test_when_finished \
 		"test_might_fail git -C replay-merges rebase --abort" &&
 	(
@@ -857,7 +857,7 @@ test_expect_success 'merge replay drops an obsolete resolution cleanly' '
 	)
 '
 
-test_expect_failure 'merge replay exposes changes to old conflict inputs' '
+test_expect_success 'merge replay exposes changes to old conflict inputs' '
 	test_when_finished \
 		"test_might_fail git -C replay-merges rebase --abort" &&
 	(
@@ -872,6 +872,57 @@ test_expect_failure 'merge replay exposes changes to old conflict inputs' '
 		test_cmp_rev :1:a X_A:a &&
 		test_cmp_rev :2:a X_F:a &&
 		test_cmp_rev :3:a X_D:a
+	)
+'
+
+test_expect_success 'recreate mode does not reuse merge resolutions' '
+	test_when_finished "git -C replay-merges rebase --abort" &&
+	(
+		cd replay-merges &&
+		test_must_fail git rebase --rebase-merges=recreate \
+			--onto onto base merged &&
+		test_path_is_missing .git/rebase-merge/replay-merges &&
+		test_path_is_file .git/MERGE_HEAD &&
+		test_grep "^<<<<<<< " a &&
+		test_grep ! manual-edit a
+	)
+'
+
+test_expect_success 'recreate configuration persists and can be overridden' '
+	test_when_finished \
+		"test_might_fail git -C replay-merges rebase --abort" &&
+	(
+		cd replay-merges &&
+		GIT_SEQUENCE_EDITOR="\"$PWD/../break-before-merges.sh\"" \
+			git -c rebase.rebaseMerges=recreate rebase -i \
+			--onto onto base M2 &&
+		test_path_is_missing .git/rebase-merge/replay-merges &&
+		git rebase --continue &&
+		test_must_fail git cat-file -e HEAD:d &&
+		test_cmp_rev HEAD:b onto:b &&
+		git -c rebase.rebaseMerges=recreate rebase -r \
+			--onto onto base M2 &&
+		test_cmp_rev HEAD:d M2:d
+	)
+'
+
+test_expect_success 'recreate combines with cousin modes in either order' '
+	test_when_finished \
+		"test_might_fail git -C replay-merges rebase --abort" &&
+	(
+		cd replay-merges &&
+		git rebase --rebase-merges=recreate --onto onto left M2 &&
+		test_cmp_rev HEAD^2 S &&
+		test_must_fail git cat-file -e HEAD:d &&
+		for mode in recreate,rebase-cousins rebase-cousins,recreate
+		do
+			git rebase --rebase-merges="$mode" \
+				--onto onto left M2 &&
+			test_cmp_rev HEAD^ onto &&
+			test_cmp_rev HEAD^2^ onto &&
+			test_must_fail git cat-file -e HEAD:d ||
+			exit 1
+		done
 	)
 '
 
