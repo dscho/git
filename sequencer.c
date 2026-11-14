@@ -31,6 +31,7 @@
 #include "merge-ort.h"
 #include "merge-ort-wrappers.h"
 #include "refs.h"
+#include "replay.h"
 #include "sparse-index.h"
 #include "strvec.h"
 #include "quote.h"
@@ -210,6 +211,7 @@ static GIT_PATH_FUNC(rebase_path_reschedule_failed_exec, "rebase-merge/reschedul
 static GIT_PATH_FUNC(rebase_path_no_reschedule_failed_exec, "rebase-merge/no-reschedule-failed-exec")
 static GIT_PATH_FUNC(rebase_path_drop_redundant_commits, "rebase-merge/drop_redundant_commits")
 static GIT_PATH_FUNC(rebase_path_keep_redundant_commits, "rebase-merge/keep_redundant_commits")
+static GIT_PATH_FUNC(rebase_path_replay_merges, "rebase-merge/replay-merges")
 static GIT_PATH_FUNC(rebase_path_trailer, "rebase-merge/trailer")
 
 /*
@@ -3347,6 +3349,8 @@ static int read_populate_opts(struct replay_opts *opts)
 		if (file_exists(rebase_path_keep_redundant_commits()))
 			opts->keep_redundant_commits = 1;
 
+		opts->replay_merges = file_exists(rebase_path_replay_merges());
+
 		read_strategy_opts(opts, &buf);
 
 		if (read_trailers(opts, &buf)) {
@@ -3446,6 +3450,8 @@ int write_basic_state(struct replay_opts *opts, const char *head_name,
 		write_file(rebase_path_drop_redundant_commits(), "%s", "");
 	if (opts->keep_redundant_commits)
 		write_file(rebase_path_keep_redundant_commits(), "%s", "");
+	if (opts->replay_merges)
+		write_file(rebase_path_replay_merges(), "%s", "");
 	if (opts->committer_date_is_author_date)
 		write_file(rebase_path_cdate_is_adate(), "%s", "");
 	if (opts->ignore_date)
@@ -4211,6 +4217,7 @@ static int do_merge(struct repository *r,
 	int run_commit_flags = 0;
 	struct strbuf ref_name = STRBUF_INIT;
 	struct commit *head_commit, *merge_commit, *i;
+	struct commit *replayed = NULL;
 	struct commit_list *bases = NULL, *j;
 	struct commit_list *to_merge = NULL, **tail = &to_merge;
 	const char *strategy = !opts->xopts.nr &&
@@ -4218,8 +4225,10 @@ static int do_merge(struct repository *r,
 		 !strcmp(opts->strategy, "recursive") ||
 		 !strcmp(opts->strategy, "ort")) ?
 		NULL : opts->strategy;
-	struct merge_options o;
+	struct merge_options o = { 0 };
+	struct merge_result result = { .clean = 1 };
 	int merge_arg_len, oneline_offset, can_fast_forward, ret, k;
+	int replay_merge;
 	static struct lock_file lock;
 	const char *p;
 	const char *reflog_action = reflog_message(opts, "merge", NULL);
@@ -4430,21 +4439,19 @@ static int do_merge(struct repository *r,
 	}
 
 	merge_commit = to_merge->item;
+	replay_merge = opts->replay_merges && commit && commit->parents &&
+		commit->parents->next && !commit->parents->next->next;
 	if (repo_get_merge_bases(r, head_commit, merge_commit, &bases) < 0) {
 		ret = -1;
 		goto leave_merge;
 	}
 
-	if (bases && oideq(&merge_commit->object.oid,
+	if (!replay_merge && bases && oideq(&merge_commit->object.oid,
 			   &bases->item->object.oid)) {
 		ret = 0;
 		/* skip merging an ancestor of HEAD */
 		goto leave_merge;
 	}
-
-	write_message(oid_to_hex(&merge_commit->object.oid), the_hash_algo->hexsz,
-		      git_path_merge_head(r), 0);
-	write_message("no-ff", 5, git_path_merge_mode(r), 0);
 
 	bases = commit_list_reverse(bases);
 
@@ -4454,16 +4461,45 @@ static int do_merge(struct repository *r,
 	o.branch2 = ref_name.buf;
 	o.buffer_output = 2;
 
-	/*
-	 * TODO: Should use merge_incore_recursive() and
-	 * merge_switch_to_result(), skipping the call to
-	 * merge_switch_to_result() when we don't actually need to
-	 * update the index and working copy immediately.
-	 */
-	ret = merge_ort_recursive(&o, head_commit, merge_commit, bases, &i);
+	if (replay_merge) {
+		if (index_differs_from(r, "HEAD", NULL, 0)) {
+			ret = error_dirty_index(r, opts);
+			goto leave_merge;
+		}
+
+		replayed = pick_merge_commit(r, commit, head_commit,
+					    merge_commit, &o, &result);
+
+		if (replayed && bases &&
+		    oideq(&merge_commit->object.oid,
+			  &bases->item->object.oid) &&
+		    oideq(&repo_get_commit_tree(r, head_commit)->object.oid,
+			  &repo_get_commit_tree(r, replayed)->object.oid)) {
+			ret = 0;
+			goto leave_merge;
+		}
+	}
+
+	write_message(oid_to_hex(&merge_commit->object.oid),
+		      the_hash_algo->hexsz, git_path_merge_head(r), 0);
+	write_message("no-ff", 5, git_path_merge_mode(r), 0);
+
+	if (!replay_merge)
+		ret = merge_ort_recursive(&o, head_commit, merge_commit,
+					  bases, &i);
+	else if (replayed) {
+		rollback_lock_file(&lock);
+		ret = checkout_fast_forward(r, &head_commit->object.oid,
+					    &replayed->object.oid, 1) ? -1 : 1;
+	} else if (result.clean)
+		ret = -1;
+	else {
+		merge_switch_to_result(&o, repo_get_commit_tree(r, head_commit),
+				       &result, 1, 1);
+		ret = result.clean;
+	}
 	if (ret <= 0)
 		fputs(o.obuf.buf, stdout);
-	strbuf_release(&o.obuf);
 	if (ret < 0) {
 		error(_("could not even attempt to merge '%.*s'"),
 		      merge_arg_len, arg);
@@ -4480,7 +4516,7 @@ static int do_merge(struct repository *r,
 	 */
 	ret = !ret;
 
-	if (r->index->cache_changed &&
+	if (!replayed && r->index->cache_changed &&
 	    write_locked_index(r->index, &lock, COMMIT_LOCK)) {
 		ret = error(_("merge: Unable to write new index file"));
 		goto leave_merge;
@@ -4508,6 +4544,8 @@ static int do_merge(struct repository *r,
 
 
 leave_merge:
+	merge_finalize(&o, &result);
+	strbuf_release(&o.obuf);
 	strbuf_release(&ref_name);
 	rollback_lock_file(&lock);
 	commit_list_free(to_merge);
