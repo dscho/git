@@ -641,4 +641,115 @@ test_expect_success 'reword fast-forwarded empty merge commit' '
 	EOF
 '
 
+test_expect_success 'setup for replaying merge resolutions' '
+	test_create_repo replay-merges &&
+	(
+		cd replay-merges &&
+		test-tool historian <<-\EOF &&
+		blob a0 line1 line2 line3 line4 line5
+		blob al line1 main line3 line4 line5
+		blob ar line1 topic line3 line4 line5
+		blob am line1 resolution line3 line4 manual-edit
+		blob extra upstream
+		blob af line1 line2 line3 line4 upstream-edit
+		commit base main base a:a0
+		commit left main left parent=base a:al
+		commit right side right parent=base a:ar
+		commit merged main merge parent=left parent=right a:am
+		commit onto target onto parent=base a:a0 b:extra
+		commit S clean-side S parent=base a:a0 c:extra
+		commit M2 clean M2 parent=left parent=S a:al c:extra d:extra
+		commit conflict target-conflict conflict parent=base a:af
+		EOF
+		git read-tree -mu HEAD
+	) &&
+	write_script break-before-merges.sh <<-\EOF
+	{
+		echo break &&
+		cat "$1"
+	} >"$1.new" &&
+	mv "$1.new" "$1"
+	EOF
+'
+
+test_expect_failure 'merge replay retains resolutions on --continue' '
+	test_when_finished \
+		"test_might_fail git -C replay-merges rebase --abort" &&
+	(
+		cd replay-merges &&
+		GIT_SEQUENCE_EDITOR="\"$PWD/../break-before-merges.sh\"" \
+			git rebase -ir --onto onto base merged &&
+		test_path_is_file .git/rebase-merge/replay-merges &&
+		git rebase --continue &&
+		test_cmp_rev HEAD:a merged:a &&
+		test_cmp_rev HEAD:b onto:b &&
+		test_cmp_rev HEAD^:a left:a &&
+		test_cmp_rev HEAD^2:a right:a &&
+		test_cmp_rev HEAD^:b onto:b &&
+		test_cmp_rev HEAD^2:b onto:b
+	)
+'
+
+test_expect_failure 'merge replay handles unchanged parent trees' '
+	test_when_finished \
+		"test_might_fail git -C replay-merges rebase --abort" &&
+	(
+		cd replay-merges &&
+		git rebase -r --signoff base merged &&
+		test_cmp_rev ! HEAD merged &&
+		test_cmp_rev HEAD^{tree} merged^{tree}
+	)
+'
+
+test_expect_failure 'merge replay reports new conflicts and can continue' '
+	test_when_finished \
+		"test_might_fail git -C replay-merges rebase --abort" &&
+	(
+		cd replay-merges &&
+		test_must_fail git rebase -r --onto conflict \
+			base merged >out 2>err &&
+		test_grep CONFLICT out &&
+		test_path_is_file .git/MERGE_HEAD &&
+		test_cmp_rev :1:a conflict:a &&
+		test_cmp_rev :2:a HEAD:a &&
+		test_cmp_rev :3:a MERGE_HEAD:a &&
+		git diff -- a >diff &&
+		test_grep -F "++<<<<<<< " diff &&
+		test_grep manual-edit a &&
+		test_grep upstream-edit a &&
+		echo resolved >a &&
+		git add a &&
+		git rebase --continue &&
+		test_cmp_rev HEAD^2^ conflict &&
+		test_path_is_missing .git/MERGE_HEAD &&
+		test_path_is_missing .git/rebase-merge &&
+		echo resolved >expect &&
+		git show HEAD:a >actual &&
+		test_cmp expect actual
+	)
+'
+
+test_expect_failure 'merge replay retains edits when a parent is upstream' '
+	test_when_finished \
+		"test_might_fail git -C replay-merges rebase --abort" &&
+	(
+		cd replay-merges &&
+		git rebase -r --onto S base M2 &&
+		test_cmp_rev HEAD:d M2:d &&
+		test_cmp_rev HEAD^^ S &&
+		test_cmp_rev HEAD^2 S
+	)
+'
+
+test_expect_success 'strategy options still recreate merge resolutions' '
+	test_when_finished \
+		"test_might_fail git -C replay-merges rebase --abort" &&
+	(
+		cd replay-merges &&
+		git rebase -r -Xours --onto onto base merged &&
+		test_cmp_rev HEAD:a left:a &&
+		test_cmp_rev HEAD:b onto:b
+	)
+'
+
 test_done
