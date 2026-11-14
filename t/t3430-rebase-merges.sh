@@ -752,4 +752,127 @@ test_expect_success 'strategy options still recreate merge resolutions' '
 	)
 '
 
+test_expect_success 'setup for replaying conflicts in the same file' '
+	(
+		cd replay-merges &&
+		test-tool historian <<-\EOF
+		blob i0 base
+		blob i1 side
+		blob i2 onto
+		commit I_A main A dir/a:i0
+		commit I_C main C parent=I_A dir/a:i0 misc:i0
+		commit I_D side D parent=I_A dir/a:i1
+		commit I_M main M parent=I_C parent=I_D dir/a:i1 misc:i0
+		commit I_R renamed R parent=I_C parent=I_D renamed/a:i1 misc:i0
+		commit I_E target E parent=I_A dir/a:i2
+
+		blob x0 1 old-base 3 4 5 6 7 8 9 new-base 11 12
+		blob xl 1 old-left 3 4 5 6 7 8 9 new-base 11 12
+		blob xd 1 old-right 3 4 5 6 7 8 9 new-side 11 12
+		blob xm 1 old-done 3 4 5 6 7 8 9 new-side 11 12
+		blob xe 1 old-left 3 4 5 6 7 8 9 new-onto 11 12
+		blob xf 1 old-updated 3 4 5 6 7 8 9 new-base 11 12
+		commit X_A main A a:x0
+		commit X_C main C parent=X_A a:xl
+		commit X_D side D parent=X_A a:xd
+		commit X_M main M parent=X_C parent=X_D a:xm
+		commit X_E target E parent=X_C a:xe
+		commit X_P incorporated P parent=X_D a:xm
+		commit X_F changed F parent=X_C a:xf
+		EOF
+	)
+'
+
+check_inner_conflict () {
+	test_must_fail git rebase -r --onto I_E I_C "$1" &&
+	test_cmp_rev HEAD I_E &&
+	test_path_is_file .git/MERGE_HEAD &&
+	git ls-files -u >unmerged &&
+	test_line_count = 3 unmerged &&
+	git diff -- "$2" >diff &&
+	test_grep -F "++<<<<<<< " diff &&
+	test_cmp_rev ":1:$2" I_A:dir/a &&
+	test_cmp_rev ":2:$2" I_E:dir/a &&
+	test_cmp_rev ":3:$2" I_D:dir/a &&
+	test_grep "^<<<<<<< " "$2"
+}
+
+test_expect_success 'merge replay exposes inner conflicts in dir/a' '
+	test_when_finished \
+		"test_might_fail git -C replay-merges rebase --abort" &&
+	(cd replay-merges && check_inner_conflict I_M dir/a)
+'
+
+test_expect_failure 'merge replay exposes inner conflicts after a rename' '
+	test_when_finished \
+		"test_might_fail git -C replay-merges rebase --abort" &&
+	(cd replay-merges && check_inner_conflict I_R renamed/a)
+'
+
+test_expect_failure 'merge replay keeps old resolutions with new conflicts' '
+	test_when_finished \
+		"test_might_fail git -C replay-merges rebase --abort" &&
+	(
+		cd replay-merges &&
+		test_must_fail git rebase -r --onto X_E X_C X_M >out 2>err &&
+		test_grep CONFLICT out &&
+		test_path_is_file .git/MERGE_HEAD &&
+		test_cmp_rev HEAD X_E &&
+		test_grep "^old-done$" a &&
+		test_grep ! "^old-left$" a &&
+		test_grep ! "^old-right$" a &&
+		grep "^<<<<<<< " a >markers &&
+		test_line_count = 1 markers &&
+		git diff -- a >diff &&
+		test_grep -F "++<<<<<<< " diff &&
+		test_cmp_rev :1:a X_A:a &&
+		test_cmp_rev :2:a X_E:a &&
+		test_cmp_rev :3:a X_D:a &&
+		git show X_M:a >a &&
+		git add a &&
+		git rebase --continue &&
+		test_cmp_rev HEAD:a X_M:a &&
+		test_cmp_rev HEAD^ X_E &&
+		test_cmp_rev HEAD^2 X_D &&
+		git ls-files -u >unmerged &&
+		test_must_be_empty unmerged &&
+		test_path_is_missing .git/MERGE_HEAD &&
+		test_path_is_missing .git/rebase-merge
+	)
+'
+
+test_expect_success 'merge replay drops an obsolete resolution cleanly' '
+	test_when_finished \
+		"test_might_fail git -C replay-merges rebase --abort" &&
+	(
+		cd replay-merges &&
+		git rebase -r --onto X_P X_C X_M &&
+		test_cmp_rev HEAD X_P &&
+		test_cmp_rev HEAD:a X_M:a &&
+		git ls-files -u >unmerged &&
+		test_must_be_empty unmerged &&
+		git diff --exit-code &&
+		git diff --cached --exit-code &&
+		test_path_is_missing .git/rebase-merge
+	)
+'
+
+test_expect_failure 'merge replay exposes changes to old conflict inputs' '
+	test_when_finished \
+		"test_might_fail git -C replay-merges rebase --abort" &&
+	(
+		cd replay-merges &&
+		test_must_fail git rebase -r --onto X_F X_C X_M &&
+		test_cmp_rev HEAD X_F &&
+		test_grep "^old-done$" a &&
+		test_grep "^old-updated$" a &&
+		test_grep "^old-right$" a &&
+		git diff -- a >diff &&
+		test_grep -F "++<<<<<<< " diff &&
+		test_cmp_rev :1:a X_A:a &&
+		test_cmp_rev :2:a X_F:a &&
+		test_cmp_rev :3:a X_D:a
+	)
+'
+
 test_done
