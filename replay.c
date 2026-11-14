@@ -387,12 +387,12 @@ static void release_replay_intervals_strmap(struct strmap *map)
  * N (automatic rewritten merge), using R as the base.
  * See Documentation/technical/replay-design.adoc.
  */
-static struct commit *pick_merge_commit(struct repository *repo,
-					struct commit *pickme,
-					struct commit *replayed_parent1,
-					struct commit *replayed_parent2,
-					struct merge_options *merge_opt,
-					struct merge_result *result)
+struct commit *pick_merge_commit(struct repository *repo,
+				struct commit *pickme,
+				struct commit *replayed_parent1,
+				struct commit *replayed_parent2,
+				struct merge_options *merge_opt,
+				struct merge_result *result)
 {
 	struct commit *parent1 = pickme->parents->item;
 	struct commit *parent2 = pickme->parents->next->item;

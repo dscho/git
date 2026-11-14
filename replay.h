@@ -3,8 +3,18 @@
 
 #include "hash.h"
 
+struct commit;
+struct merge_options;
+struct merge_result;
 struct repository;
 struct rev_info;
+
+struct commit *pick_merge_commit(struct repository *repo,
+				struct commit *pickme,
+				struct commit *replayed_parent1,
+				struct commit *replayed_parent2,
+				struct merge_options *merge_opt,
+				struct merge_result *result);
 
 /*
  * Controls what happens when a replayed commit becomes empty (i.e. its tree
