@@ -23,7 +23,10 @@ concurrency:
 jobs:
   ci-config:
     name: config
-    if: vars.CI_BRANCHES == '' || contains(vars.CI_BRANCHES, github.ref_name)
+    # Skip the other jobs for this diagnostic run.
+    if: >-
+      (github.head_ref || github.ref_name) != 'ci-reftable-leaks-diagnostics' &&
+      (vars.CI_BRANCHES == '' || contains(vars.CI_BRANCHES, github.ref_name))
     runs-on: ubuntu-latest
     outputs:
       enabled: ${{ steps.check-ref.outputs.enabled }}${{ steps.skip-if-redundant.outputs.enabled }}
@@ -393,52 +396,22 @@ jobs:
     - run: ci/run-build-and-minimal-fuzzers.sh
   dockerized:
     name: ${{matrix.vector.jobname}} (${{matrix.vector.image}})
-    needs: ci-config
-    if: needs.ci-config.outputs.enabled == 'yes'
     concurrency:
       group: dockerized-${{ matrix.vector.jobname }}-${{ matrix.vector.image }}-${{ github.ref }}
-      cancel-in-progress: ${{ needs.ci-config.outputs.skip_concurrent == 'yes' }}
+      cancel-in-progress: false
     strategy:
       fail-fast: false
       matrix:
         vector:
-        - jobname: linux-sha256
-          image: ubuntu:rolling
-          cc: clang
-        - jobname: linux-feature-testbed
-          image: ubuntu:latest
-        - jobname: linux-breaking-changes
-          cc: gcc
-          image: ubuntu:rolling
-        - jobname: fedora-breaking-changes-meson
-          image: fedora:latest
-        - jobname: linux-leaks
-          image: ubuntu:rolling
-          cc: gcc
         - jobname: linux-reftable-leaks
           image: ubuntu:rolling
           cc: gcc
-        - jobname: linux-asan-ubsan
-          image: ubuntu:rolling
-          cc: clang
-        - jobname: linux-meson
-          image: ubuntu:rolling
-          cc: gcc
-        - jobname: linux-musl-meson
-          image: alpine:latest
-        - jobname: linux32
-          image: i386/debian:latest
-        # A RHEL 8 compatible distro.  Supported until 2029-05-31.
-        - jobname: almalinux-8
-          image: almalinux:8
-        # Supported until 2028-06-30.
-        - jobname: debian-12
-          image: debian:12
     env:
       jobname: ${{matrix.vector.jobname}}
       CC: ${{matrix.vector.cc}}
       CI_JOB_IMAGE: ${{matrix.vector.image}}
       CUSTOM_PATH: /custom
+      GIT_TEST_LONG: 'true'
     runs-on: >-
       ${{ matrix.vector.jobname == 'linux32'
           && 'ubuntu-24.04' || 'ubuntu-latest' }}
@@ -467,7 +440,12 @@ jobs:
     - run: ci/install-dependencies.sh
     - run: useradd builder --create-home
     - run: chown -R builder .
-    - run: chmod a+w $GITHUB_ENV && sudo --preserve-env --set-home --user=builder ci/run-build-and-tests.sh
+    - run: >-
+        chmod a+w $GITHUB_ENV &&
+        sudo --preserve-env --set-home --user=builder
+        ci/run-build-and-tests.sh
+        T="t1007-hash-object.sh t7508-status.sh t7900-maintenance.sh"
+        UNIT_TESTS=
     - name: print test failures
       if: failure() && env.FAILED_TEST_ARTIFACTS != ''
       run: sudo --preserve-env --set-home --user=builder ci/print-test-failures.sh
@@ -477,6 +455,13 @@ jobs:
       with:
         name: failed-tests-${{matrix.vector.jobname}}
         path: ${{env.FAILED_TEST_ARTIFACTS}}
+    - name: Upload leak-check logs
+      if: failure() || cancelled()
+      # v7
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      with:
+        name: test-logs-${{matrix.vector.jobname}}-${{github.run_attempt}}
+        path: t/test-results
   static-analysis:
     needs: ci-config
     if: needs.ci-config.outputs.enabled == 'yes'
