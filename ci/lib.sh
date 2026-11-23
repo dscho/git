@@ -49,6 +49,7 @@ group () {
 		"$@" 2>&1
 		echo $? >exit.status
 	) |
+	stdbuf -oL \
 	sed 's/^\(\([^ ]*\):\([0-9]*\):\([0-9]*:\) \)\(error\|warning\): /::\5 file=\2,line=\3::\1/'
 	res=$(cat exit.status)
 	rm exit.status
