@@ -3,39 +3,14 @@ name: Benchmark parallel checkout thresholds
 on: create
 
 permissions:
+  actions: read
   contents: read
 
 jobs:
-  build:
+  benchmark:
     if: >-
       github.event.ref_type == 'branch' &&
-      github.ref == 'refs/heads/benchmark-pr-6469-threshold'
-    runs-on: windows-2022
-    steps:
-    - uses: actions/checkout@v7
-    - uses: git-for-windows/setup-git-for-windows-sdk@v2
-      with:
-        architecture: x86_64
-    - name: Install Rust target
-      shell: bash
-      run: |
-        set -o pipefail
-        rustup target add x86_64-pc-windows-gnu </dev/null 2>&1 |
-          tee benchmark-rustup.log
-    - name: Build Git
-      shell: bash
-      run: |
-        set -o pipefail
-        make -j4 NO_PERL=1 git.exe </dev/null 2>&1 |
-          tee benchmark-build.log
-    - uses: actions/upload-artifact@v7
-      with:
-        name: benchmark-git
-        path: git.exe
-        if-no-files-found: error
-
-  benchmark:
-    needs: build
+      github.ref == 'refs/heads/benchmark-pr-6469-retry-46086154452'
     strategy:
       fail-fast: false
       matrix:
@@ -50,6 +25,8 @@ jobs:
       with:
         name: benchmark-git
         path: ${{ github.workspace }}
+        github-token: ${{ github.token }}
+        run-id: 46086154452
     - name: Record environment
       shell: pwsh
       run: |

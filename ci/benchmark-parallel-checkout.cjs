@@ -34,14 +34,16 @@ const globalConfig = path.join(root, 'empty-config');
 fs.writeFileSync(globalConfig, '');
 
 const env = { ...process.env };
+const pathKeys = Object.keys(env).filter(key => /^PATH$/i.test(key));
+console.log(`Inherited PATH keys: ${pathKeys.join(', ')}`);
 for (const key of Object.keys(env)) {
-	if (/^GIT_/i.test(key))
+	if (/^GIT_/i.test(key) || /^PATH$/i.test(key))
 		delete env[key];
 }
 env.GIT_CONFIG_NOSYSTEM = '1';
 env.GIT_CONFIG_GLOBAL = globalConfig;
 env.GIT_EXEC_PATH = path.dirname(gitPath);
-env.PATH = path.dirname(gitPath) + path.delimiter + env.PATH;
+env.PATH = path.dirname(gitPath) + path.delimiter + process.env.PATH;
 env.LC_ALL = 'C';
 
 function git(args, extraEnv) {
@@ -55,8 +57,8 @@ function git(args, extraEnv) {
 	if (result.error)
 		throw result.error;
 	if (result.status !== 0)
-		throw new Error(`git ${args.join(' ')} failed: ` +
-				result.stderr);
+		throw new Error(`git ${args.join(' ')} failed ` +
+				`(${result.status}): ${result.stderr}`);
 	return result.stdout.trim();
 }
 
