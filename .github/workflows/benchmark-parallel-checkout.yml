@@ -1,0 +1,102 @@
+name: Benchmark parallel checkout thresholds
+
+on: create
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    if: >-
+      github.event.ref_type == 'branch' &&
+      github.ref == 'refs/heads/benchmark-pr-6469-threshold'
+    runs-on: windows-2022
+    steps:
+    - uses: actions/checkout@v7
+    - uses: git-for-windows/setup-git-for-windows-sdk@v2
+      with:
+        architecture: x86_64
+    - name: Install Rust target
+      shell: bash
+      run: |
+        set -o pipefail
+        rustup target add x86_64-pc-windows-gnu </dev/null 2>&1 |
+          tee benchmark-rustup.log
+    - name: Build Git
+      shell: bash
+      run: |
+        set -o pipefail
+        make -j4 NO_PERL=1 git.exe </dev/null 2>&1 |
+          tee benchmark-build.log
+    - uses: actions/upload-artifact@v7
+      with:
+        name: benchmark-git
+        path: git.exe
+        if-no-files-found: error
+
+  benchmark:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, windows-2025]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v7
+    - uses: git-for-windows/setup-git-for-windows-sdk@v2
+      with:
+        architecture: x86_64
+    - uses: actions/download-artifact@v8
+      with:
+        name: benchmark-git
+        path: ${{ github.workspace }}
+    - name: Record environment
+      shell: pwsh
+      run: |
+        $status = if (Get-Command Get-MpComputerStatus -ErrorAction Ignore) {
+          Get-MpComputerStatus -ErrorAction Continue |
+            Select-Object AMRunningMode,AntivirusEnabled,
+              RealTimeProtectionEnabled
+        } else { 'not available' }
+        $preferences = if (Get-Command Get-MpPreference -ErrorAction Ignore) {
+          Get-MpPreference -ErrorAction Continue |
+            Select-Object ExclusionPath,ExclusionProcess,ExclusionExtension
+        } else { 'not available' }
+        [ordered]@{
+          image = $env:ImageOS
+          imageVersion = $env:ImageVersion
+          workspace = $env:GITHUB_WORKSPACE
+          windows = Get-CimInstance Win32_OperatingSystem |
+            Select-Object Caption,Version,BuildNumber
+          processors = @(Get-CimInstance Win32_Processor |
+            Select-Object Name,NumberOfCores,NumberOfLogicalProcessors)
+          processorCount = [Environment]::ProcessorCount
+          processAffinity = '{0:x}' -f
+            (Get-Process -Id $PID).ProcessorAffinity.ToInt64()
+          volumes = @(Get-Volume | Where-Object DriveLetter |
+            Select-Object DriveLetter,FileSystem,DriveType,Size,SizeRemaining)
+          defender = $status
+          defenderExclusions = $preferences
+          nodeVersion = node.exe --version
+          gitVersion = & .\git.exe --version --build-options
+          gitSha256 = (Get-FileHash .\git.exe -Algorithm SHA256).Hash
+        } | ConvertTo-Json -Depth 5 |
+          Tee-Object -FilePath benchmark-environment.json
+    - name: Measure checkouts
+      shell: pwsh
+      run: |
+        $command = 'node.exe "ci\benchmark-parallel-checkout.cjs"'
+        $command += ' "%GITHUB_WORKSPACE%\git.exe"'
+        $command += ' "%GITHUB_WORKSPACE%\benchmark-data" < NUL 2>&1'
+        & $env:ComSpec /c $command |
+          Tee-Object -FilePath benchmark-results.log
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    - uses: actions/upload-artifact@v7
+      if: always()
+      with:
+        name: benchmark-results-${{ matrix.os }}
+        path: |
+          benchmark-environment.json
+          benchmark-results.log
+          benchmark-data\output
+        if-no-files-found: warn
